@@ -1,10 +1,10 @@
 # Project Status
 
 ## Last Completed
-- ENV-018: Add variable interpolation support for `${VAR}` and `$VAR` in .env values [iter-10]
+- ENV-020: Defined .envref.yaml schema with Config, BackendConfig, ProfileConfig types and Viper-based loader [iter-11]
 
 ## Current State
-- Go module `github.com/xcke/envref` initialized with Cobra dependency
+- Go module `github.com/xcke/envref` initialized with Cobra + Viper dependencies
 - Root command with help text describing envref's purpose
 - `envref version` subcommand prints version (set via `-ldflags` at build time)
 - `envref get <KEY>` command loads `.env` + `.env.local`, merges, interpolates, prints value
@@ -27,17 +27,24 @@
   - Variables resolve against earlier definitions in the same env (order-dependent)
   - Undefined variables expand to empty string; `$$` produces literal `$`
   - Applied automatically in `get` and `list` commands after merge
+- `.envref.yaml` config schema (`internal/config`):
+  - `Config` struct: project name, env_file, local_file, backends, profiles
+  - `BackendConfig`: name, type, config map for backend-specific settings
+  - `ProfileConfig`: per-profile env_file override
+  - Viper-based loader with defaults (env_file=".env", local_file=".env.local")
+  - Project root discovery: walks up directory tree to find `.envref.yaml`
+  - Validation: required project name, no duplicate backends, non-empty paths
 - `.env` file parser (`internal/parser`) with:
   - Full quote/multiline/comment support (single, double, backtick quotes)
   - UTF-8 BOM detection and stripping, CRLF normalization
   - Trailing whitespace trimming, duplicate key detection with warnings
-  - `QuoteStyle` tracking on entries (QuoteNone, QuoteSingle, QuoteDouble, QuoteBacktick)
+  - `QuoteStyle` tracking on entries
 - `.env` file loader, merger, and writer (`internal/envfile`) with:
   - `Load`, `LoadOptional`, `Merge`, `Write`, `Interpolate`, ordered key storage
   - `Refs()`, `HasRefs()`, `ResolvedRefs()` for ref:// handling
 - `ref://` URI parser (`internal/ref`) with Parse, IsRef, Reference type
 - Makefile with targets: `all`, `build`, `test`, `lint`, `vet`, `check`, `install`, `clean`, `help`
-- Directory structure: `cmd/envref/`, `internal/cmd/`, `internal/parser/`, `internal/envfile/`, `internal/ref/`, `pkg/`
+- Directory structure: `cmd/envref/`, `internal/cmd/`, `internal/parser/`, `internal/envfile/`, `internal/config/`, `internal/ref/`, `pkg/`
 - All checks pass: `go build`, `go vet`, `go test`, `golangci-lint`
 
 ## Known Issues

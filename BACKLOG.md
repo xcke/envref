@@ -38,7 +38,7 @@
 
 ## Phase 2 — Config File (`.envref.yaml`)
 
-- [TODO] P1 | ENV-020 | Define `.envref.yaml` schema (project name, secret backends, profiles)
+- [DONE] P1 | ENV-020 | Define `.envref.yaml` schema (project name, secret backends, profiles)
 - [TODO] P1 | ENV-021 | Implement config loader using Viper (project root discovery via `.envref.yaml`)
 - [TODO] P1 | ENV-022 | Add `envref init` command — scaffold `.envref.yaml`, `.env`, `.envrc`, `.gitignore` entries
 - [TODO] P2 | ENV-023 | Support config inheritance / defaults (global `~/.config/envref/config.yaml` + project-level)
