@@ -27,6 +27,7 @@ from your OS keychain or other secret backends at runtime.`,
 	rootCmd.AddCommand(newVersionCmd())
 	rootCmd.AddCommand(newGetCmd())
 	rootCmd.AddCommand(newSetCmd())
+	rootCmd.AddCommand(newListCmd())
 
 	return rootCmd
 }

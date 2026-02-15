@@ -1,7 +1,7 @@
 # Project Status
 
 ## Last Completed
-- ENV-016: Handle edge cases — BOM stripping, CRLF normalization, duplicate key warnings, trailing whitespace [iter-8]
+- ENV-017: Add `envref list` command — print all key-value pairs, mask ref:// secrets by default [iter-9]
 
 ## Current State
 - Go module `github.com/xcke/envref` initialized with Cobra dependency
@@ -18,21 +18,15 @@
   - Updates existing keys in place; appends new keys
   - Creates the target file if it doesn't exist
   - Auto-quotes values containing spaces, newlines, or special characters
-  - Prints parser warnings to stderr
+- `envref list` command prints all merged key-value pairs
+  - `--file` / `-f` and `--local-file` flags consistent with other commands
+  - `--show-secrets` flag to reveal ref:// values (masked as `ref://***` by default)
 - `.env` file parser (`internal/parser`) with:
   - Full quote/multiline/comment support (single, double, backtick quotes)
-  - UTF-8 BOM detection and stripping on first line
-  - CRLF line ending normalization (strips trailing `\r`)
-  - Trailing whitespace trimming for unquoted values
-  - Duplicate key detection with warnings (last value wins, emits `Warning`)
-  - `Warning` type for non-fatal parse issues
-  - `Parse()` returns `([]Entry, []Warning, error)`
+  - UTF-8 BOM detection and stripping, CRLF normalization
+  - Trailing whitespace trimming, duplicate key detection with warnings
 - `.env` file loader, merger, and writer (`internal/envfile`) with:
-  - `Load(path)` — returns `(*Env, []Warning, error)`
-  - `LoadOptional(path)` — same but returns empty Env if file missing
-  - `Merge(base, overlays...)` — merge multiple Env layers, later overlays win
-  - `Write(path)` — serialize Env to .env file with proper quoting
-  - `Env` type with ordered key storage, Get/Set/Keys/All/Len methods
+  - `Load`, `LoadOptional`, `Merge`, `Write`, ordered key storage
   - `Refs()`, `HasRefs()`, `ResolvedRefs()` for ref:// handling
 - `ref://` URI parser (`internal/ref`) with Parse, IsRef, Reference type
 - Makefile with targets: `all`, `build`, `test`, `lint`, `vet`, `check`, `install`, `clean`, `help`
