@@ -1,7 +1,7 @@
 # Project Status
 
 ## Last Completed
-- ENV-014: Added `envref get <KEY>` command to look up and print a single value [iter-6]
+- ENV-015: Added `envref set <KEY>=<VALUE>` command to write values to .env files [iter-7]
 
 ## Current State
 - Go module `github.com/xcke/envref` initialized with Cobra dependency
@@ -11,14 +11,22 @@
   - `--file` / `-f` flag to specify custom .env path (default `.env`)
   - `--local-file` flag to specify override file path (default `.env.local`)
   - Errors on missing key or missing base .env file; .env.local is optional
-- Unit tests for root command, version subcommand, and get command
+- `envref set <KEY>=<VALUE>` command writes key-value pairs to .env files
+  - `--file` / `-f` flag to specify target .env path (default `.env`)
+  - `--local` flag to write to `.env.local` instead of `.env`
+  - `--local-file` flag to specify .env.local path (default `.env.local`)
+  - Updates existing keys in place; appends new keys
+  - Creates the target file if it doesn't exist
+  - Auto-quotes values containing spaces, newlines, or special characters
+- Unit tests for root command, version, get, and set commands
 - Makefile with targets: `all`, `build`, `test`, `lint`, `vet`, `check`, `install`, `clean`, `help`
 - Build output goes to `build/` directory with embedded version from `git describe`
 - `.env` file parser (`internal/parser`) with full quote/multiline/comment support
-- `.env` file loader and merger (`internal/envfile`) with:
+- `.env` file loader, merger, and writer (`internal/envfile`) with:
   - `Load(path)` — parse .env file from disk into ordered key-value map
   - `LoadOptional(path)` — same as Load but returns empty Env if file missing
   - `Merge(base, overlays...)` — merge multiple Env layers, later overlays win
+  - `Write(path)` — serialize Env to .env file with proper quoting
   - `Env` type with ordered key storage, Get/Set/Keys/All/Len methods
   - `Refs()` — return all entries with ref:// values
   - `HasRefs()` — check if env contains any ref:// references

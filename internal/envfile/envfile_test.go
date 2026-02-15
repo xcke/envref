@@ -595,3 +595,167 @@ func TestLoadAndMergeOptionalLocal(t *testing.T) {
 		t.Errorf("FOO: got %q, want %q", entry.Value, "bar")
 	}
 }
+
+func TestWrite(t *testing.T) {
+	t.Run("writes simple key-value pairs", func(t *testing.T) {
+		dir := t.TempDir()
+		path := filepath.Join(dir, ".env")
+
+		env := NewEnv()
+		env.Set(parser.Entry{Key: "FOO", Value: "bar", Line: 1})
+		env.Set(parser.Entry{Key: "BAZ", Value: "qux", Line: 2})
+
+		if err := env.Write(path); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		content, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("reading file: %v", err)
+		}
+		want := "FOO=bar\nBAZ=qux\n"
+		if string(content) != want {
+			t.Errorf("got %q, want %q", string(content), want)
+		}
+	})
+
+	t.Run("preserves insertion order", func(t *testing.T) {
+		dir := t.TempDir()
+		path := filepath.Join(dir, ".env")
+
+		env := NewEnv()
+		env.Set(parser.Entry{Key: "CHARLIE", Value: "3", Line: 1})
+		env.Set(parser.Entry{Key: "ALPHA", Value: "1", Line: 2})
+		env.Set(parser.Entry{Key: "BRAVO", Value: "2", Line: 3})
+
+		if err := env.Write(path); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		content, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("reading file: %v", err)
+		}
+		want := "CHARLIE=3\nALPHA=1\nBRAVO=2\n"
+		if string(content) != want {
+			t.Errorf("got %q, want %q", string(content), want)
+		}
+	})
+
+	t.Run("quotes values with spaces", func(t *testing.T) {
+		dir := t.TempDir()
+		path := filepath.Join(dir, ".env")
+
+		env := NewEnv()
+		env.Set(parser.Entry{Key: "GREETING", Value: "hello world", Line: 1})
+
+		if err := env.Write(path); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		content, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("reading file: %v", err)
+		}
+		want := "GREETING=\"hello world\"\n"
+		if string(content) != want {
+			t.Errorf("got %q, want %q", string(content), want)
+		}
+	})
+
+	t.Run("escapes newlines in values", func(t *testing.T) {
+		dir := t.TempDir()
+		path := filepath.Join(dir, ".env")
+
+		env := NewEnv()
+		env.Set(parser.Entry{Key: "MULTI", Value: "line1\nline2", Line: 1})
+
+		if err := env.Write(path); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		content, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("reading file: %v", err)
+		}
+		want := "MULTI=\"line1\\nline2\"\n"
+		if string(content) != want {
+			t.Errorf("got %q, want %q", string(content), want)
+		}
+	})
+
+	t.Run("handles empty values", func(t *testing.T) {
+		dir := t.TempDir()
+		path := filepath.Join(dir, ".env")
+
+		env := NewEnv()
+		env.Set(parser.Entry{Key: "EMPTY", Value: "", Line: 1})
+
+		if err := env.Write(path); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		content, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("reading file: %v", err)
+		}
+		want := "EMPTY=\n"
+		if string(content) != want {
+			t.Errorf("got %q, want %q", string(content), want)
+		}
+	})
+
+	t.Run("writes empty env", func(t *testing.T) {
+		dir := t.TempDir()
+		path := filepath.Join(dir, ".env")
+
+		env := NewEnv()
+		if err := env.Write(path); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		content, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("reading file: %v", err)
+		}
+		if string(content) != "" {
+			t.Errorf("got %q, want empty", string(content))
+		}
+	})
+
+	t.Run("roundtrip: write then load", func(t *testing.T) {
+		dir := t.TempDir()
+		path := filepath.Join(dir, ".env")
+
+		original := NewEnv()
+		original.Set(parser.Entry{Key: "SIMPLE", Value: "value", Line: 1})
+		original.Set(parser.Entry{Key: "SPACED", Value: "hello world", Line: 2})
+		original.Set(parser.Entry{Key: "REF", Value: "ref://secrets/key", Line: 3, IsRef: true})
+		original.Set(parser.Entry{Key: "EMPTY", Value: "", Line: 4})
+
+		if err := original.Write(path); err != nil {
+			t.Fatalf("write: %v", err)
+		}
+
+		loaded, err := Load(path)
+		if err != nil {
+			t.Fatalf("load: %v", err)
+		}
+
+		if loaded.Len() != original.Len() {
+			t.Fatalf("len: got %d, want %d", loaded.Len(), original.Len())
+		}
+
+		for _, key := range original.Keys() {
+			orig, _ := original.Get(key)
+			got, ok := loaded.Get(key)
+			if !ok {
+				t.Errorf("key %q missing after roundtrip", key)
+				continue
+			}
+			if got.Value != orig.Value {
+				t.Errorf("key %q: got %q, want %q", key, got.Value, orig.Value)
+			}
+		}
+	})
+}

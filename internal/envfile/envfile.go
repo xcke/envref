@@ -5,6 +5,7 @@ package envfile
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/xcke/envref/internal/parser"
 	"github.com/xcke/envref/internal/ref"
@@ -157,6 +158,55 @@ func Merge(base *Env, overlays ...*Env) *Env {
 	}
 
 	return result
+}
+
+// Write serializes the Env to a .env formatted file at the given path.
+// Entries are written in insertion order, one per line, as KEY=VALUE.
+// Values that contain spaces, quotes, or newlines are double-quoted with
+// appropriate escaping.
+func (e *Env) Write(path string) error {
+	var b strings.Builder
+	for _, key := range e.order {
+		entry := e.entries[key]
+		b.WriteString(key)
+		b.WriteByte('=')
+		b.WriteString(formatValue(entry.Value))
+		b.WriteByte('\n')
+	}
+	return os.WriteFile(path, []byte(b.String()), 0o644)
+}
+
+// formatValue returns the value formatted for a .env file.
+// Simple values are returned as-is. Values containing spaces, newlines,
+// double quotes, or hash characters are wrapped in double quotes with escaping.
+func formatValue(value string) string {
+	if value == "" {
+		return ""
+	}
+	needsQuoting := strings.ContainsAny(value, " \t\n\r\"'`#\\$")
+	if !needsQuoting {
+		return value
+	}
+	var b strings.Builder
+	b.WriteByte('"')
+	for _, ch := range value {
+		switch ch {
+		case '"':
+			b.WriteString(`\"`)
+		case '\\':
+			b.WriteString(`\\`)
+		case '\n':
+			b.WriteString(`\n`)
+		case '\r':
+			b.WriteString(`\r`)
+		case '\t':
+			b.WriteString(`\t`)
+		default:
+			b.WriteRune(ch)
+		}
+	}
+	b.WriteByte('"')
+	return b.String()
 }
 
 // unwrapPathError extracts the underlying error from a wrapped path error,
