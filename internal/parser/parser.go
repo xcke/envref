@@ -13,6 +13,9 @@ import (
 // RefPrefix is the URI scheme prefix for secret references in .env values.
 const RefPrefix = "ref://"
 
+// bom is the UTF-8 Byte Order Mark sequence.
+const bom = "\xEF\xBB\xBF"
+
 // Entry represents a single key-value pair parsed from a .env file.
 type Entry struct {
 	Key   string
@@ -24,6 +27,16 @@ type Entry struct {
 	// IsRef is true when the parsed value starts with "ref://",
 	// indicating it is an unresolved secret reference.
 	IsRef bool
+}
+
+// Warning represents a non-fatal issue detected during parsing.
+type Warning struct {
+	Line    int
+	Message string
+}
+
+func (w Warning) String() string {
+	return fmt.Sprintf("line %d: %s", w.Line, w.Message)
 }
 
 // ParseError represents a parsing error with line context.
@@ -46,14 +59,29 @@ func (e *ParseError) Error() string {
 //   - Comments (lines starting with #, and inline comments for unquoted values)
 //   - Empty lines (skipped)
 //   - Whitespace trimming for unquoted values
-func Parse(r io.Reader) ([]Entry, error) {
+//   - UTF-8 BOM stripping (first line)
+//   - CRLF line ending normalization
+//   - Duplicate key detection (last wins, with warning)
+func Parse(r io.Reader) ([]Entry, []Warning, error) {
 	var entries []Entry
+	var warnings []Warning
+	seen := make(map[string]int) // key -> line number of first occurrence
 	scanner := bufio.NewScanner(r)
 	lineNum := 0
+	firstLine := true
 
 	for scanner.Scan() {
 		lineNum++
 		line := scanner.Text()
+
+		// Strip UTF-8 BOM from the first line.
+		if firstLine {
+			line = strings.TrimPrefix(line, bom)
+			firstLine = false
+		}
+
+		// Strip trailing carriage return (handles CRLF line endings).
+		line = strings.TrimRight(line, "\r")
 
 		// Skip empty lines and comments.
 		trimmed := strings.TrimSpace(line)
@@ -84,9 +112,18 @@ func Parse(r io.Reader) ([]Entry, error) {
 
 		value, raw, newLineNum, err := parseValue(rawValue, scanner, lineNum)
 		if err != nil {
-			return entries, &ParseError{Line: startLine, Message: err.Error()}
+			return entries, warnings, &ParseError{Line: startLine, Message: err.Error()}
 		}
 		lineNum = newLineNum
+
+		// Check for duplicate keys.
+		if prevLine, exists := seen[key]; exists {
+			warnings = append(warnings, Warning{
+				Line:    startLine,
+				Message: fmt.Sprintf("duplicate key %q (previously defined on line %d, using latest value)", key, prevLine),
+			})
+		}
+		seen[key] = startLine
 
 		entries = append(entries, Entry{
 			Key:   key,
@@ -98,10 +135,10 @@ func Parse(r io.Reader) ([]Entry, error) {
 	}
 
 	if err := scanner.Err(); err != nil {
-		return entries, fmt.Errorf("reading input: %w", err)
+		return entries, warnings, fmt.Errorf("reading input: %w", err)
 	}
 
-	return entries, nil
+	return entries, warnings, nil
 }
 
 // parseValue handles the value portion of a KEY=VALUE pair.

@@ -5,6 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/xcke/envref/internal/envfile"
+	"github.com/xcke/envref/internal/parser"
 )
 
 // newGetCmd creates the get subcommand.
@@ -33,15 +34,17 @@ Use --file to specify a custom .env file path.`,
 
 // runGet loads env files, merges them, and prints the value for the given key.
 func runGet(cmd *cobra.Command, key, envPath, localPath string) error {
-	base, err := envfile.Load(envPath)
+	base, warnings, err := envfile.Load(envPath)
 	if err != nil {
 		return fmt.Errorf("loading %s: %w", envPath, err)
 	}
+	printWarnings(cmd, envPath, warnings)
 
-	local, err := envfile.LoadOptional(localPath)
+	local, localWarnings, err := envfile.LoadOptional(localPath)
 	if err != nil {
 		return fmt.Errorf("loading %s: %w", localPath, err)
 	}
+	printWarnings(cmd, localPath, localWarnings)
 
 	merged := envfile.Merge(base, local)
 
@@ -52,4 +55,11 @@ func runGet(cmd *cobra.Command, key, envPath, localPath string) error {
 
 	_, _ = fmt.Fprintln(cmd.OutOrStdout(), entry.Value)
 	return nil
+}
+
+// printWarnings writes parser warnings to stderr for the given file.
+func printWarnings(cmd *cobra.Command, path string, warnings []parser.Warning) {
+	for _, w := range warnings {
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "warning: %s: %s\n", path, w)
+	}
 }

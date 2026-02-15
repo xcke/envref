@@ -266,7 +266,7 @@ func TestParse(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := Parse(strings.NewReader(tt.input))
+			got, _, err := Parse(strings.NewReader(tt.input))
 			if tt.wantErr {
 				if err == nil {
 					t.Fatal("expected error, got nil")
@@ -303,8 +303,272 @@ func TestParse(t *testing.T) {
 	}
 }
 
+func TestParseBOM(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  []Entry
+	}{
+		{
+			name:  "strips UTF-8 BOM from first line",
+			input: "\xEF\xBB\xBFFOO=bar",
+			want: []Entry{
+				{Key: "FOO", Value: "bar", Raw: "bar", Line: 1},
+			},
+		},
+		{
+			name:  "BOM with multiple entries",
+			input: "\xEF\xBB\xBFFOO=bar\nBAZ=qux",
+			want: []Entry{
+				{Key: "FOO", Value: "bar", Raw: "bar", Line: 1},
+				{Key: "BAZ", Value: "qux", Raw: "qux", Line: 2},
+			},
+		},
+		{
+			name:  "BOM before comment",
+			input: "\xEF\xBB\xBF# comment\nFOO=bar",
+			want: []Entry{
+				{Key: "FOO", Value: "bar", Raw: "bar", Line: 2},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, _, err := Parse(strings.NewReader(tt.input))
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if len(got) != len(tt.want) {
+				t.Fatalf("expected %d entries, got %d: %+v", len(tt.want), len(got), got)
+			}
+			for i, want := range tt.want {
+				if got[i].Key != want.Key {
+					t.Errorf("entry[%d] Key: got %q, want %q", i, got[i].Key, want.Key)
+				}
+				if got[i].Value != want.Value {
+					t.Errorf("entry[%d] Value: got %q, want %q", i, got[i].Value, want.Value)
+				}
+				if got[i].Line != want.Line {
+					t.Errorf("entry[%d] Line: got %d, want %d", i, got[i].Line, want.Line)
+				}
+			}
+		})
+	}
+}
+
+func TestParseCRLF(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  []Entry
+	}{
+		{
+			name:  "CRLF line endings",
+			input: "FOO=bar\r\nBAZ=qux\r\n",
+			want: []Entry{
+				{Key: "FOO", Value: "bar", Raw: "bar", Line: 1},
+				{Key: "BAZ", Value: "qux", Raw: "qux", Line: 2},
+			},
+		},
+		{
+			name:  "mixed LF and CRLF",
+			input: "FOO=bar\r\nBAZ=qux\n",
+			want: []Entry{
+				{Key: "FOO", Value: "bar", Raw: "bar", Line: 1},
+				{Key: "BAZ", Value: "qux", Raw: "qux", Line: 2},
+			},
+		},
+		{
+			name:  "CRLF with quoted value",
+			input: "FOO=\"hello world\"\r\nBAR=baz\r\n",
+			want: []Entry{
+				{Key: "FOO", Value: "hello world", Raw: `"hello world"`, Line: 1},
+				{Key: "BAR", Value: "baz", Raw: "baz", Line: 2},
+			},
+		},
+		{
+			name:  "CRLF with trailing whitespace",
+			input: "FOO=bar  \r\nBAZ=qux\r\n",
+			want: []Entry{
+				{Key: "FOO", Value: "bar", Raw: "bar", Line: 1},
+				{Key: "BAZ", Value: "qux", Raw: "qux", Line: 2},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, _, err := Parse(strings.NewReader(tt.input))
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if len(got) != len(tt.want) {
+				t.Fatalf("expected %d entries, got %d: %+v", len(tt.want), len(got), got)
+			}
+			for i, want := range tt.want {
+				if got[i].Key != want.Key {
+					t.Errorf("entry[%d] Key: got %q, want %q", i, got[i].Key, want.Key)
+				}
+				if got[i].Value != want.Value {
+					t.Errorf("entry[%d] Value: got %q, want %q", i, got[i].Value, want.Value)
+				}
+			}
+		})
+	}
+}
+
+func TestParseDuplicateKeys(t *testing.T) {
+	tests := []struct {
+		name         string
+		input        string
+		wantEntries  []Entry
+		wantWarnings int
+	}{
+		{
+			name:  "duplicate key last wins",
+			input: "FOO=first\nFOO=second",
+			wantEntries: []Entry{
+				{Key: "FOO", Value: "first", Raw: "first", Line: 1},
+				{Key: "FOO", Value: "second", Raw: "second", Line: 2},
+			},
+			wantWarnings: 1,
+		},
+		{
+			name:  "triple duplicate",
+			input: "FOO=first\nFOO=second\nFOO=third",
+			wantEntries: []Entry{
+				{Key: "FOO", Value: "first", Raw: "first", Line: 1},
+				{Key: "FOO", Value: "second", Raw: "second", Line: 2},
+				{Key: "FOO", Value: "third", Raw: "third", Line: 3},
+			},
+			wantWarnings: 2,
+		},
+		{
+			name:  "no duplicates no warnings",
+			input: "FOO=bar\nBAZ=qux",
+			wantEntries: []Entry{
+				{Key: "FOO", Value: "bar", Raw: "bar", Line: 1},
+				{Key: "BAZ", Value: "qux", Raw: "qux", Line: 2},
+			},
+			wantWarnings: 0,
+		},
+		{
+			name:  "duplicate with other keys between",
+			input: "FOO=first\nBAR=middle\nFOO=second",
+			wantEntries: []Entry{
+				{Key: "FOO", Value: "first", Raw: "first", Line: 1},
+				{Key: "BAR", Value: "middle", Raw: "middle", Line: 2},
+				{Key: "FOO", Value: "second", Raw: "second", Line: 3},
+			},
+			wantWarnings: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, warnings, err := Parse(strings.NewReader(tt.input))
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if len(got) != len(tt.wantEntries) {
+				t.Fatalf("expected %d entries, got %d: %+v", len(tt.wantEntries), len(got), got)
+			}
+			for i, want := range tt.wantEntries {
+				if got[i].Key != want.Key || got[i].Value != want.Value {
+					t.Errorf("entry[%d]: got {%q, %q}, want {%q, %q}", i, got[i].Key, got[i].Value, want.Key, want.Value)
+				}
+			}
+			if len(warnings) != tt.wantWarnings {
+				t.Errorf("expected %d warnings, got %d: %v", tt.wantWarnings, len(warnings), warnings)
+			}
+		})
+	}
+}
+
+func TestParseDuplicateWarningMessage(t *testing.T) {
+	_, warnings, err := Parse(strings.NewReader("FOO=first\nFOO=second"))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(warnings) != 1 {
+		t.Fatalf("expected 1 warning, got %d", len(warnings))
+	}
+	w := warnings[0]
+	if w.Line != 2 {
+		t.Errorf("warning line: got %d, want 2", w.Line)
+	}
+	if !strings.Contains(w.Message, "duplicate key") {
+		t.Errorf("warning message should contain 'duplicate key': got %q", w.Message)
+	}
+	if !strings.Contains(w.Message, "FOO") {
+		t.Errorf("warning message should contain key name: got %q", w.Message)
+	}
+}
+
+func TestParseBOMWithCRLF(t *testing.T) {
+	input := "\xEF\xBB\xBFFOO=bar\r\nBAZ=qux\r\n"
+	got, _, err := Parse(strings.NewReader(input))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("expected 2 entries, got %d: %+v", len(got), got)
+	}
+	if got[0].Key != "FOO" || got[0].Value != "bar" {
+		t.Errorf("entry[0]: got {%q, %q}, want {\"FOO\", \"bar\"}", got[0].Key, got[0].Value)
+	}
+	if got[1].Key != "BAZ" || got[1].Value != "qux" {
+		t.Errorf("entry[1]: got {%q, %q}, want {\"BAZ\", \"qux\"}", got[1].Key, got[1].Value)
+	}
+}
+
+func TestParseTrailingWhitespace(t *testing.T) {
+	tests := []struct {
+		name      string
+		input     string
+		wantValue string
+	}{
+		{
+			name:      "trailing spaces on unquoted value",
+			input:     "FOO=bar   ",
+			wantValue: "bar",
+		},
+		{
+			name:      "trailing tabs on unquoted value",
+			input:     "FOO=bar\t\t",
+			wantValue: "bar",
+		},
+		{
+			name:      "trailing whitespace preserved in double quotes",
+			input:     `FOO="bar   "`,
+			wantValue: "bar   ",
+		},
+		{
+			name:      "trailing whitespace preserved in single quotes",
+			input:     `FOO='bar   '`,
+			wantValue: "bar   ",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, _, err := Parse(strings.NewReader(tt.input))
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if len(got) != 1 {
+				t.Fatalf("expected 1 entry, got %d", len(got))
+			}
+			if got[0].Value != tt.wantValue {
+				t.Errorf("Value: got %q, want %q", got[0].Value, tt.wantValue)
+			}
+		})
+	}
+}
+
 func TestParseError(t *testing.T) {
-	_, err := Parse(strings.NewReader("FOO='unterminated"))
+	_, _, err := Parse(strings.NewReader("FOO='unterminated"))
 	if err == nil {
 		t.Fatal("expected error for unterminated single quote")
 	}
@@ -315,5 +579,14 @@ func TestParseError(t *testing.T) {
 	}
 	if pe.Line != 1 {
 		t.Errorf("expected error on line 1, got line %d", pe.Line)
+	}
+}
+
+func TestWarningString(t *testing.T) {
+	w := Warning{Line: 5, Message: "duplicate key \"FOO\""}
+	got := w.String()
+	want := `line 5: duplicate key "FOO"`
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
 	}
 }

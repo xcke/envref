@@ -23,7 +23,7 @@ func TestLoad(t *testing.T) {
 
 	t.Run("loads simple env file", func(t *testing.T) {
 		path := writeFile(t, dir, ".env", "FOO=bar\nBAZ=qux\n")
-		env, err := Load(path)
+		env, _, err := Load(path)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -47,7 +47,7 @@ func TestLoad(t *testing.T) {
 	})
 
 	t.Run("returns error for missing file", func(t *testing.T) {
-		_, err := Load(filepath.Join(dir, "nonexistent"))
+		_, _, err := Load(filepath.Join(dir, "nonexistent"))
 		if err == nil {
 			t.Fatal("expected error for missing file")
 		}
@@ -55,7 +55,7 @@ func TestLoad(t *testing.T) {
 
 	t.Run("returns error for parse error", func(t *testing.T) {
 		path := writeFile(t, dir, ".env.bad", "FOO='unterminated")
-		_, err := Load(path)
+		_, _, err := Load(path)
 		if err == nil {
 			t.Fatal("expected error for parse error")
 		}
@@ -63,7 +63,7 @@ func TestLoad(t *testing.T) {
 
 	t.Run("handles duplicate keys (last wins)", func(t *testing.T) {
 		path := writeFile(t, dir, ".env.dup", "FOO=first\nFOO=second\n")
-		env, err := Load(path)
+		env, _, err := Load(path)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -78,7 +78,7 @@ func TestLoad(t *testing.T) {
 
 	t.Run("preserves key order", func(t *testing.T) {
 		path := writeFile(t, dir, ".env.order", "CHARLIE=3\nALPHA=1\nBRAVO=2\n")
-		env, err := Load(path)
+		env, _, err := Load(path)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -97,7 +97,7 @@ func TestLoad(t *testing.T) {
 	t.Run("loads env file with comments and blank lines", func(t *testing.T) {
 		content := "# Database\nDB_HOST=localhost\n\n# App\nAPP_NAME='My App'\n"
 		path := writeFile(t, dir, ".env.comments", content)
-		env, err := Load(path)
+		env, _, err := Load(path)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -109,7 +109,7 @@ func TestLoad(t *testing.T) {
 	t.Run("loads env file with ref:// values", func(t *testing.T) {
 		content := "API_KEY=ref://secrets/api_key\nDB_PASS=ref://keychain/db_pass\n"
 		path := writeFile(t, dir, ".env.refs", content)
-		env, err := Load(path)
+		env, _, err := Load(path)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -124,7 +124,7 @@ func TestLoadOptional(t *testing.T) {
 	dir := t.TempDir()
 
 	t.Run("returns empty env for missing file", func(t *testing.T) {
-		env, err := LoadOptional(filepath.Join(dir, ".env.local"))
+		env, _, err := LoadOptional(filepath.Join(dir, ".env.local"))
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -135,7 +135,7 @@ func TestLoadOptional(t *testing.T) {
 
 	t.Run("loads existing file", func(t *testing.T) {
 		path := writeFile(t, dir, ".env.local", "SECRET=value\n")
-		env, err := LoadOptional(path)
+		env, _, err := LoadOptional(path)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -150,7 +150,7 @@ func TestLoadOptional(t *testing.T) {
 
 	t.Run("returns error for parse error", func(t *testing.T) {
 		path := writeFile(t, dir, ".env.local.bad", "KEY='unterminated")
-		_, err := LoadOptional(path)
+		_, _, err := LoadOptional(path)
 		if err == nil {
 			t.Fatal("expected error for parse error")
 		}
@@ -365,12 +365,12 @@ EXTRA_VAR=local_only
 `
 	localPath := writeFile(t, dir, ".env.local", localContent)
 
-	base, err := Load(envPath)
+	base, _, err := Load(envPath)
 	if err != nil {
 		t.Fatalf("loading .env: %v", err)
 	}
 
-	local, err := Load(localPath)
+	local, _, err := Load(localPath)
 	if err != nil {
 		t.Fatalf("loading .env.local: %v", err)
 	}
@@ -538,7 +538,7 @@ func TestLoadRefsFromFile(t *testing.T) {
 	content := "DB_HOST=localhost\nDB_PASS=ref://secrets/db_pass\nAPI_KEY=ref://keychain/api_key\nDEBUG=true\n"
 	path := writeFile(t, dir, ".env", content)
 
-	env, err := Load(path)
+	env, _, err := Load(path)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -575,12 +575,12 @@ func TestLoadAndMergeOptionalLocal(t *testing.T) {
 	// Only .env exists, no .env.local.
 	envPath := writeFile(t, dir, ".env", "FOO=bar\n")
 
-	base, err := Load(envPath)
+	base, _, err := Load(envPath)
 	if err != nil {
 		t.Fatalf("loading .env: %v", err)
 	}
 
-	local, err := LoadOptional(filepath.Join(dir, ".env.local"))
+	local, _, err := LoadOptional(filepath.Join(dir, ".env.local"))
 	if err != nil {
 		t.Fatalf("loading optional .env.local: %v", err)
 	}
@@ -737,7 +737,7 @@ func TestWrite(t *testing.T) {
 			t.Fatalf("write: %v", err)
 		}
 
-		loaded, err := Load(path)
+		loaded, _, err := Load(path)
 		if err != nil {
 			t.Fatalf("load: %v", err)
 		}
@@ -758,4 +758,69 @@ func TestWrite(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestLoadReturnsWarningsForDuplicateKeys(t *testing.T) {
+	dir := t.TempDir()
+	path := writeFile(t, dir, ".env", "FOO=first\nBAR=middle\nFOO=second\n")
+
+	env, warnings, err := Load(path)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Last value wins.
+	entry, _ := env.Get("FOO")
+	if entry.Value != "second" {
+		t.Errorf("FOO: got %q, want %q", entry.Value, "second")
+	}
+
+	// Should have exactly one warning about the duplicate.
+	if len(warnings) != 1 {
+		t.Fatalf("expected 1 warning, got %d: %v", len(warnings), warnings)
+	}
+	if warnings[0].Line != 3 {
+		t.Errorf("warning line: got %d, want 3", warnings[0].Line)
+	}
+}
+
+func TestLoadHandlesBOM(t *testing.T) {
+	dir := t.TempDir()
+	path := writeFile(t, dir, ".env", "\xEF\xBB\xBFFOO=bar\nBAZ=qux\n")
+
+	env, _, err := Load(path)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if env.Len() != 2 {
+		t.Fatalf("expected 2 entries, got %d", env.Len())
+	}
+	entry, ok := env.Get("FOO")
+	if !ok {
+		t.Fatal("expected key FOO (BOM should be stripped)")
+	}
+	if entry.Value != "bar" {
+		t.Errorf("FOO: got %q, want %q", entry.Value, "bar")
+	}
+}
+
+func TestLoadHandlesCRLF(t *testing.T) {
+	dir := t.TempDir()
+	path := writeFile(t, dir, ".env", "FOO=bar\r\nBAZ=qux\r\n")
+
+	env, _, err := Load(path)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if env.Len() != 2 {
+		t.Fatalf("expected 2 entries, got %d", env.Len())
+	}
+	entry, _ := env.Get("FOO")
+	if entry.Value != "bar" {
+		t.Errorf("FOO: got %q, want %q", entry.Value, "bar")
+	}
+	entry, _ = env.Get("BAZ")
+	if entry.Value != "qux" {
+		t.Errorf("BAZ: got %q, want %q", entry.Value, "qux")
+	}
 }

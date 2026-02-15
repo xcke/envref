@@ -29,7 +29,7 @@
 - [DONE] P1 | ENV-013 | Detect and tag `ref://` values as unresolved secret references
 - [DONE] P1 | ENV-014 | Add `envref get <KEY>` command — print single resolved value
 - [DONE] P1 | ENV-015 | Add `envref set <KEY>=<VALUE>` command — write to `.env` or `.env.local`
-- [TODO] P2 | ENV-016 | Handle edge cases: duplicate keys (last wins + warn), BOM, CRLF, trailing whitespace
+- [DONE] P2 | ENV-016 | Handle edge cases: duplicate keys (last wins + warn), BOM, CRLF, trailing whitespace
 - [TODO] P2 | ENV-017 | Add `envref list` command — print all key-value pairs (mask secrets by default)
 - [TODO] P2 | ENV-018 | Support variable interpolation within `.env` (`DB_URL=postgres://${DB_HOST}:${DB_PORT}/app`)
 - [TODO] P3 | ENV-019 | Add `--format` flag to output commands (`json`, `shell`, `table`)

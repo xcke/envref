@@ -52,10 +52,11 @@ func runSet(cmd *cobra.Command, arg, targetPath string) error {
 	}
 
 	// Load existing file or start fresh if it doesn't exist.
-	env, err := envfile.LoadOptional(targetPath)
+	env, warnings, err := envfile.LoadOptional(targetPath)
 	if err != nil {
 		return fmt.Errorf("loading %s: %w", targetPath, err)
 	}
+	printWarnings(cmd, targetPath, warnings)
 
 	// Create the entry.
 	entry := parser.Entry{

@@ -106,37 +106,38 @@ func (e *Env) HasRefs() bool {
 
 // Load reads a .env file from disk and returns an Env with all entries.
 // Returns an error if the file cannot be opened or parsed.
-func Load(path string) (*Env, error) {
+// Parse warnings (e.g., duplicate keys) are returned as the second value.
+func Load(path string) (*Env, []parser.Warning, error) {
 	f, err := os.Open(path)
 	if err != nil {
-		return nil, fmt.Errorf("opening %s: %w", path, err)
+		return nil, nil, fmt.Errorf("opening %s: %w", path, err)
 	}
 
-	entries, parseErr := parser.Parse(f)
+	entries, warnings, parseErr := parser.Parse(f)
 	closeErr := f.Close()
 	if parseErr != nil {
-		return nil, fmt.Errorf("parsing %s: %w", path, parseErr)
+		return nil, warnings, fmt.Errorf("parsing %s: %w", path, parseErr)
 	}
 	if closeErr != nil {
-		return nil, fmt.Errorf("closing %s: %w", path, closeErr)
+		return nil, warnings, fmt.Errorf("closing %s: %w", path, closeErr)
 	}
 
 	env := NewEnv()
 	for _, entry := range entries {
 		env.Set(entry)
 	}
-	return env, nil
+	return env, warnings, nil
 }
 
 // LoadOptional reads a .env file from disk, returning an empty Env if the
 // file does not exist. Other errors (permission denied, parse errors) are
-// still returned.
-func LoadOptional(path string) (*Env, error) {
-	env, err := Load(path)
+// still returned. Parse warnings are returned as the second value.
+func LoadOptional(path string) (*Env, []parser.Warning, error) {
+	env, warnings, err := Load(path)
 	if err != nil && os.IsNotExist(unwrapPathError(err)) {
-		return NewEnv(), nil
+		return NewEnv(), nil, nil
 	}
-	return env, err
+	return env, warnings, err
 }
 
 // Merge combines a base Env with one or more overlay Envs. Overlays are
