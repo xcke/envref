@@ -23,7 +23,7 @@
 
 ## Phase 1 — Core .env Parsing & Merging
 
-- [TODO] P1 | ENV-010 | Implement `.env` file parser (handle quotes, multiline, comments, empty lines)
+- [DONE] P1 | ENV-010 | Implement `.env` file parser (handle quotes, multiline, comments, empty lines)
 - [TODO] P1 | ENV-011 | Implement `.env.local` parser (same format, gitignored overrides)
 - [TODO] P1 | ENV-012 | Implement merge logic: `.env` ← `.env.local` (local wins on conflict)
 - [TODO] P1 | ENV-013 | Detect and tag `ref://` values as unresolved secret references
