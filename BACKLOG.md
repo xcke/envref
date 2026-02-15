@@ -31,7 +31,7 @@
 - [DONE] P1 | ENV-015 | Add `envref set <KEY>=<VALUE>` command — write to `.env` or `.env.local`
 - [DONE] P2 | ENV-016 | Handle edge cases: duplicate keys (last wins + warn), BOM, CRLF, trailing whitespace
 - [DONE] P2 | ENV-017 | Add `envref list` command — print all key-value pairs (mask secrets by default)
-- [TODO] P2 | ENV-018 | Support variable interpolation within `.env` (`DB_URL=postgres://${DB_HOST}:${DB_PORT}/app`)
+- [DONE] P2 | ENV-018 | Support variable interpolation within `.env` (`DB_URL=postgres://${DB_HOST}:${DB_PORT}/app`)
 - [TODO] P3 | ENV-019 | Add `--format` flag to output commands (`json`, `shell`, `table`)
 
 ---

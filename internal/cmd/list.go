@@ -48,6 +48,7 @@ func runList(cmd *cobra.Command, envPath, localPath string, showSecrets bool) er
 	printWarnings(cmd, localPath, localWarnings)
 
 	merged := envfile.Merge(base, local)
+	envfile.Interpolate(merged)
 	out := cmd.OutOrStdout()
 
 	for _, entry := range merged.All() {

@@ -47,6 +47,7 @@ func runGet(cmd *cobra.Command, key, envPath, localPath string) error {
 	printWarnings(cmd, localPath, localWarnings)
 
 	merged := envfile.Merge(base, local)
+	envfile.Interpolate(merged)
 
 	entry, found := merged.Get(key)
 	if !found {

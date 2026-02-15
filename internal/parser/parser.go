@@ -16,6 +16,20 @@ const RefPrefix = "ref://"
 // bom is the UTF-8 Byte Order Mark sequence.
 const bom = "\xEF\xBB\xBF"
 
+// QuoteStyle indicates how a value was quoted in the .env file.
+type QuoteStyle int
+
+const (
+	// QuoteNone means the value was unquoted.
+	QuoteNone QuoteStyle = iota
+	// QuoteSingle means the value was wrapped in single quotes (literal, no interpolation).
+	QuoteSingle
+	// QuoteDouble means the value was wrapped in double quotes (escape processing).
+	QuoteDouble
+	// QuoteBacktick means the value was wrapped in backticks (literal, no interpolation).
+	QuoteBacktick
+)
+
 // Entry represents a single key-value pair parsed from a .env file.
 type Entry struct {
 	Key   string
@@ -27,6 +41,8 @@ type Entry struct {
 	// IsRef is true when the parsed value starts with "ref://",
 	// indicating it is an unresolved secret reference.
 	IsRef bool
+	// Quote indicates how the value was quoted in the source file.
+	Quote QuoteStyle
 }
 
 // Warning represents a non-fatal issue detected during parsing.
@@ -110,7 +126,7 @@ func Parse(r io.Reader) ([]Entry, []Warning, error) {
 		rawValue := trimmed[eqIdx+1:]
 		startLine := lineNum
 
-		value, raw, newLineNum, err := parseValue(rawValue, scanner, lineNum)
+		value, raw, newLineNum, quote, err := parseValue(rawValue, scanner, lineNum)
 		if err != nil {
 			return entries, warnings, &ParseError{Line: startLine, Message: err.Error()}
 		}
@@ -131,6 +147,7 @@ func Parse(r io.Reader) ([]Entry, []Warning, error) {
 			Raw:   raw,
 			Line:  startLine,
 			IsRef: strings.HasPrefix(value, RefPrefix),
+			Quote: quote,
 		})
 	}
 
@@ -142,26 +159,26 @@ func Parse(r io.Reader) ([]Entry, []Warning, error) {
 }
 
 // parseValue handles the value portion of a KEY=VALUE pair.
-// It returns the processed value, the raw value, the updated line number, and any error.
-func parseValue(rawValue string, scanner *bufio.Scanner, lineNum int) (string, string, int, error) {
+// It returns the processed value, the raw value, the updated line number, the quote style, and any error.
+func parseValue(rawValue string, scanner *bufio.Scanner, lineNum int) (string, string, int, QuoteStyle, error) {
 	trimmed := strings.TrimLeftFunc(rawValue, unicode.IsSpace)
 
 	if trimmed == "" {
-		return "", rawValue, lineNum, nil
+		return "", rawValue, lineNum, QuoteNone, nil
 	}
 
 	switch trimmed[0] {
 	case '\'':
 		value, raw, ln, err := parseSingleQuoted(trimmed, lineNum)
-		return value, raw, ln, err
+		return value, raw, ln, QuoteSingle, err
 	case '"':
 		value, raw, ln, err := parseDoubleQuoted(trimmed, scanner, lineNum)
-		return value, raw, ln, err
+		return value, raw, ln, QuoteDouble, err
 	case '`':
 		value, raw, ln, err := parseBacktickQuoted(trimmed, scanner, lineNum)
-		return value, raw, ln, err
+		return value, raw, ln, QuoteBacktick, err
 	default:
-		return parseUnquoted(rawValue), rawValue, lineNum, nil
+		return parseUnquoted(rawValue), rawValue, lineNum, QuoteNone, nil
 	}
 }
 
