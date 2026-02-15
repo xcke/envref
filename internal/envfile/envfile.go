@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/xcke/envref/internal/parser"
+	"github.com/xcke/envref/internal/ref"
 )
 
 // Env represents a set of environment variables loaded from one or more files.
@@ -59,6 +60,47 @@ func (e *Env) All() []parser.Entry {
 		result = append(result, e.entries[key])
 	}
 	return result
+}
+
+// Refs returns all entries whose values are ref:// references, in insertion order.
+func (e *Env) Refs() []parser.Entry {
+	var refs []parser.Entry
+	for _, key := range e.order {
+		entry := e.entries[key]
+		if entry.IsRef {
+			refs = append(refs, entry)
+		}
+	}
+	return refs
+}
+
+// ResolvedRefs returns a map of parsed ref.Reference objects keyed by env key,
+// for all entries that have valid ref:// values. Entries with malformed ref://
+// URIs are skipped (use Refs() and parse individually to handle errors).
+func (e *Env) ResolvedRefs() map[string]ref.Reference {
+	result := make(map[string]ref.Reference)
+	for _, key := range e.order {
+		entry := e.entries[key]
+		if !entry.IsRef {
+			continue
+		}
+		parsed, err := ref.Parse(entry.Value)
+		if err != nil {
+			continue
+		}
+		result[key] = parsed
+	}
+	return result
+}
+
+// HasRefs reports whether the Env contains any ref:// references.
+func (e *Env) HasRefs() bool {
+	for _, key := range e.order {
+		if e.entries[key].IsRef {
+			return true
+		}
+	}
+	return false
 }
 
 // Load reads a .env file from disk and returns an Env with all entries.

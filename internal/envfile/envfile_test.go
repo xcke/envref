@@ -438,6 +438,137 @@ EXTRA_VAR=local_only
 	}
 }
 
+func TestRefs(t *testing.T) {
+	t.Run("returns only ref entries", func(t *testing.T) {
+		env := NewEnv()
+		env.Set(parser.Entry{Key: "DB_HOST", Value: "localhost", Line: 1})
+		env.Set(parser.Entry{Key: "DB_PASS", Value: "ref://secrets/db_pass", Line: 2, IsRef: true})
+		env.Set(parser.Entry{Key: "API_KEY", Value: "ref://keychain/api_key", Line: 3, IsRef: true})
+		env.Set(parser.Entry{Key: "DEBUG", Value: "true", Line: 4})
+
+		refs := env.Refs()
+		if len(refs) != 2 {
+			t.Fatalf("expected 2 refs, got %d", len(refs))
+		}
+		if refs[0].Key != "DB_PASS" {
+			t.Errorf("refs[0].Key: got %q, want %q", refs[0].Key, "DB_PASS")
+		}
+		if refs[1].Key != "API_KEY" {
+			t.Errorf("refs[1].Key: got %q, want %q", refs[1].Key, "API_KEY")
+		}
+	})
+
+	t.Run("returns empty for no refs", func(t *testing.T) {
+		env := NewEnv()
+		env.Set(parser.Entry{Key: "FOO", Value: "bar", Line: 1})
+
+		refs := env.Refs()
+		if len(refs) != 0 {
+			t.Fatalf("expected 0 refs, got %d", len(refs))
+		}
+	})
+}
+
+func TestHasRefs(t *testing.T) {
+	t.Run("true when refs exist", func(t *testing.T) {
+		env := NewEnv()
+		env.Set(parser.Entry{Key: "FOO", Value: "bar", Line: 1})
+		env.Set(parser.Entry{Key: "SECRET", Value: "ref://secrets/key", Line: 2, IsRef: true})
+
+		if !env.HasRefs() {
+			t.Error("expected HasRefs() to return true")
+		}
+	})
+
+	t.Run("false when no refs", func(t *testing.T) {
+		env := NewEnv()
+		env.Set(parser.Entry{Key: "FOO", Value: "bar", Line: 1})
+
+		if env.HasRefs() {
+			t.Error("expected HasRefs() to return false")
+		}
+	})
+
+	t.Run("false for empty env", func(t *testing.T) {
+		env := NewEnv()
+		if env.HasRefs() {
+			t.Error("expected HasRefs() to return false for empty env")
+		}
+	})
+}
+
+func TestResolvedRefs(t *testing.T) {
+	t.Run("parses valid refs", func(t *testing.T) {
+		env := NewEnv()
+		env.Set(parser.Entry{Key: "DB_HOST", Value: "localhost", Line: 1})
+		env.Set(parser.Entry{Key: "DB_PASS", Value: "ref://secrets/db_pass", Line: 2, IsRef: true})
+		env.Set(parser.Entry{Key: "API_KEY", Value: "ref://keychain/api_key", Line: 3, IsRef: true})
+
+		resolved := env.ResolvedRefs()
+		if len(resolved) != 2 {
+			t.Fatalf("expected 2 resolved refs, got %d", len(resolved))
+		}
+
+		dbRef, ok := resolved["DB_PASS"]
+		if !ok {
+			t.Fatal("expected DB_PASS in resolved refs")
+		}
+		if dbRef.Backend != "secrets" {
+			t.Errorf("DB_PASS backend: got %q, want %q", dbRef.Backend, "secrets")
+		}
+		if dbRef.Path != "db_pass" {
+			t.Errorf("DB_PASS path: got %q, want %q", dbRef.Path, "db_pass")
+		}
+
+		apiRef, ok := resolved["API_KEY"]
+		if !ok {
+			t.Fatal("expected API_KEY in resolved refs")
+		}
+		if apiRef.Backend != "keychain" {
+			t.Errorf("API_KEY backend: got %q, want %q", apiRef.Backend, "keychain")
+		}
+		if apiRef.Path != "api_key" {
+			t.Errorf("API_KEY path: got %q, want %q", apiRef.Path, "api_key")
+		}
+	})
+}
+
+func TestLoadRefsFromFile(t *testing.T) {
+	dir := t.TempDir()
+	content := "DB_HOST=localhost\nDB_PASS=ref://secrets/db_pass\nAPI_KEY=ref://keychain/api_key\nDEBUG=true\n"
+	path := writeFile(t, dir, ".env", content)
+
+	env, err := Load(path)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !env.HasRefs() {
+		t.Fatal("expected env to have refs")
+	}
+
+	refs := env.Refs()
+	if len(refs) != 2 {
+		t.Fatalf("expected 2 refs, got %d", len(refs))
+	}
+	if refs[0].Key != "DB_PASS" {
+		t.Errorf("refs[0].Key: got %q, want %q", refs[0].Key, "DB_PASS")
+	}
+	if refs[1].Key != "API_KEY" {
+		t.Errorf("refs[1].Key: got %q, want %q", refs[1].Key, "API_KEY")
+	}
+
+	// Non-ref entries should have IsRef = false.
+	entry, _ := env.Get("DB_HOST")
+	if entry.IsRef {
+		t.Error("DB_HOST should not be a ref")
+	}
+	entry, _ = env.Get("DEBUG")
+	if entry.IsRef {
+		t.Error("DEBUG should not be a ref")
+	}
+}
+
 func TestLoadAndMergeOptionalLocal(t *testing.T) {
 	dir := t.TempDir()
 

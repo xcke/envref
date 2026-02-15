@@ -1,7 +1,7 @@
 # Project Status
 
 ## Last Completed
-- ENV-011 + ENV-012: Added envfile package with Load, LoadOptional, and Merge functions [iter-4]
+- ENV-013: Added ref:// detection and tagging for secret references [iter-5]
 
 ## Current State
 - Go module `github.com/xcke/envref` initialized with Cobra dependency
@@ -16,8 +16,15 @@
   - `LoadOptional(path)` — same as Load but returns empty Env if file missing
   - `Merge(base, overlays...)` — merge multiple Env layers, later overlays win
   - `Env` type with ordered key storage, Get/Set/Keys/All/Len methods
-  - 20 test cases covering load, merge, ordering, integration scenarios
-- Directory structure: `cmd/envref/`, `internal/cmd/`, `internal/parser/`, `internal/envfile/`, `pkg/`
+  - `Refs()` — return all entries with ref:// values
+  - `HasRefs()` — check if env contains any ref:// references
+  - `ResolvedRefs()` — parse ref:// URIs into structured Reference objects
+- `ref://` URI parser (`internal/ref`) with:
+  - `IsRef(value)` — check if a value is a ref:// reference
+  - `Parse(value)` — parse ref:// URI into backend + path components
+  - `Reference` type with Raw, Backend, Path fields
+- Parser `Entry.IsRef` field auto-set during parsing when value starts with `ref://`
+- Directory structure: `cmd/envref/`, `internal/cmd/`, `internal/parser/`, `internal/envfile/`, `internal/ref/`, `pkg/`
 - All checks pass: `go build`, `go vet`, `go test`, `golangci-lint`
 
 ## Known Issues

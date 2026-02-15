@@ -181,7 +181,7 @@ func TestParse(t *testing.T) {
 			name:  "ref:// value",
 			input: "API_KEY=ref://secrets/api_key",
 			want: []Entry{
-				{Key: "API_KEY", Value: "ref://secrets/api_key", Raw: "ref://secrets/api_key", Line: 1},
+				{Key: "API_KEY", Value: "ref://secrets/api_key", Raw: "ref://secrets/api_key", Line: 1, IsRef: true},
 			},
 		},
 		{
@@ -190,7 +190,7 @@ func TestParse(t *testing.T) {
 			want: []Entry{
 				{Key: "DB_HOST", Value: "localhost", Raw: "localhost", Line: 2},
 				{Key: "DB_PORT", Value: "5432", Raw: "5432", Line: 3},
-				{Key: "DB_PASS", Value: "ref://secrets/db_pass", Raw: "ref://secrets/db_pass", Line: 4},
+				{Key: "DB_PASS", Value: "ref://secrets/db_pass", Raw: "ref://secrets/db_pass", Line: 4, IsRef: true},
 				{Key: "APP_NAME", Value: "My App", Raw: "'My App'", Line: 7},
 				{Key: "DEBUG", Value: "true", Raw: "true", Line: 8},
 			},
@@ -294,6 +294,9 @@ func TestParse(t *testing.T) {
 				}
 				if g.Line != want.Line {
 					t.Errorf("entry[%d] Line: got %d, want %d", i, g.Line, want.Line)
+				}
+				if g.IsRef != want.IsRef {
+					t.Errorf("entry[%d] IsRef: got %v, want %v", i, g.IsRef, want.IsRef)
 				}
 			}
 		})

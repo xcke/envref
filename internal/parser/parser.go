@@ -10,6 +10,9 @@ import (
 	"unicode"
 )
 
+// RefPrefix is the URI scheme prefix for secret references in .env values.
+const RefPrefix = "ref://"
+
 // Entry represents a single key-value pair parsed from a .env file.
 type Entry struct {
 	Key   string
@@ -18,6 +21,9 @@ type Entry struct {
 	Raw string
 	// Line is the 1-based line number where this entry starts.
 	Line int
+	// IsRef is true when the parsed value starts with "ref://",
+	// indicating it is an unresolved secret reference.
+	IsRef bool
 }
 
 // ParseError represents a parsing error with line context.
@@ -87,6 +93,7 @@ func Parse(r io.Reader) ([]Entry, error) {
 			Value: value,
 			Raw:   raw,
 			Line:  startLine,
+			IsRef: strings.HasPrefix(value, RefPrefix),
 		})
 	}
 
