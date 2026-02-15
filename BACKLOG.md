@@ -5,20 +5,13 @@
 <!-- Priority: P0 (hotfix), P1 (high), P2 (normal), P3 (low) -->
 <!-- Agent picks highest-priority TODO each iteration -->
 
-# Backlog
-
-<!-- Format: - [STATUS] PRIORITY | ID | Title -->
-<!-- Status: TODO, IN_PROGRESS, DONE, BLOCKED -->
-<!-- Priority: P0 (hotfix), P1 (high), P2 (normal), P3 (low) -->
-<!-- Agent picks highest-priority TODO each iteration -->
-
 ---
 
 ## Phase 0 — Project Bootstrap
 
-- [TODO] P1 | ENV-001 | Initialize Go module (`go mod init github.com/xcke/envref`)
-- [TODO] P1 | ENV-002 | Set up project directory structure (`cmd/`, `internal/`, `pkg/`)
-- [TODO] P1 | ENV-003 | Add Cobra CLI scaffold with root command and version flag
+- [DONE] P1 | ENV-001 | Initialize Go module (`go mod init github.com/xcke/envref`)
+- [DONE] P1 | ENV-002 | Set up project directory structure (`cmd/`, `internal/`, `pkg/`)
+- [DONE] P1 | ENV-003 | Add Cobra CLI scaffold with root command and version flag
 - [TODO] P1 | ENV-004 | Set up Makefile with `build`, `test`, `lint`, `install` targets
 - [TODO] P2 | ENV-005 | Add `.goreleaser.yml` for cross-platform binary releases
 - [TODO] P2 | ENV-006 | Set up CI pipeline (GitHub Actions: test, lint, build)
