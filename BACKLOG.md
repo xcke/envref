@@ -72,8 +72,7 @@
 ### 3d — External Backends (plugins)
 
 - [TODO] P3 | ENV-050 | Implement 1Password CLI backend (`op` CLI wrapper)
-- [TODO] P3 | ENV-051 | Implement Bitwarden CLI backend (`bw` CLI wrapper)
-- [TODO] P3 | ENV-052 | Implement AWS SSM Parameter Store backend
+- [TODO] P3 | ENV-052 | Implement AWS SSM Parameter Store backend and Oracle OCI Vault store backend
 - [TODO] P3 | ENV-053 | Implement HashiCorp Vault backend
 - [TODO] P3 | ENV-054 | Define plugin interface for community-contributed backends
 
@@ -107,8 +106,8 @@
 
 ## Phase 6 — direnv Integration
 
-- [TODO] P1 | ENV-080 | Add `envref init --direnv` — generate `.envrc` with `eval "$(envref resolve --direnv)"`
-- [TODO] P1 | ENV-081 | Ensure `envref resolve --direnv` output is compatible with direnv `eval`
+- [DONE] P1 | ENV-080 | Add `envref init --direnv` — generate `.envrc` with `eval "$(envref resolve --direnv)"`
+- [DONE] P1 | ENV-081 | Ensure `envref resolve --direnv` output is compatible with direnv `eval`
 - [TODO] P2 | ENV-082 | Handle direnv trust/allow flow — prompt user to run `direnv allow` after init
 - [TODO] P2 | ENV-083 | Add `envref resolve --watch` — output on file changes (for direnv reload triggers)
 - [TODO] P2 | ENV-084 | Ensure fast startup (<50ms) for resolve command — benchmark and optimize
@@ -186,7 +185,7 @@
 
 ## Phase 12 — Testing & Quality
 
-- [TODO] P1 | ENV-140 | Unit tests for `.env` parser (edge cases, multiline, quotes, comments)
+- [DONE] P1 | ENV-140 | Unit tests for `.env` parser (edge cases, multiline, quotes, comments)
 - [TODO] P1 | ENV-141 | Unit tests for merge logic (override precedence, ref detection)
 - [TODO] P1 | ENV-142 | Unit tests for resolution pipeline (mock backends)
 - [TODO] P1 | ENV-143 | Integration tests for CLI commands (cobra test helpers)
