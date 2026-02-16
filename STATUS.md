@@ -1,7 +1,7 @@
 # Project Status
 
 ## Last Completed
-- ENV-115: Documented all seven backend types with configuration, examples, and troubleshooting [iter-72]
+- ENV-134: Added AUR package with GoReleaser aurs publisher and reference PKGBUILD [iter-73]
 
 ## Current State
 - Go module `github.com/xcke/envref` initialized with Cobra + Viper + go-keyring + age + sqlite + testify + x/term dependencies
@@ -44,7 +44,7 @@
 - **Security hardening:** Vault passphrase stored as `[]byte` (clearable), zeroed on Close; decrypted plaintext bytes cleared after use
 - **Comprehensive README** with architecture diagram, resolution pipeline, project structure, vault docs, and benchmarks
 - **docs/ directory** with four usage guides: getting-started, direnv-integration, profiles, secret-backends
-- **Homebrew tap:** GoReleaser `brews` config auto-publishes to `xcke/homebrew-tap`
+- **Distribution:** Homebrew tap via GoReleaser `brews` config; AUR `envref-bin` package via GoReleaser `aurs` publisher
 - **MIT LICENSE** file included
 - `.env` file parser with full quote/multiline/comment/BOM/CRLF support
 - `ref://` URI parser with `FindAll` for embedded ref discovery, `Backend` interface, `Registry`, `NamespacedBackend`

@@ -67,6 +67,28 @@ brews:
       - name: go
         type: build
 
+aurs:
+  - name: envref-bin
+    homepage: "https://github.com/xcke/envref"
+    description: "CLI tool for separating config from secrets in .env files"
+    license: "MIT"
+    maintainers:
+      - "xcke <xcke@users.noreply.github.com>"
+    contributors:
+      - "xcke <xcke@users.noreply.github.com>"
+    private_key: "{{ .Env.AUR_SSH_KEY }}"
+    git_url: "ssh://aur@aur.archlinux.org/envref-bin.git"
+    provides:
+      - envref
+    conflicts:
+      - envref
+    depends:
+      - glibc
+    package: |-
+      install -Dm755 "./envref" "${pkgdir}/usr/bin/envref"
+      install -Dm644 "./LICENSE" "${pkgdir}/usr/share/licenses/envref/LICENSE"
+      install -Dm644 "./README.md" "${pkgdir}/usr/share/doc/envref/README.md"
+
 release:
   github:
     owner: xcke

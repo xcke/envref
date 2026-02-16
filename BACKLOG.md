@@ -179,7 +179,7 @@
 - [DONE] P2 | ENV-131 | Add `docs/` with usage guides per feature (getting started, direnv, profiles, backends)
 - [DONE] P2 | ENV-132 | Set up GoReleaser for GitHub Releases (Linux, macOS, Windows binaries)
 - [DONE] P2 | ENV-133 | Add Homebrew tap formula
-- [TODO] P3 | ENV-134 | Add AUR package
+- [DONE] P3 | ENV-134 | Add AUR package
 - [TODO] P3 | ENV-135 | Add Scoop manifest (Windows)
 - [TODO] P3 | ENV-136 | Add Nix flake
 - [TODO] P3 | ENV-137 | Create project website / landing page Shell inspired Github Page landing page for the tool, with excelent documentation

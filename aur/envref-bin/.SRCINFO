@@ -1,0 +1,17 @@
+pkgbase = envref-bin
+	pkgdesc = CLI tool for separating config from secrets in .env files
+	pkgver = 0.0.0
+	pkgrel = 1
+	url = https://github.com/xcke/envref
+	arch = x86_64
+	arch = aarch64
+	license = MIT
+	provides = envref
+	conflicts = envref
+	depends = glibc
+	source_x86_64 = https://github.com/xcke/envref/releases/download/v0.0.0/envref_0.0.0_linux_amd64.tar.gz
+	sha256sums_x86_64 = SKIP
+	source_aarch64 = https://github.com/xcke/envref/releases/download/v0.0.0/envref_0.0.0_linux_arm64.tar.gz
+	sha256sums_aarch64 = SKIP
+
+pkgname = envref-bin
