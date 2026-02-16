@@ -1,7 +1,7 @@
 # Project Status
 
 ## Last Completed
-- ENV-091: Added `envref profile list` command — shows configured profiles, discovers convention-based `.env.*` files on disk, marks active profile with `*` [iter-15]
+- ENV-092: Added `envref profile use <name>` command — sets active profile in `.envref.yaml`, validates profile exists in config or as convention file on disk, supports `--clear` flag to deactivate [iter-16]
 
 ## Current State
 - Go module `github.com/xcke/envref` initialized with Cobra + Viper + go-keyring + testify dependencies
@@ -16,7 +16,9 @@
 - `envref resolve --profile <name>` — uses a named profile's env file in the merge chain
 - `envref resolve --direnv` — outputs `export KEY=VALUE` format for shell integration
 - `envref profile list` — shows available profiles from config and convention-based `.env.*` files, marks active profile
+- `envref profile use <name>` — sets active profile in `.envref.yaml`, validates against config and disk, supports `--clear`
 - **Profile support:** `.envref.yaml` `active_profile` field, `profiles` map with custom `env_file` paths, convention-based naming (`.env.<name>`), `--profile` flag overrides config, 3-layer merge: base ← profile ← local
+- **Config write support:** `SetActiveProfile()` function for targeted YAML field updates preserving file formatting
 - Resolution pipeline: `internal/resolve` package with `Resolve()` function, per-key error collection, direct backend matching + fallback chain
 - Shell-safe quoting for direnv export output (single-quote escaping)
 - Variable interpolation (`${VAR}` and `$VAR` syntax)
@@ -34,6 +36,8 @@
 - **Resolve test coverage: 50+ test cases**
 - **Integration test coverage: 50+ test cases** (including profile tests)
 - **Profile list test coverage: 11 test cases**
+- **Profile use test coverage: 10 test cases**
+- **Config SetActiveProfile test coverage: 5 test cases**
 - Directory structure: `cmd/envref/`, `internal/cmd/`, `internal/parser/`, `internal/envfile/`, `internal/config/`, `internal/ref/`, `internal/resolve/`, `internal/backend/`, `pkg/`
 - All checks pass: `go build`, `go vet`, `go test`, `golangci-lint`
 

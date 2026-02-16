@@ -665,6 +665,129 @@ profiles:
 	}
 }
 
+func TestSetActiveProfile_UpdateExisting(t *testing.T) {
+	dir := t.TempDir()
+	content := `project: myapp
+active_profile: staging
+profiles:
+  staging:
+    env_file: .env.staging
+  production:
+    env_file: .env.production
+`
+	path := writeFile(t, dir, FullFileName, content)
+
+	if err := SetActiveProfile(path, "production"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify the file was updated correctly.
+	cfg, err := LoadFile(path)
+	if err != nil {
+		t.Fatalf("loading updated config: %v", err)
+	}
+	if cfg.ActiveProfile != "production" {
+		t.Errorf("ActiveProfile = %q, want %q", cfg.ActiveProfile, "production")
+	}
+	// Verify other fields are preserved.
+	if cfg.Project != "myapp" {
+		t.Errorf("Project = %q, want %q", cfg.Project, "myapp")
+	}
+	if len(cfg.Profiles) != 2 {
+		t.Errorf("len(Profiles) = %d, want 2", len(cfg.Profiles))
+	}
+}
+
+func TestSetActiveProfile_InsertNew(t *testing.T) {
+	dir := t.TempDir()
+	content := `project: myapp
+env_file: .env
+local_file: .env.local
+profiles:
+  staging:
+    env_file: .env.staging
+`
+	path := writeFile(t, dir, FullFileName, content)
+
+	if err := SetActiveProfile(path, "staging"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	cfg, err := LoadFile(path)
+	if err != nil {
+		t.Fatalf("loading updated config: %v", err)
+	}
+	if cfg.ActiveProfile != "staging" {
+		t.Errorf("ActiveProfile = %q, want %q", cfg.ActiveProfile, "staging")
+	}
+	if cfg.Project != "myapp" {
+		t.Errorf("Project = %q, want %q", cfg.Project, "myapp")
+	}
+}
+
+func TestSetActiveProfile_ClearProfile(t *testing.T) {
+	dir := t.TempDir()
+	content := `project: myapp
+active_profile: staging
+profiles:
+  staging:
+    env_file: .env.staging
+`
+	path := writeFile(t, dir, FullFileName, content)
+
+	if err := SetActiveProfile(path, ""); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	cfg, err := LoadFile(path)
+	if err != nil {
+		t.Fatalf("loading updated config: %v", err)
+	}
+	if cfg.ActiveProfile != "" {
+		t.Errorf("ActiveProfile = %q, want empty", cfg.ActiveProfile)
+	}
+	if cfg.Project != "myapp" {
+		t.Errorf("Project = %q, want %q", cfg.Project, "myapp")
+	}
+}
+
+func TestSetActiveProfile_PreservesComments(t *testing.T) {
+	dir := t.TempDir()
+	content := `# envref project configuration
+project: myapp
+env_file: .env
+# This is a comment
+local_file: .env.local
+`
+	path := writeFile(t, dir, FullFileName, content)
+
+	if err := SetActiveProfile(path, "staging"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("reading file: %v", err)
+	}
+	got := string(data)
+	if !contains(got, "# envref project configuration") {
+		t.Error("comment was lost from file")
+	}
+	if !contains(got, "# This is a comment") {
+		t.Error("inline comment was lost from file")
+	}
+	if !contains(got, "active_profile: staging") {
+		t.Error("active_profile was not inserted")
+	}
+}
+
+func TestSetActiveProfile_NonexistentFile(t *testing.T) {
+	err := SetActiveProfile("/nonexistent/path/.envref.yaml", "staging")
+	if err == nil {
+		t.Fatal("expected error for nonexistent file")
+	}
+}
+
 // contains reports whether s contains substr.
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && containsAt(s, substr)

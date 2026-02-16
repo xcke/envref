@@ -121,7 +121,7 @@
   Plan: Added ActiveProfile field to Config, ProfileEnvFile/HasProfile/EffectiveProfile methods,
   --profile flag on resolve, --profile-file on get/list, updated loadAndMergeEnv for 3-layer merge.
 - [DONE] P1 | ENV-091 | Add `envref profile list` — show available profiles
-- [TODO] P1 | ENV-092 | Add `envref profile use <name>` — set active profile (stored in `.envref.yaml` or `.envref.local`)
+- [DONE] P1 | ENV-092 | Add `envref profile use <name>` — set active profile (stored in `.envref.yaml` or `.envref.local`)
 - [DONE] P1 | ENV-093 | Update resolve pipeline to load base `.env` ← profile `.env.<name>` ← `.env.local`
 - [TODO] P2 | ENV-094 | Add `envref profile create <name>` — scaffold new profile file
 - [TODO] P2 | ENV-095 | Add `envref profile diff <a> <b>` — show key/value differences between profiles

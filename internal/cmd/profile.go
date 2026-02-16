@@ -26,6 +26,7 @@ Use subcommands to list available profiles.`,
 	}
 
 	cmd.AddCommand(newProfileListCmd())
+	cmd.AddCommand(newProfileUseCmd())
 
 	return cmd
 }
@@ -49,6 +50,86 @@ Examples:
 			return runProfileList(cmd)
 		},
 	}
+}
+
+// newProfileUseCmd creates the profile use subcommand.
+func newProfileUseCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "use <name>",
+		Short: "Set the active profile",
+		Long: `Set the active environment profile for the current project.
+
+Updates the active_profile field in .envref.yaml so that subsequent
+commands (resolve, get, list) use the specified profile by default.
+
+The profile must either be defined in .envref.yaml or exist as a
+convention-based file (e.g., .env.<name>) on disk.
+
+Use the --clear flag to deactivate the current profile.
+
+Examples:
+  envref profile use staging       # activate the staging profile
+  envref profile use production    # switch to production
+  envref profile use --clear       # deactivate the current profile`,
+		Args: cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			clear, _ := cmd.Flags().GetBool("clear")
+			var name string
+			if clear {
+				name = ""
+			} else {
+				if len(args) == 0 {
+					return fmt.Errorf("profile name is required (or use --clear to deactivate)")
+				}
+				name = args[0]
+			}
+			return runProfileUse(cmd, name)
+		},
+	}
+
+	cmd.Flags().Bool("clear", false, "clear the active profile")
+
+	return cmd
+}
+
+// runProfileUse implements the profile use command logic.
+func runProfileUse(cmd *cobra.Command, name string) error {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("getting working directory: %w", err)
+	}
+
+	cfg, projectDir, err := config.Load(cwd)
+	if err != nil {
+		return fmt.Errorf("loading config: %w", err)
+	}
+
+	// If clearing the active profile, just update and return.
+	if name == "" {
+		configPath := filepath.Join(projectDir, config.FullFileName)
+		if err := config.SetActiveProfile(configPath, ""); err != nil {
+			return fmt.Errorf("updating config: %w", err)
+		}
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "Cleared active profile")
+		return nil
+	}
+
+	// Validate that the profile exists (in config or on disk).
+	if !cfg.HasProfile(name) {
+		envFile := ".env." + name
+		diskPath := filepath.Join(projectDir, envFile)
+		if _, statErr := os.Stat(diskPath); statErr != nil {
+			return fmt.Errorf("profile %q not found (not in config and %s does not exist)", name, envFile)
+		}
+	}
+
+	configPath := filepath.Join(projectDir, config.FullFileName)
+	if err := config.SetActiveProfile(configPath, name); err != nil {
+		return fmt.Errorf("updating config: %w", err)
+	}
+
+	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Active profile set to %q\n", name)
+	return nil
 }
 
 // profileInfo holds information about a discovered profile.

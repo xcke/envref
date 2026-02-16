@@ -219,6 +219,56 @@ func findConfigDir(startDir string) (string, error) {
 	}
 }
 
+// SetActiveProfile updates the active_profile field in the config file at path.
+// It preserves existing file content by performing a targeted line replacement
+// rather than re-marshaling the entire config. If the file does not already
+// contain an active_profile line, one is inserted after the project line.
+// An empty profile name clears the active profile.
+func SetActiveProfile(path, profile string) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("reading config %s: %w", path, err)
+	}
+
+	lines := strings.Split(string(data), "\n")
+	found := false
+
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "active_profile:") || strings.HasPrefix(trimmed, "active_profile :") {
+			if profile == "" {
+				// Remove the line entirely.
+				lines = append(lines[:i], lines[i+1:]...)
+			} else {
+				lines[i] = "active_profile: " + profile
+			}
+			found = true
+			break
+		}
+	}
+
+	if !found && profile != "" {
+		// Insert after the project line, or at the top if no project line.
+		insertIdx := 0
+		for i, line := range lines {
+			trimmed := strings.TrimSpace(line)
+			if strings.HasPrefix(trimmed, "project:") || strings.HasPrefix(trimmed, "project :") {
+				insertIdx = i + 1
+				break
+			}
+		}
+		newLine := "active_profile: " + profile
+		lines = append(lines[:insertIdx+1], lines[insertIdx:]...)
+		lines[insertIdx] = newLine
+	}
+
+	content := strings.Join(lines, "\n")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		return fmt.Errorf("writing config %s: %w", path, err)
+	}
+	return nil
+}
+
 // loadFile reads and parses a single config file using Viper.
 func loadFile(path string) (*Config, error) {
 	v := viper.New()

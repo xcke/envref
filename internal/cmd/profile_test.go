@@ -275,4 +275,178 @@ func TestProfileCmd_Help(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, stdout, "Manage environment profiles")
 	assert.Contains(t, stdout, "list")
+	assert.Contains(t, stdout, "use")
+}
+
+// --- profile use tests -------------------------------------------------------
+
+func TestProfileUseCmd_SetConfiguredProfile(t *testing.T) {
+	dir := t.TempDir()
+	cfgContent := `project: myapp
+env_file: .env
+local_file: .env.local
+profiles:
+  staging:
+    env_file: .env.staging
+  production:
+    env_file: .env.production
+`
+	writeTestFile(t, dir, config.FullFileName, cfgContent)
+	writeTestFile(t, dir, ".env", "KEY=value\n")
+
+	chdir(t, dir)
+
+	stdout, _, err := execCmd(t, "profile", "use", "staging")
+	require.NoError(t, err)
+	assert.Contains(t, stdout, "staging")
+
+	// Verify the config file was updated.
+	cfg, loadErr := config.LoadFile(filepath.Join(dir, config.FullFileName))
+	require.NoError(t, loadErr)
+	assert.Equal(t, "staging", cfg.ActiveProfile)
+}
+
+func TestProfileUseCmd_SetConventionProfile(t *testing.T) {
+	dir := t.TempDir()
+	cfgContent := `project: myapp
+env_file: .env
+local_file: .env.local
+`
+	writeTestFile(t, dir, config.FullFileName, cfgContent)
+	writeTestFile(t, dir, ".env", "KEY=value\n")
+	writeTestFile(t, dir, ".env.development", "KEY=dev\n")
+
+	chdir(t, dir)
+
+	stdout, _, err := execCmd(t, "profile", "use", "development")
+	require.NoError(t, err)
+	assert.Contains(t, stdout, "development")
+
+	cfg, loadErr := config.LoadFile(filepath.Join(dir, config.FullFileName))
+	require.NoError(t, loadErr)
+	assert.Equal(t, "development", cfg.ActiveProfile)
+}
+
+func TestProfileUseCmd_SwitchProfile(t *testing.T) {
+	dir := t.TempDir()
+	cfgContent := `project: myapp
+active_profile: staging
+profiles:
+  staging:
+    env_file: .env.staging
+  production:
+    env_file: .env.production
+`
+	writeTestFile(t, dir, config.FullFileName, cfgContent)
+	writeTestFile(t, dir, ".env", "KEY=value\n")
+
+	chdir(t, dir)
+
+	stdout, _, err := execCmd(t, "profile", "use", "production")
+	require.NoError(t, err)
+	assert.Contains(t, stdout, "production")
+
+	cfg, loadErr := config.LoadFile(filepath.Join(dir, config.FullFileName))
+	require.NoError(t, loadErr)
+	assert.Equal(t, "production", cfg.ActiveProfile)
+}
+
+func TestProfileUseCmd_ClearProfile(t *testing.T) {
+	dir := t.TempDir()
+	cfgContent := `project: myapp
+active_profile: staging
+profiles:
+  staging:
+    env_file: .env.staging
+`
+	writeTestFile(t, dir, config.FullFileName, cfgContent)
+	writeTestFile(t, dir, ".env", "KEY=value\n")
+
+	chdir(t, dir)
+
+	stdout, _, err := execCmd(t, "profile", "use", "--clear")
+	require.NoError(t, err)
+	assert.Contains(t, stdout, "Cleared active profile")
+
+	cfg, loadErr := config.LoadFile(filepath.Join(dir, config.FullFileName))
+	require.NoError(t, loadErr)
+	assert.Empty(t, cfg.ActiveProfile)
+}
+
+func TestProfileUseCmd_NonexistentProfile(t *testing.T) {
+	dir := t.TempDir()
+	cfgContent := `project: myapp
+profiles:
+  staging:
+    env_file: .env.staging
+`
+	writeTestFile(t, dir, config.FullFileName, cfgContent)
+	writeTestFile(t, dir, ".env", "KEY=value\n")
+
+	chdir(t, dir)
+
+	_, _, err := execCmd(t, "profile", "use", "nonexistent")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "not found")
+}
+
+func TestProfileUseCmd_NoArgs(t *testing.T) {
+	dir := t.TempDir()
+	cfgContent := `project: myapp
+`
+	writeTestFile(t, dir, config.FullFileName, cfgContent)
+
+	chdir(t, dir)
+
+	_, _, err := execCmd(t, "profile", "use")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "profile name is required")
+}
+
+func TestProfileUseCmd_NoConfig(t *testing.T) {
+	dir := t.TempDir()
+	chdir(t, dir)
+
+	_, _, err := execCmd(t, "profile", "use", "staging")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "loading config")
+}
+
+func TestProfileUseCmd_PreservesOtherConfig(t *testing.T) {
+	dir := t.TempDir()
+	cfgContent := `project: myapp
+env_file: .env
+local_file: .env.local
+backends:
+  - name: keychain
+    type: keychain
+profiles:
+  staging:
+    env_file: .env.staging
+  production:
+    env_file: .env.production
+`
+	writeTestFile(t, dir, config.FullFileName, cfgContent)
+	writeTestFile(t, dir, ".env", "KEY=value\n")
+
+	chdir(t, dir)
+
+	_, _, err := execCmd(t, "profile", "use", "staging")
+	require.NoError(t, err)
+
+	cfg, loadErr := config.LoadFile(filepath.Join(dir, config.FullFileName))
+	require.NoError(t, loadErr)
+	assert.Equal(t, "staging", cfg.ActiveProfile)
+	assert.Equal(t, "myapp", cfg.Project)
+	assert.Equal(t, ".env", cfg.EnvFile)
+	assert.Len(t, cfg.Backends, 1)
+	assert.Len(t, cfg.Profiles, 2)
+}
+
+func TestProfileUseCmd_Help(t *testing.T) {
+	stdout, _, err := execCmd(t, "profile", "use", "--help")
+	require.NoError(t, err)
+	assert.Contains(t, stdout, "Set the active environment profile")
+	assert.Contains(t, stdout, "envref profile use staging")
+	assert.Contains(t, stdout, "--clear")
 }
