@@ -44,6 +44,12 @@ Examples:
   envref run --strict -- make test`,
 		// Cobra's built-in -- handling passes everything after -- as args.
 		Args: cobra.MinimumNArgs(1),
+		PreRun: func(cmd *cobra.Command, args []string) {
+			setVaultCmdContext(cmd)
+		},
+		PostRun: func(cmd *cobra.Command, args []string) {
+			clearVaultCmdContext()
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			profile, _ := cmd.Flags().GetString("profile")
 			strict, _ := cmd.Flags().GetBool("strict")

@@ -33,6 +33,12 @@ Examples:
   envref status                          # show environment overview
   envref status --profile staging        # show status for staging profile`,
 		Args: cobra.NoArgs,
+		PreRun: func(cmd *cobra.Command, args []string) {
+			setVaultCmdContext(cmd)
+		},
+		PostRun: func(cmd *cobra.Command, args []string) {
+			clearVaultCmdContext()
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			profile, _ := cmd.Flags().GetString("profile")
 			return runStatus(cmd, profile)

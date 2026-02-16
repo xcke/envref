@@ -1,10 +1,10 @@
 # Project Status
 
 ## Last Completed
-- ENV-040: Implemented local encrypted vault backend with SQLite + age encryption [iter-44]
+- ENV-041: Added vault init command with master passphrase setup flow and verification [iter-45]
 
 ## Current State
-- Go module `github.com/xcke/envref` initialized with Cobra + Viper + go-keyring + age + sqlite + testify dependencies
+- Go module `github.com/xcke/envref` initialized with Cobra + Viper + go-keyring + age + sqlite + testify + x/term dependencies
 - Root command with help text describing envref's purpose
 - `envref version` subcommand prints version (set via `-ldflags` at build time)
 - `envref init` command scaffolds new envref projects (`.envref.yaml`, `.env`, `.env.local`, optional `.envrc`)
@@ -26,8 +26,11 @@
 - `envref config show` — prints resolved effective config (plain, JSON, table formats)
 - `envref completion <shell>` — generates shell completion scripts (bash, zsh, fish, powershell)
 - `envref edit` — opens .env files in `$VISUAL`/`$EDITOR`
+- `envref vault init` — initialize vault with master passphrase (interactive prompt with confirmation, or via env var)
 - **Two secret backends:** `KeychainBackend` (OS keychain via go-keyring) and `VaultBackend` (local SQLite + age encryption)
-- **VaultBackend:** per-value age scrypt encryption, passphrase via `ENVREF_VAULT_PASSPHRASE` env var or `config.passphrase`, configurable DB path, lazy connection, WAL mode
+- **VaultBackend:** per-value age scrypt encryption, passphrase via `ENVREF_VAULT_PASSPHRASE` env var or `config.passphrase` or interactive terminal prompt, configurable DB path, lazy connection, WAL mode
+- **Vault setup flow:** `vault init` stores encrypted verification token; subsequent access verifies passphrase against token; wrong passphrase returns clear error
+- **Interactive passphrase prompt:** secret/resolve/run/status commands prompt for vault passphrase at terminal when not configured via env var or config
 - **Global verbosity flags, colorized output, fuzzy key matching, resolution cache**
 - **README.md** with project overview, install instructions, quickstart, and command reference
 - `.env` file parser with full quote/multiline/comment/BOM/CRLF support

@@ -27,6 +27,12 @@ func newSecretCmd() *cobra.Command {
 
 Use subcommands to set, get, delete, and list secrets for the current project.
 Secrets are namespaced by project name from .envref.yaml.`,
+		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			setVaultCmdContext(cmd)
+		},
+		PersistentPostRun: func(cmd *cobra.Command, args []string) {
+			clearVaultCmdContext()
+		},
 	}
 
 	cmd.AddCommand(newSecretSetCmd())
@@ -852,22 +858,9 @@ func createBackend(bc config.BackendConfig) (backend.Backend, error) {
 
 // createVaultBackend creates a VaultBackend from the backend config.
 // The passphrase is resolved in order: ENVREF_VAULT_PASSPHRASE env var,
-// then config.passphrase from .envref.yaml. Returns an error if no
-// passphrase is available.
+// config.passphrase from .envref.yaml, then interactive terminal prompt
+// (if a command context is available). Returns an error if no passphrase
+// can be obtained.
 func createVaultBackend(bc config.BackendConfig) (*backend.VaultBackend, error) {
-	// Resolve passphrase: env var takes precedence over config.
-	passphrase := os.Getenv("ENVREF_VAULT_PASSPHRASE")
-	if passphrase == "" {
-		passphrase = bc.Config["passphrase"]
-	}
-	if passphrase == "" {
-		return nil, fmt.Errorf("vault passphrase required: set ENVREF_VAULT_PASSPHRASE or config.passphrase in .envref.yaml")
-	}
-
-	var opts []backend.VaultOption
-	if path := bc.Config["path"]; path != "" {
-		opts = append(opts, backend.WithVaultPath(path))
-	}
-
-	return backend.NewVaultBackend(passphrase, opts...)
+	return createVaultBackendWithContext(bc)
 }

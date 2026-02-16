@@ -283,6 +283,147 @@ func TestVaultBackend_CloseIdempotent(t *testing.T) {
 	}
 }
 
+func TestVaultBackend_Initialize(t *testing.T) {
+	v := testVault(t)
+
+	// Vault starts uninitialized.
+	initialized, err := v.IsInitialized()
+	if err != nil {
+		t.Fatalf("IsInitialized: %v", err)
+	}
+	if initialized {
+		t.Fatal("new vault should not be initialized")
+	}
+
+	// Initialize the vault.
+	if err := v.Initialize(); err != nil {
+		t.Fatalf("Initialize: %v", err)
+	}
+
+	// Vault is now initialized.
+	initialized, err = v.IsInitialized()
+	if err != nil {
+		t.Fatalf("IsInitialized after init: %v", err)
+	}
+	if !initialized {
+		t.Fatal("vault should be initialized after Initialize()")
+	}
+
+	// Double-initialize should fail.
+	err = v.Initialize()
+	if err == nil {
+		t.Fatal("double Initialize should fail")
+	}
+}
+
+func TestVaultBackend_VerifyPassphrase(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "vault.db")
+
+	// Create and initialize a vault.
+	v1, err := NewVaultBackend("correct-pass", WithVaultPath(dbPath))
+	if err != nil {
+		t.Fatalf("NewVaultBackend: %v", err)
+	}
+	if err := v1.Initialize(); err != nil {
+		t.Fatalf("Initialize: %v", err)
+	}
+
+	// Verify with correct passphrase.
+	if err := v1.VerifyPassphrase(); err != nil {
+		t.Fatalf("VerifyPassphrase (correct): %v", err)
+	}
+	if err := v1.Close(); err != nil {
+		t.Fatalf("Close v1: %v", err)
+	}
+
+	// Open with wrong passphrase — VerifyPassphrase should fail.
+	v2, err := NewVaultBackend("wrong-pass", WithVaultPath(dbPath))
+	if err != nil {
+		t.Fatalf("NewVaultBackend v2: %v", err)
+	}
+	defer func() { _ = v2.Close() }()
+
+	err = v2.VerifyPassphrase()
+	if !errors.Is(err, ErrWrongPassphrase) {
+		t.Fatalf("VerifyPassphrase (wrong): got %v, want ErrWrongPassphrase", err)
+	}
+}
+
+func TestVaultBackend_VerifyPassphrase_NotInitialized(t *testing.T) {
+	v := testVault(t)
+
+	// VerifyPassphrase on uninitialized vault returns ErrVaultNotInitialized.
+	err := v.VerifyPassphrase()
+	if !errors.Is(err, ErrVaultNotInitialized) {
+		t.Fatalf("VerifyPassphrase (uninitialized): got %v, want ErrVaultNotInitialized", err)
+	}
+}
+
+func TestVaultBackend_InitializePersistence(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "vault.db")
+
+	// Initialize, close, reopen — should still be initialized.
+	v1, err := NewVaultBackend("pass123", WithVaultPath(dbPath))
+	if err != nil {
+		t.Fatalf("NewVaultBackend v1: %v", err)
+	}
+	if err := v1.Initialize(); err != nil {
+		t.Fatalf("Initialize: %v", err)
+	}
+	if err := v1.Close(); err != nil {
+		t.Fatalf("Close v1: %v", err)
+	}
+
+	v2, err := NewVaultBackend("pass123", WithVaultPath(dbPath))
+	if err != nil {
+		t.Fatalf("NewVaultBackend v2: %v", err)
+	}
+	defer func() { _ = v2.Close() }()
+
+	initialized, err := v2.IsInitialized()
+	if err != nil {
+		t.Fatalf("IsInitialized v2: %v", err)
+	}
+	if !initialized {
+		t.Fatal("vault should remain initialized after close/reopen")
+	}
+
+	if err := v2.VerifyPassphrase(); err != nil {
+		t.Fatalf("VerifyPassphrase v2: %v", err)
+	}
+}
+
+func TestVaultBackend_SecretsWorkWithInitialization(t *testing.T) {
+	v := testVault(t)
+
+	// Initialize the vault.
+	if err := v.Initialize(); err != nil {
+		t.Fatalf("Initialize: %v", err)
+	}
+
+	// Secrets should still work after initialization.
+	if err := v.Set("api_key", "secret123"); err != nil {
+		t.Fatalf("Set: %v", err)
+	}
+	val, err := v.Get("api_key")
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if val != "secret123" {
+		t.Fatalf("Get: got %q, want %q", val, "secret123")
+	}
+
+	keys, err := v.List()
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if len(keys) != 1 {
+		t.Fatalf("List: got %d keys, want 1", len(keys))
+	}
+}
+
 func TestVaultBackend_ReopenAfterClose(t *testing.T) {
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "vault.db")

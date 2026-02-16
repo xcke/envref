@@ -41,6 +41,12 @@ Examples:
   envref resolve --strict                # fail with no output if any ref fails
   eval "$(envref resolve --direnv)"      # inject into current shell`,
 		Args: cobra.NoArgs,
+		PreRun: func(cmd *cobra.Command, args []string) {
+			setVaultCmdContext(cmd)
+		},
+		PostRun: func(cmd *cobra.Command, args []string) {
+			clearVaultCmdContext()
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			direnv, _ := cmd.Flags().GetBool("direnv")
 			profile, _ := cmd.Flags().GetString("profile")

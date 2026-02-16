@@ -226,8 +226,116 @@ func (v *VaultBackend) Close() error {
 	return nil
 }
 
+// metadataVerifyKey is the metadata key used to store an encrypted
+// verification token. On initialization, a known plaintext is encrypted
+// with the passphrase and stored. On subsequent opens, decrypting this
+// token verifies that the correct passphrase was provided.
+const metadataVerifyKey = "__envref_verify__"
+
+// metadataVerifyPlaintext is the known plaintext encrypted into the
+// verification token during vault initialization.
+const metadataVerifyPlaintext = "envref-vault-ok"
+
+// ErrVaultNotInitialized is returned when the vault database exists but
+// has no verification token — i.e., vault init has not been run.
+var ErrVaultNotInitialized = errors.New("vault not initialized: run 'envref vault init'")
+
+// ErrWrongPassphrase is returned when the verification token cannot be
+// decrypted with the provided passphrase.
+var ErrWrongPassphrase = errors.New("wrong vault passphrase")
+
+// Initialize stores an encrypted verification token in the vault. This
+// must be called once before regular use. It returns an error if the
+// vault is already initialized.
+func (v *VaultBackend) Initialize() error {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+
+	db, err := v.open()
+	if err != nil {
+		return fmt.Errorf("vault init: %w", err)
+	}
+
+	// Check if already initialized.
+	var existing string
+	err = db.QueryRow("SELECT value FROM metadata WHERE key = ?", metadataVerifyKey).Scan(&existing)
+	if err == nil {
+		return fmt.Errorf("vault is already initialized at %s", v.dbPath)
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return fmt.Errorf("vault init: checking existing token: %w", err)
+	}
+
+	// Encrypt the verification plaintext with the current passphrase.
+	token, err := v.encrypt(metadataVerifyPlaintext)
+	if err != nil {
+		return fmt.Errorf("vault init: encrypting verification token: %w", err)
+	}
+
+	_, err = db.Exec("INSERT INTO metadata (key, value) VALUES (?, ?)", metadataVerifyKey, token)
+	if err != nil {
+		return fmt.Errorf("vault init: storing verification token: %w", err)
+	}
+
+	return nil
+}
+
+// IsInitialized returns true if the vault has a verification token
+// stored (i.e., vault init has been run).
+func (v *VaultBackend) IsInitialized() (bool, error) {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+
+	db, err := v.open()
+	if err != nil {
+		return false, fmt.Errorf("vault: %w", err)
+	}
+
+	var dummy string
+	err = db.QueryRow("SELECT value FROM metadata WHERE key = ?", metadataVerifyKey).Scan(&dummy)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("vault: checking initialization: %w", err)
+	}
+	return true, nil
+}
+
+// VerifyPassphrase checks that the current passphrase can decrypt the
+// stored verification token. Returns ErrVaultNotInitialized if no token
+// exists, or ErrWrongPassphrase if decryption fails.
+func (v *VaultBackend) VerifyPassphrase() error {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+
+	db, err := v.open()
+	if err != nil {
+		return fmt.Errorf("vault: %w", err)
+	}
+
+	var token string
+	err = db.QueryRow("SELECT value FROM metadata WHERE key = ?", metadataVerifyKey).Scan(&token)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrVaultNotInitialized
+	}
+	if err != nil {
+		return fmt.Errorf("vault: reading verification token: %w", err)
+	}
+
+	plaintext, err := v.decrypt(token)
+	if err != nil {
+		return ErrWrongPassphrase
+	}
+	if plaintext != metadataVerifyPlaintext {
+		return ErrWrongPassphrase
+	}
+
+	return nil
+}
+
 // open lazily opens (or returns) the SQLite database connection and
-// ensures the secrets table exists. Must be called with v.mu held.
+// ensures the secrets and metadata tables exist. Must be called with v.mu held.
 func (v *VaultBackend) open() (*sql.DB, error) {
 	if v.db != nil {
 		return v.db, nil
@@ -252,6 +360,16 @@ func (v *VaultBackend) open() (*sql.DB, error) {
 	if err != nil {
 		_ = db.Close()
 		return nil, fmt.Errorf("initializing vault schema: %w", err)
+	}
+
+	// Create the metadata table for vault state (verification token, etc.).
+	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS metadata (
+		key   TEXT PRIMARY KEY NOT NULL,
+		value TEXT NOT NULL
+	)`)
+	if err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("initializing vault metadata schema: %w", err)
 	}
 
 	v.db = db

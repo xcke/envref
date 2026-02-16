@@ -49,6 +49,7 @@ from your OS keychain or other secret backends at runtime.`,
 	rootCmd.AddCommand(newConfigCmd())
 	rootCmd.AddCommand(newCompletionCmd())
 	rootCmd.AddCommand(newEditCmd())
+	rootCmd.AddCommand(newVaultCmd())
 
 	return rootCmd
 }
