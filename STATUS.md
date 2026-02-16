@@ -1,7 +1,7 @@
 # Project Status
 
 ## Last Completed
-- ENV-066: Added `envref secret copy` command to copy secrets between projects [iter-31]
+- ENV-076: Added in-memory resolution cache to avoid duplicate backend hits for identical ref:// URIs [iter-32]
 
 ## Current State
 - Go module `github.com/xcke/envref` initialized with Cobra + Viper + go-keyring + testify dependencies
@@ -24,6 +24,7 @@
 - `envref doctor` — scans .env files for common issues
 - `envref config show` — prints resolved effective config (plain, JSON, table formats)
 - `envref completion <shell>` — generates shell completion scripts (bash, zsh, fish, powershell)
+- **Resolution cache:** Duplicate `ref://` URIs within a single resolve call are resolved once, avoiding redundant backend queries
 - **Config validation on load:** `Load()` calls `Validate()` automatically, returning `*ValidationError` for semantic errors
 - **Config inheritance:** Global config at `~/.config/envref/config.yaml` merged with project `.envref.yaml`
 - **Output format support:** `--format` flag on `get`, `list`, `resolve`, and `config show` commands (plain, json, shell, table)

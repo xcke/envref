@@ -58,6 +58,24 @@ func (m *mockBackend) List() ([]string, error) {
 	return keys, nil
 }
 
+// countingBackend wraps a mockBackend and counts Get calls per key.
+type countingBackend struct {
+	*mockBackend
+	getCounts map[string]int
+}
+
+func newCountingBackend(name string, secrets map[string]string) *countingBackend {
+	return &countingBackend{
+		mockBackend: newMockBackend(name, secrets),
+		getCounts:   make(map[string]int),
+	}
+}
+
+func (c *countingBackend) Get(key string) (string, error) {
+	c.getCounts[key]++
+	return c.mockBackend.Get(key)
+}
+
 // errorBackend always returns an error on Get (simulates connection failures).
 type errorBackend struct {
 	name string
@@ -1039,6 +1057,112 @@ func TestResolve_DuplicateRefPaths(t *testing.T) {
 	assert.Len(t, result.Entries, 2)
 	assert.Equal(t, "the_value", result.Entries[0].Value)
 	assert.Equal(t, "the_value", result.Entries[1].Value)
+}
+
+// ---------------------------------------------------------------------------
+// Resolution Cache Tests
+// ---------------------------------------------------------------------------
+
+func TestResolve_CacheAvoidsDuplicateBackendHits(t *testing.T) {
+	// Three env vars reference the same secret. The backend should only be hit once.
+	cb := newCountingBackend("keychain", map[string]string{
+		"proj/shared": "the_value",
+	})
+	env := buildEnv(
+		parser.Entry{Key: "A", Value: "ref://keychain/shared", IsRef: true},
+		parser.Entry{Key: "B", Value: "ref://keychain/shared", IsRef: true},
+		parser.Entry{Key: "C", Value: "ref://keychain/shared", IsRef: true},
+	)
+	reg := buildRegistry(cb)
+
+	result, err := resolve.Resolve(env, reg, "proj")
+	require.NoError(t, err)
+
+	assert.True(t, result.Resolved())
+	assert.Len(t, result.Entries, 3)
+	for _, entry := range result.Entries {
+		assert.Equal(t, "the_value", entry.Value)
+		assert.True(t, entry.WasRef)
+	}
+
+	// The backend should have been queried only once for the namespaced key.
+	assert.Equal(t, 1, cb.getCounts["proj/shared"],
+		"expected 1 backend hit for duplicate refs, got %d", cb.getCounts["proj/shared"])
+}
+
+func TestResolve_CacheDistinctRefsHitBackendSeparately(t *testing.T) {
+	// Different ref URIs should each hit the backend once.
+	cb := newCountingBackend("keychain", map[string]string{
+		"proj/key_a": "val_a",
+		"proj/key_b": "val_b",
+	})
+	env := buildEnv(
+		parser.Entry{Key: "A", Value: "ref://keychain/key_a", IsRef: true},
+		parser.Entry{Key: "B", Value: "ref://keychain/key_b", IsRef: true},
+	)
+	reg := buildRegistry(cb)
+
+	result, err := resolve.Resolve(env, reg, "proj")
+	require.NoError(t, err)
+
+	assert.True(t, result.Resolved())
+	assert.Equal(t, 1, cb.getCounts["proj/key_a"])
+	assert.Equal(t, 1, cb.getCounts["proj/key_b"])
+}
+
+func TestResolve_CacheErrorsAreAlsoCached(t *testing.T) {
+	// If a ref fails, the error should be cached so duplicate refs don't retry.
+	cb := newCountingBackend("keychain", map[string]string{})
+	env := buildEnv(
+		parser.Entry{Key: "A", Value: "ref://keychain/missing", IsRef: true},
+		parser.Entry{Key: "B", Value: "ref://keychain/missing", IsRef: true},
+	)
+	reg := buildRegistry(cb)
+
+	result, err := resolve.Resolve(env, reg, "proj")
+	require.NoError(t, err)
+
+	assert.False(t, result.Resolved())
+	assert.Len(t, result.Errors, 2)
+	assert.Equal(t, "A", result.Errors[0].Key)
+	assert.Equal(t, "B", result.Errors[1].Key)
+
+	// Backend should have been queried only once.
+	assert.Equal(t, 1, cb.getCounts["proj/missing"],
+		"expected 1 backend hit for cached error, got %d", cb.getCounts["proj/missing"])
+}
+
+func TestResolve_CacheMixedSuccessAndDuplicates(t *testing.T) {
+	// Mix of unique refs and duplicates. Each unique ref hits the backend once.
+	cb := newCountingBackend("keychain", map[string]string{
+		"proj/secret_a": "val_a",
+		"proj/secret_b": "val_b",
+	})
+	env := buildEnv(
+		parser.Entry{Key: "A1", Value: "ref://keychain/secret_a", IsRef: true},
+		parser.Entry{Key: "B1", Value: "ref://keychain/secret_b", IsRef: true},
+		parser.Entry{Key: "A2", Value: "ref://keychain/secret_a", IsRef: true},
+		parser.Entry{Key: "B2", Value: "ref://keychain/secret_b", IsRef: true},
+		parser.Entry{Key: "A3", Value: "ref://keychain/secret_a", IsRef: true},
+	)
+	reg := buildRegistry(cb)
+
+	result, err := resolve.Resolve(env, reg, "proj")
+	require.NoError(t, err)
+
+	assert.True(t, result.Resolved())
+	assert.Len(t, result.Entries, 5)
+
+	// Each unique secret queried exactly once.
+	assert.Equal(t, 1, cb.getCounts["proj/secret_a"])
+	assert.Equal(t, 1, cb.getCounts["proj/secret_b"])
+
+	// All entries get correct values.
+	assert.Equal(t, "val_a", result.Entries[0].Value)
+	assert.Equal(t, "val_b", result.Entries[1].Value)
+	assert.Equal(t, "val_a", result.Entries[2].Value)
+	assert.Equal(t, "val_b", result.Entries[3].Value)
+	assert.Equal(t, "val_a", result.Entries[4].Value)
 }
 
 // ---------------------------------------------------------------------------

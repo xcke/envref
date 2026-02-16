@@ -90,6 +90,14 @@ func Resolve(env *envfile.Env, registry *backend.Registry, project string) (*Res
 		}
 	}
 
+	// Cache resolved values to avoid duplicate backend hits when multiple
+	// env vars reference the same secret (keyed by raw ref:// URI).
+	type cachedResult struct {
+		value string
+		err   error
+	}
+	cache := make(map[string]cachedResult)
+
 	result := &Result{}
 	for _, envEntry := range env.All() {
 		if !envEntry.IsRef {
@@ -117,13 +125,19 @@ func Resolve(env *envfile.Env, registry *backend.Registry, project string) (*Res
 			continue
 		}
 
-		// Resolve the secret.
-		value, resolveErr := resolveRef(parsed, nsBackends, nsRegistry)
-		if resolveErr != nil {
+		// Check the cache before hitting backends.
+		cached, ok := cache[envEntry.Value]
+		if !ok {
+			value, resolveErr := resolveRef(parsed, nsBackends, nsRegistry)
+			cached = cachedResult{value: value, err: resolveErr}
+			cache[envEntry.Value] = cached
+		}
+
+		if cached.err != nil {
 			result.Errors = append(result.Errors, KeyErr{
 				Key: envEntry.Key,
 				Ref: envEntry.Value,
-				Err: resolveErr,
+				Err: cached.err,
 			})
 			// Keep the original ref:// value for unresolved entries.
 			result.Entries = append(result.Entries, Entry{
@@ -136,7 +150,7 @@ func Resolve(env *envfile.Env, registry *backend.Registry, project string) (*Res
 
 		result.Entries = append(result.Entries, Entry{
 			Key:    envEntry.Key,
-			Value:  value,
+			Value:  cached.value,
 			WasRef: true,
 		})
 	}
