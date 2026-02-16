@@ -8,6 +8,10 @@ secrets     = OS keychain / password manager / cloud vault
 envref resolve = config + resolved secrets → direnv / shell env
 ```
 
+<p align="center">
+  <img src="site/demo.svg" alt="envref demo — init, add refs, store secrets, resolve" width="820">
+</p>
+
 ## Install
 
 ### Homebrew (macOS / Linux)

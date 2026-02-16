@@ -1,0 +1,103 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 560" font-family="'JetBrains Mono','Fira Code','Cascadia Code','SF Mono','Menlo','Consolas',monospace" font-size="13">
+  <defs>
+    <style>
+      .bg { fill: #0d1117; }
+      .titlebar { fill: #161b22; }
+      .titlebar-text { fill: #8b949e; font-size: 12px; text-anchor: middle; }
+      .dot-red { fill: #ff5f56; }
+      .dot-yellow { fill: #ffbd2e; }
+      .dot-green { fill: #27c93f; }
+      .prompt { fill: #7ee787; }
+      .cmd { fill: #e6edf5; }
+      .comment { fill: #6b7d93; }
+      .key { fill: #79c0ff; }
+      .value { fill: #ffa657; }
+      .ref { fill: #d2a8ff; }
+      .string { fill: #a5d6ff; }
+      .success { fill: #7ee787; }
+      .output { fill: #c5cdd8; }
+      .dim { fill: #484f58; }
+      .cursor { fill: #58a6ff; }
+      @keyframes blink { 0%,49% { opacity: 1; } 50%,100% { opacity: 0; } }
+      @keyframes typeLine1 { 0%,3% { width: 0; } 6% { width: 270px; } 100% { width: 270px; } }
+      @keyframes typeLine2 { 0%,14% { width: 0; } 17% { width: 255px; } 100% { width: 255px; } }
+      @keyframes typeLine3 { 0%,32% { width: 0; } 35% { width: 354px; } 100% { width: 354px; } }
+      @keyframes typeLine4 { 0%,50% { width: 0; } 53% { width: 115px; } 100% { width: 115px; } }
+      @keyframes showOutput1 { 0%,7% { opacity: 0; } 8% { opacity: 1; } 100% { opacity: 1; } }
+      @keyframes showOutput2 { 0%,18% { opacity: 0; } 19% { opacity: 1; } 100% { opacity: 1; } }
+      @keyframes showOutput3 { 0%,36% { opacity: 0; } 37% { opacity: 1; } 100% { opacity: 1; } }
+      @keyframes showOutput4 { 0%,54% { opacity: 0; } 55% { opacity: 1; } 100% { opacity: 1; } }
+      .line1-clip rect { animation: typeLine1 22s steps(34,end) infinite; }
+      .line2-clip rect { animation: typeLine2 22s steps(32,end) infinite; }
+      .line3-clip rect { animation: typeLine3 22s steps(44,end) infinite; }
+      .line4-clip rect { animation: typeLine4 22s steps(15,end) infinite; }
+      .output1 { animation: showOutput1 22s step-end infinite; }
+      .output2 { animation: showOutput2 22s step-end infinite; }
+      .output3 { animation: showOutput3 22s step-end infinite; }
+      .output4 { animation: showOutput4 22s step-end infinite; }
+    </style>
+    <clipPath id="clip1" class="line1-clip"><rect x="0" y="0" width="0" height="20"/></clipPath>
+    <clipPath id="clip2" class="line2-clip"><rect x="0" y="0" width="0" height="20"/></clipPath>
+    <clipPath id="clip3" class="line3-clip"><rect x="0" y="0" width="0" height="20"/></clipPath>
+    <clipPath id="clip4" class="line4-clip"><rect x="0" y="0" width="0" height="20"/></clipPath>
+  </defs>
+
+  <!-- Window frame -->
+  <rect class="bg" width="820" height="560" rx="8"/>
+  <rect class="titlebar" width="820" height="36" rx="8"/>
+  <rect class="titlebar" y="28" width="820" height="8"/>
+  <circle class="dot-red" cx="20" cy="18" r="6"/>
+  <circle class="dot-yellow" cx="40" cy="18" r="6"/>
+  <circle class="dot-green" cx="60" cy="18" r="6"/>
+  <text class="titlebar-text" x="410" y="22">envref — ~/my-project</text>
+
+  <!-- Step 1: envref init -->
+  <g transform="translate(20, 56)">
+    <text class="comment" y="0">&#35; Step 1: Initialize a new project</text>
+    <g clip-path="url(#clip1)">
+      <text y="20"><tspan class="prompt">$ </tspan><tspan class="cmd">envref init --project my-app</tspan></text>
+    </g>
+    <g class="output1">
+      <text class="success" y="44">&#10004; Created .envref.yaml</text>
+      <text class="success" y="62">&#10004; Created .env with example entries</text>
+      <text class="success" y="80">&#10004; Created .env.local (gitignored)</text>
+      <text class="output" y="102">Project "my-app" initialized. Run envref secret set to add secrets.</text>
+    </g>
+  </g>
+
+  <!-- Step 2: Show .env content with ref:// -->
+  <g transform="translate(20, 178)" class="output2">
+    <text class="comment" y="0">&#35; Step 2: Your .env uses ref:// for secrets (safe to commit)</text>
+    <text y="20"><tspan class="prompt">$ </tspan><tspan class="cmd">cat .env</tspan></text>
+    <text y="44"><tspan class="key">APP_NAME</tspan><tspan class="dim">=</tspan><tspan class="string">my-app</tspan></text>
+    <text y="62"><tspan class="key">APP_PORT</tspan><tspan class="dim">=</tspan><tspan class="string">3000</tspan></text>
+    <text y="80"><tspan class="key">DATABASE_URL</tspan><tspan class="dim">=</tspan><tspan class="ref">ref://secrets/database_url</tspan></text>
+    <text y="98"><tspan class="key">API_KEY</tspan><tspan class="dim">=</tspan><tspan class="ref">ref://secrets/api_key</tspan></text>
+  </g>
+
+  <!-- Step 3: Store a secret -->
+  <g transform="translate(20, 300)">
+    <text class="comment output3" y="0">&#35; Step 3: Store actual secrets in your OS keychain</text>
+    <g clip-path="url(#clip3)">
+      <text y="20"><tspan class="prompt">$ </tspan><tspan class="cmd">envref secret set api_key --value sk-live-abc123</tspan></text>
+    </g>
+    <g class="output3">
+      <text class="success" y="44">&#10004; Stored "api_key" in keychain backend (project: my-app)</text>
+    </g>
+  </g>
+
+  <!-- Step 4: Resolve -->
+  <g transform="translate(20, 368)">
+    <text class="comment output4" y="0">&#35; Step 4: Resolve references → real values</text>
+    <g clip-path="url(#clip4)">
+      <text y="20"><tspan class="prompt">$ </tspan><tspan class="cmd">envref resolve</tspan></text>
+    </g>
+    <g class="output4">
+      <text y="44"><tspan class="key">APP_NAME</tspan><tspan class="dim">=</tspan><tspan class="string">my-app</tspan></text>
+      <text y="62"><tspan class="key">APP_PORT</tspan><tspan class="dim">=</tspan><tspan class="string">3000</tspan></text>
+      <text y="80"><tspan class="key">DATABASE_URL</tspan><tspan class="dim">=</tspan><tspan class="value">postgres://user:pass@db.example.com:5432/mydb</tspan></text>
+      <text y="98"><tspan class="key">API_KEY</tspan><tspan class="dim">=</tspan><tspan class="value">sk-live-abc123</tspan></text>
+      <text class="dim" y="124">&#35; ref:// → resolved from keychain  &#9475;  zero secrets on disk  &#9475;  .env is safe to commit</text>
+    </g>
+  </g>
+</svg>

@@ -1,7 +1,7 @@
 # Project Status
 
 ## Last Completed
-- ENV-137: Created project landing page with terminal-inspired design and GitHub Pages deploy workflow [iter-76]
+- ENV-138: Created animated SVG terminal demo showing the 4-step envref workflow (init, ref://, store secret, resolve); embedded in README.md [iter-77]
 
 ## Current State
 - Go module `github.com/xcke/envref` initialized with Cobra + Viper + go-keyring + age + sqlite + testify + x/term dependencies
@@ -42,10 +42,11 @@
 - **Team config:** `.envref.yaml` supports a `team` section with member names and age public keys; validated on load (unique names/keys, age1... format)
 - **Nested references:** `${ref://secrets/key}` in values and embedded `ref://` URIs after interpolation are resolved via a second pass in the resolution pipeline
 - **Security hardening:** Vault passphrase stored as `[]byte` (clearable), zeroed on Close; decrypted plaintext bytes cleared after use
-- **Comprehensive README** with architecture diagram, resolution pipeline, project structure, vault docs, and benchmarks
+- **Comprehensive README** with architecture diagram, resolution pipeline, project structure, vault docs, benchmarks, and animated SVG terminal demo
 - **docs/ directory** with four usage guides: getting-started, direnv-integration, profiles, secret-backends
 - **Distribution:** Homebrew tap via GoReleaser `brews` config; AUR `envref-bin` package via GoReleaser `aurs` publisher; Scoop bucket via GoReleaser `scoops` publisher (Windows); Nix flake with `buildGoModule` package and dev shell
 - **Project website:** Single-page landing page in `site/` with terminal-inspired dark theme, feature overview, backend comparison, CLI reference, installation methods, and documentation links; GitHub Pages deploy workflow in `.github/workflows/pages.yml`
+- **Animated SVG demo:** `site/demo.svg` with 4-step animated terminal showing init, ref://, secret store, and resolve workflow; embedded in README.md
 - **MIT LICENSE** file included
 - `.env` file parser with full quote/multiline/comment/BOM/CRLF support
 - `ref://` URI parser with `FindAll` for embedded ref discovery, `Backend` interface, `Registry`, `NamespacedBackend`

@@ -183,7 +183,7 @@
 - [DONE] P3 | ENV-135 | Add Scoop manifest (Windows)
 - [DONE] P3 | ENV-136 | Add Nix flake
 - [DONE] P3 | ENV-137 | Create project website / landing page Shell inspired Github Page landing page for the tool, with excelent documentation
-- [TODO] P3 | ENV-138 | Record demo GIF / asciinema for README
+- [DONE] P3 | ENV-138 | Create animated SVG terminal demo for README
 
 ---
 
