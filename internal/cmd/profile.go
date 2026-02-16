@@ -28,6 +28,7 @@ Use subcommands to list available profiles.`,
 
 	cmd.AddCommand(newProfileListCmd())
 	cmd.AddCommand(newProfileUseCmd())
+	cmd.AddCommand(newProfileCreateCmd())
 
 	return cmd
 }
@@ -91,6 +92,136 @@ Examples:
 	cmd.Flags().Bool("clear", false, "clear the active profile")
 
 	return cmd
+}
+
+// newProfileCreateCmd creates the profile create subcommand.
+func newProfileCreateCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "create <name>",
+		Short: "Create a new profile",
+		Long: `Create a new environment profile by scaffolding a profile-specific .env file.
+
+Creates the file .env.<name> (or a custom path via --env-file) and optionally
+registers the profile in .envref.yaml.
+
+By default, the new file is created with a comment header. Use --from to copy
+an existing .env file as a starting point.
+
+Examples:
+  envref profile create staging              # create .env.staging
+  envref profile create staging --register   # also add to .envref.yaml
+  envref profile create staging --from .env  # copy .env as starting point
+  envref profile create staging --env-file envs/staging.env  # custom path`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runProfileCreate(cmd, args[0])
+		},
+	}
+
+	cmd.Flags().Bool("register", false, "register the profile in .envref.yaml")
+	cmd.Flags().Bool("force", false, "overwrite existing profile file")
+	cmd.Flags().String("from", "", "copy an existing file as the profile base")
+	cmd.Flags().String("env-file", "", "custom env file path (default .env.<name>)")
+
+	return cmd
+}
+
+// runProfileCreate implements the profile create command logic.
+func runProfileCreate(cmd *cobra.Command, name string) error {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("getting working directory: %w", err)
+	}
+
+	cfg, projectDir, err := config.Load(cwd)
+	if err != nil {
+		return fmt.Errorf("loading config: %w", err)
+	}
+
+	w := output.NewWriter(cmd)
+
+	// Validate the profile name.
+	if name == "local" {
+		return fmt.Errorf("cannot create profile %q: reserved for local overrides (.env.local)", name)
+	}
+	if strings.Contains(name, ".") {
+		return fmt.Errorf("profile name %q must not contain dots", name)
+	}
+	if strings.Contains(name, "/") || strings.Contains(name, "\\") {
+		return fmt.Errorf("profile name %q must not contain path separators", name)
+	}
+	if name == "" {
+		return fmt.Errorf("profile name is required")
+	}
+
+	force, _ := cmd.Flags().GetBool("force")
+	register, _ := cmd.Flags().GetBool("register")
+	fromFile, _ := cmd.Flags().GetString("from")
+	envFileFlag, _ := cmd.Flags().GetString("env-file")
+
+	// Determine the target env file path.
+	envFile := ".env." + name
+	if envFileFlag != "" {
+		envFile = envFileFlag
+	}
+
+	targetPath := filepath.Join(projectDir, envFile)
+
+	// Check if file already exists.
+	if !force {
+		if _, statErr := os.Stat(targetPath); statErr == nil {
+			return fmt.Errorf("profile file %s already exists (use --force to overwrite)", envFile)
+		}
+	}
+
+	// Determine file content.
+	var content string
+	if fromFile != "" {
+		fromPath := filepath.Join(projectDir, fromFile)
+		data, readErr := os.ReadFile(fromPath)
+		if readErr != nil {
+			return fmt.Errorf("reading source file %s: %w", fromFile, readErr)
+		}
+		content = string(data)
+	} else {
+		content = fmt.Sprintf("# Environment variables for the %q profile\n# Merge order: .env ← .env.%s ← .env.local\n", name, name)
+	}
+
+	// Ensure parent directory exists for custom paths.
+	parentDir := filepath.Dir(targetPath)
+	if parentDir != projectDir {
+		if mkErr := os.MkdirAll(parentDir, 0o755); mkErr != nil {
+			return fmt.Errorf("creating directory %s: %w", parentDir, mkErr)
+		}
+	}
+
+	if err := os.WriteFile(targetPath, []byte(content), 0o644); err != nil {
+		return fmt.Errorf("writing %s: %w", envFile, err)
+	}
+	w.Info("Created %s\n", envFile)
+
+	// Optionally register in .envref.yaml.
+	if register {
+		// Only register with custom env_file if it differs from convention.
+		registerEnvFile := ""
+		if envFileFlag != "" {
+			registerEnvFile = envFileFlag
+		}
+
+		configPath := filepath.Join(projectDir, config.FullFileName)
+		if addErr := config.AddProfile(configPath, name, registerEnvFile); addErr != nil {
+			// If the profile already exists in config, warn but don't fail.
+			if cfg.HasProfile(name) {
+				w.Warn("Profile %q already registered in config\n", name)
+			} else {
+				return fmt.Errorf("registering profile in config: %w", addErr)
+			}
+		} else {
+			w.Info("Registered profile %q in %s\n", name, config.FullFileName)
+		}
+	}
+
+	return nil
 }
 
 // runProfileUse implements the profile use command logic.

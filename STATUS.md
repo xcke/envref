@@ -1,7 +1,7 @@
 # Project Status
 
 ## Last Completed
-- ENV-113: Implemented fuzzy key matching in error messages with "did you mean?" suggestions [iter-36]
+- ENV-094: Added `envref profile create <name>` command to scaffold new profile files [iter-37]
 
 ## Current State
 - Go module `github.com/xcke/envref` initialized with Cobra + Viper + go-keyring + testify dependencies
@@ -19,6 +19,7 @@
 - `envref run -- <command>` — resolves env vars and executes a subprocess with them injected
 - `envref profile list` — shows available profiles from config and convention-based `.env.*` files
 - `envref profile use <name>` — sets active profile in `.envref.yaml`
+- `envref profile create <name>` — scaffolds `.env.<name>` file with optional `--from`, `--register`, `--env-file`, `--force` flags
 - `envref validate` — checks .env against .env.example schema
 - `envref validate --ci` — CI mode: extra keys are errors, compact output, silent on success, exit code 1 on any failure
 - `envref status` — shows environment overview with actionable hints
@@ -34,6 +35,7 @@
 - **Config inheritance:** Global config at `~/.config/envref/config.yaml` merged with project `.envref.yaml`
 - **Output format support:** `--format` flag on `get`, `list`, `resolve`, and `config show` commands (plain, json, shell, table)
 - **Profile support:** 3-layer merge with `--profile` flag
+- **Config profile management:** `AddProfile()` function for programmatic config file updates
 - **Keychain error handling:** `KeychainError` type classifies raw go-keyring errors into categories with platform-specific actionable hints
 - Resolution pipeline with per-key error collection, partial resolution, direct backend matching + fallback chain
 - `.env` file parser with full quote/multiline/comment/BOM/CRLF support

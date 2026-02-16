@@ -871,6 +871,156 @@ func TestSetActiveProfile_NonexistentFile(t *testing.T) {
 	}
 }
 
+func TestAddProfile_NewProfilesSection(t *testing.T) {
+	dir := t.TempDir()
+	cfgContent := `project: myapp
+env_file: .env
+local_file: .env.local
+`
+	writeFile(t, dir, FullFileName, cfgContent)
+
+	path := filepath.Join(dir, FullFileName)
+	err := AddProfile(path, "staging", "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	cfg, loadErr := LoadFile(path)
+	if loadErr != nil {
+		t.Fatalf("LoadFile error: %v", loadErr)
+	}
+	if !cfg.HasProfile("staging") {
+		t.Error("profile 'staging' should exist")
+	}
+}
+
+func TestAddProfile_ExistingProfilesSection(t *testing.T) {
+	dir := t.TempDir()
+	cfgContent := `project: myapp
+env_file: .env
+local_file: .env.local
+profiles:
+  staging:
+    env_file: .env.staging
+`
+	writeFile(t, dir, FullFileName, cfgContent)
+
+	path := filepath.Join(dir, FullFileName)
+	err := AddProfile(path, "production", ".env.production")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	cfg, loadErr := LoadFile(path)
+	if loadErr != nil {
+		t.Fatalf("LoadFile error: %v", loadErr)
+	}
+	if !cfg.HasProfile("production") {
+		t.Error("profile 'production' should exist")
+	}
+	if cfg.Profiles["production"].EnvFile != ".env.production" {
+		t.Errorf("EnvFile = %q, want %q", cfg.Profiles["production"].EnvFile, ".env.production")
+	}
+	// Staging should still be there.
+	if !cfg.HasProfile("staging") {
+		t.Error("profile 'staging' should still exist")
+	}
+}
+
+func TestAddProfile_DuplicateProfile(t *testing.T) {
+	dir := t.TempDir()
+	cfgContent := `project: myapp
+profiles:
+  staging:
+    env_file: .env.staging
+`
+	writeFile(t, dir, FullFileName, cfgContent)
+
+	path := filepath.Join(dir, FullFileName)
+	err := AddProfile(path, "staging", "")
+	if err == nil {
+		t.Fatal("expected error for duplicate profile")
+	}
+	if !contains(err.Error(), "already exists") {
+		t.Errorf("error = %q, want to contain 'already exists'", err.Error())
+	}
+}
+
+func TestAddProfile_WithCustomEnvFile(t *testing.T) {
+	dir := t.TempDir()
+	cfgContent := `project: myapp
+env_file: .env
+local_file: .env.local
+`
+	writeFile(t, dir, FullFileName, cfgContent)
+
+	path := filepath.Join(dir, FullFileName)
+	err := AddProfile(path, "staging", "envs/staging.env")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	cfg, loadErr := LoadFile(path)
+	if loadErr != nil {
+		t.Fatalf("LoadFile error: %v", loadErr)
+	}
+	if !cfg.HasProfile("staging") {
+		t.Error("profile 'staging' should exist")
+	}
+	if cfg.Profiles["staging"].EnvFile != "envs/staging.env" {
+		t.Errorf("EnvFile = %q, want %q", cfg.Profiles["staging"].EnvFile, "envs/staging.env")
+	}
+}
+
+func TestAddProfile_NonexistentFile(t *testing.T) {
+	err := AddProfile("/nonexistent/path/.envref.yaml", "staging", "")
+	if err == nil {
+		t.Fatal("expected error for nonexistent file")
+	}
+}
+
+func TestAddProfile_PreservesExistingContent(t *testing.T) {
+	dir := t.TempDir()
+	cfgContent := `project: myapp
+env_file: .env
+local_file: .env.local
+backends:
+  - name: keychain
+    type: keychain
+profiles:
+  staging:
+    env_file: .env.staging
+`
+	writeFile(t, dir, FullFileName, cfgContent)
+
+	path := filepath.Join(dir, FullFileName)
+	err := AddProfile(path, "production", "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	cfg, loadErr := LoadFile(path)
+	if loadErr != nil {
+		t.Fatalf("LoadFile error: %v", loadErr)
+	}
+	// Original config should be preserved.
+	if cfg.Project != "myapp" {
+		t.Errorf("Project = %q, want %q", cfg.Project, "myapp")
+	}
+	if len(cfg.Backends) != 1 {
+		t.Fatalf("len(Backends) = %d, want 1", len(cfg.Backends))
+	}
+	if cfg.Backends[0].Name != "keychain" {
+		t.Errorf("Backends[0].Name = %q, want %q", cfg.Backends[0].Name, "keychain")
+	}
+	if !cfg.HasProfile("staging") {
+		t.Error("profile 'staging' should still exist")
+	}
+	if !cfg.HasProfile("production") {
+		t.Error("profile 'production' should exist")
+	}
+}
+
 func TestGlobalConfigDir(t *testing.T) {
 	t.Run("uses ENVREF_CONFIG_DIR if set", func(t *testing.T) {
 		t.Setenv("ENVREF_CONFIG_DIR", "/custom/config/dir")

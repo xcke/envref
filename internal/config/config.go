@@ -450,6 +450,113 @@ func SetActiveProfile(path, profile string) error {
 	return nil
 }
 
+// AddProfile adds a new profile entry to the config file at path.
+// It preserves existing file content by performing a targeted insertion
+// into the profiles section. If no profiles section exists, one is created.
+// Returns an error if the profile already exists.
+func AddProfile(path, profile, envFile string) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("reading config %s: %w", path, err)
+	}
+
+	lines := strings.Split(string(data), "\n")
+
+	// Check if the profile already exists in the config.
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == profile+":" && isInProfilesSection(lines, line) {
+			return fmt.Errorf("profile %q already exists in config", profile)
+		}
+	}
+
+	// Build the new profile entry. Always include env_file so the profile
+	// is parseable by Viper (a key with no sub-keys is treated as null).
+	if envFile == "" {
+		envFile = ".env." + profile
+	}
+	entry := "  " + profile + ":\n    env_file: " + envFile
+
+	// Find the profiles section and insert the new entry.
+	profilesSectionIdx := -1
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "profiles:" {
+			profilesSectionIdx = i
+			break
+		}
+	}
+
+	if profilesSectionIdx >= 0 {
+		// Find the end of the profiles section (next top-level key or EOF).
+		insertIdx := profilesSectionIdx + 1
+		for insertIdx < len(lines) {
+			line := lines[insertIdx]
+			trimmed := strings.TrimSpace(line)
+			if trimmed == "" || strings.HasPrefix(line, "  ") || strings.HasPrefix(line, "#") {
+				insertIdx++
+				continue
+			}
+			// Reached a new top-level key.
+			break
+		}
+
+		// Insert before the next top-level key (or at end of section).
+		entryLines := strings.Split(entry, "\n")
+		newLines := make([]string, 0, len(lines)+len(entryLines))
+		newLines = append(newLines, lines[:insertIdx]...)
+		newLines = append(newLines, entryLines...)
+		newLines = append(newLines, lines[insertIdx:]...)
+		lines = newLines
+	} else {
+		// No profiles section — add one at the end.
+		// Find a good insertion point: before trailing empty lines.
+		insertIdx := len(lines)
+		for insertIdx > 0 && strings.TrimSpace(lines[insertIdx-1]) == "" {
+			insertIdx--
+		}
+
+		section := "\nprofiles:\n" + entry
+		sectionLines := strings.Split(section, "\n")
+		newLines := make([]string, 0, len(lines)+len(sectionLines))
+		newLines = append(newLines, lines[:insertIdx]...)
+		newLines = append(newLines, sectionLines...)
+		newLines = append(newLines, lines[insertIdx:]...)
+		lines = newLines
+	}
+
+	content := strings.Join(lines, "\n")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		return fmt.Errorf("writing config %s: %w", path, err)
+	}
+	return nil
+}
+
+// isInProfilesSection checks if the given line appears within the profiles
+// section of the config. This is a heuristic: the line must be indented and
+// appear after a "profiles:" top-level key.
+func isInProfilesSection(lines []string, target string) bool {
+	inProfiles := false
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "profiles:" {
+			inProfiles = true
+			continue
+		}
+		if inProfiles {
+			// Check if we've left the profiles section (new top-level key).
+			if len(line) > 0 && line[0] != ' ' && line[0] != '#' && trimmed != "" {
+				inProfiles = false
+				continue
+			}
+			if line == target {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // loadFile reads and parses a single config file using Viper.
 func loadFile(path string) (*Config, error) {
 	v := viper.New()

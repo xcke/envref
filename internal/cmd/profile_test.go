@@ -450,3 +450,221 @@ func TestProfileUseCmd_Help(t *testing.T) {
 	assert.Contains(t, stdout, "envref profile use staging")
 	assert.Contains(t, stdout, "--clear")
 }
+
+// --- profile create tests ----------------------------------------------------
+
+func TestProfileCreateCmd_Basic(t *testing.T) {
+	dir := t.TempDir()
+	cfgContent := `project: myapp
+env_file: .env
+local_file: .env.local
+`
+	writeTestFile(t, dir, config.FullFileName, cfgContent)
+	writeTestFile(t, dir, ".env", "KEY=value\n")
+
+	chdir(t, dir)
+
+	stdout, _, err := execCmd(t, "profile", "create", "staging")
+	require.NoError(t, err)
+	assert.Contains(t, stdout, "staging")
+
+	// Verify the file was created.
+	data, readErr := os.ReadFile(filepath.Join(dir, ".env.staging"))
+	require.NoError(t, readErr)
+	assert.Contains(t, string(data), "staging")
+	assert.Contains(t, string(data), "# Environment variables")
+}
+
+func TestProfileCreateCmd_WithFromFile(t *testing.T) {
+	dir := t.TempDir()
+	cfgContent := `project: myapp
+env_file: .env
+local_file: .env.local
+`
+	writeTestFile(t, dir, config.FullFileName, cfgContent)
+	writeTestFile(t, dir, ".env", "KEY=value\nDB_HOST=localhost\n")
+
+	chdir(t, dir)
+
+	stdout, _, err := execCmd(t, "profile", "create", "staging", "--from", ".env")
+	require.NoError(t, err)
+	assert.Contains(t, stdout, "staging")
+
+	// Verify the file was copied from .env.
+	data, readErr := os.ReadFile(filepath.Join(dir, ".env.staging"))
+	require.NoError(t, readErr)
+	assert.Contains(t, string(data), "KEY=value")
+	assert.Contains(t, string(data), "DB_HOST=localhost")
+}
+
+func TestProfileCreateCmd_WithRegister(t *testing.T) {
+	dir := t.TempDir()
+	cfgContent := `project: myapp
+env_file: .env
+local_file: .env.local
+`
+	writeTestFile(t, dir, config.FullFileName, cfgContent)
+	writeTestFile(t, dir, ".env", "KEY=value\n")
+
+	chdir(t, dir)
+
+	stdout, _, err := execCmd(t, "profile", "create", "staging", "--register")
+	require.NoError(t, err)
+	assert.Contains(t, stdout, "Registered")
+
+	// Verify the profile was added to config.
+	cfg, loadErr := config.LoadFile(filepath.Join(dir, config.FullFileName))
+	require.NoError(t, loadErr)
+	assert.True(t, cfg.HasProfile("staging"))
+}
+
+func TestProfileCreateCmd_WithRegisterAndCustomEnvFile(t *testing.T) {
+	dir := t.TempDir()
+	cfgContent := `project: myapp
+env_file: .env
+local_file: .env.local
+`
+	writeTestFile(t, dir, config.FullFileName, cfgContent)
+	writeTestFile(t, dir, ".env", "KEY=value\n")
+
+	chdir(t, dir)
+
+	stdout, _, err := execCmd(t, "profile", "create", "staging", "--register", "--env-file", "envs/staging.env")
+	require.NoError(t, err)
+	assert.Contains(t, stdout, "Registered")
+
+	// Verify the profile was added with custom env_file.
+	cfg, loadErr := config.LoadFile(filepath.Join(dir, config.FullFileName))
+	require.NoError(t, loadErr)
+	assert.True(t, cfg.HasProfile("staging"))
+	assert.Equal(t, "envs/staging.env", cfg.Profiles["staging"].EnvFile)
+
+	// Verify the file was created at the custom path.
+	_, statErr := os.Stat(filepath.Join(dir, "envs", "staging.env"))
+	assert.NoError(t, statErr)
+}
+
+func TestProfileCreateCmd_AlreadyExists(t *testing.T) {
+	dir := t.TempDir()
+	cfgContent := `project: myapp
+env_file: .env
+local_file: .env.local
+`
+	writeTestFile(t, dir, config.FullFileName, cfgContent)
+	writeTestFile(t, dir, ".env", "KEY=value\n")
+	writeTestFile(t, dir, ".env.staging", "EXISTING=true\n")
+
+	chdir(t, dir)
+
+	_, _, err := execCmd(t, "profile", "create", "staging")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "already exists")
+}
+
+func TestProfileCreateCmd_ForceOverwrite(t *testing.T) {
+	dir := t.TempDir()
+	cfgContent := `project: myapp
+env_file: .env
+local_file: .env.local
+`
+	writeTestFile(t, dir, config.FullFileName, cfgContent)
+	writeTestFile(t, dir, ".env", "KEY=value\n")
+	writeTestFile(t, dir, ".env.staging", "EXISTING=true\n")
+
+	chdir(t, dir)
+
+	stdout, _, err := execCmd(t, "profile", "create", "staging", "--force")
+	require.NoError(t, err)
+	assert.Contains(t, stdout, "staging")
+
+	// Verify the file was overwritten.
+	data, readErr := os.ReadFile(filepath.Join(dir, ".env.staging"))
+	require.NoError(t, readErr)
+	assert.NotContains(t, string(data), "EXISTING")
+	assert.Contains(t, string(data), "# Environment variables")
+}
+
+func TestProfileCreateCmd_ReservedNameLocal(t *testing.T) {
+	dir := t.TempDir()
+	cfgContent := `project: myapp
+env_file: .env
+local_file: .env.local
+`
+	writeTestFile(t, dir, config.FullFileName, cfgContent)
+	writeTestFile(t, dir, ".env", "KEY=value\n")
+
+	chdir(t, dir)
+
+	_, _, err := execCmd(t, "profile", "create", "local")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "reserved")
+}
+
+func TestProfileCreateCmd_InvalidNameWithDots(t *testing.T) {
+	dir := t.TempDir()
+	cfgContent := `project: myapp
+env_file: .env
+local_file: .env.local
+`
+	writeTestFile(t, dir, config.FullFileName, cfgContent)
+	writeTestFile(t, dir, ".env", "KEY=value\n")
+
+	chdir(t, dir)
+
+	_, _, err := execCmd(t, "profile", "create", "staging.bak")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "must not contain dots")
+}
+
+func TestProfileCreateCmd_NoArgs(t *testing.T) {
+	dir := t.TempDir()
+	cfgContent := `project: myapp
+`
+	writeTestFile(t, dir, config.FullFileName, cfgContent)
+
+	chdir(t, dir)
+
+	_, _, err := execCmd(t, "profile", "create")
+	assert.Error(t, err)
+}
+
+func TestProfileCreateCmd_NoConfig(t *testing.T) {
+	dir := t.TempDir()
+	chdir(t, dir)
+
+	_, _, err := execCmd(t, "profile", "create", "staging")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "loading config")
+}
+
+func TestProfileCreateCmd_FromNonexistentFile(t *testing.T) {
+	dir := t.TempDir()
+	cfgContent := `project: myapp
+env_file: .env
+local_file: .env.local
+`
+	writeTestFile(t, dir, config.FullFileName, cfgContent)
+	writeTestFile(t, dir, ".env", "KEY=value\n")
+
+	chdir(t, dir)
+
+	_, _, err := execCmd(t, "profile", "create", "staging", "--from", ".env.nonexistent")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "reading source file")
+}
+
+func TestProfileCreateCmd_Help(t *testing.T) {
+	stdout, _, err := execCmd(t, "profile", "create", "--help")
+	require.NoError(t, err)
+	assert.Contains(t, stdout, "Create a new environment profile")
+	assert.Contains(t, stdout, "--register")
+	assert.Contains(t, stdout, "--force")
+	assert.Contains(t, stdout, "--from")
+	assert.Contains(t, stdout, "--env-file")
+}
+
+func TestProfileCreateCmd_VisibleInHelp(t *testing.T) {
+	stdout, _, err := execCmd(t, "profile", "--help")
+	require.NoError(t, err)
+	assert.Contains(t, stdout, "create")
+}
