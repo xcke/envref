@@ -14,7 +14,7 @@
 - [DONE] P1 | ENV-003 | Add Cobra CLI scaffold with root command and version flag
 - [DONE] P1 | ENV-004 | Set up Makefile with `build`, `test`, `lint`, `install` targets
 - [DONE] P2 | ENV-005 | Add `.goreleaser.yml` for cross-platform binary releases
-- [TODO] P2 | ENV-006 | Set up CI pipeline (GitHub Actions: test, lint, build)
+- [DONE] P2 | ENV-006 | Set up CI pipeline (GitHub Actions: test, lint, build)
 - [TODO] P2 | ENV-007 | Add `README.md` with project overview, install instructions, and quickstart
 - [TODO] P3 | ENV-008 | Add `LICENSE` (MIT or Apache 2.0)
 - [TODO] P3 | ENV-009 | Add `.gitignore` for Go projects

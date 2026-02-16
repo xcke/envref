@@ -1,7 +1,7 @@
 # Project Status
 
 ## Last Completed
-- ENV-005: Added `.goreleaser.yml` for cross-platform binary releases (Linux/macOS/Windows, amd64/arm64) [iter-19]
+- ENV-006: Added GitHub Actions CI pipeline with test (multi-OS matrix), lint, and build jobs [iter-20]
 
 ## Current State
 - Go module `github.com/xcke/envref` initialized with Cobra + Viper + go-keyring + testify dependencies
@@ -29,6 +29,7 @@
 - `.env` file loader, merger, writer, and interpolator with ref:// handling
 - `ref://` URI parser, `Backend` interface, `Registry` with fallback chain, `NamespacedBackend`, `KeychainBackend`
 - **GoReleaser config** for cross-platform releases (Linux/macOS/Windows × amd64/arm64, tar.gz/zip, checksums, changelog)
+- **GitHub Actions CI pipeline** with test (ubuntu/macos/windows matrix), lint (go vet + golangci-lint), and build jobs
 - Makefile with build/test/lint/install targets
 - Comprehensive test coverage: parser (100+), merge (38+), resolve (50+), integration (50+), profile, validate, status tests
 - Directory structure: `cmd/envref/`, `internal/cmd/`, `internal/parser/`, `internal/envfile/`, `internal/config/`, `internal/ref/`, `internal/resolve/`, `internal/backend/`, `pkg/`
