@@ -182,6 +182,7 @@ func runSyncPush(cmd *cobra.Command, toKeys, toFiles []string, toTeam bool, file
 	if err != nil {
 		return fmt.Errorf("initializing backends: %w", err)
 	}
+	defer registry.CloseAll()
 
 	targetBackend := registry.Backend(backendName)
 	if targetBackend == nil {
@@ -299,6 +300,7 @@ func runSyncPull(cmd *cobra.Command, identityFile, file, backendName, profile st
 	if err != nil {
 		return fmt.Errorf("initializing backends: %w", err)
 	}
+	defer registry.CloseAll()
 
 	targetBackend := registry.Backend(backendName)
 	if targetBackend == nil {

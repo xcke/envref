@@ -102,6 +102,7 @@ func runOnboard(cmd *cobra.Command, profileOverride, backendName string, dryRun 
 	if err != nil {
 		return fmt.Errorf("initializing backends: %w", err)
 	}
+	defer registry.CloseAll()
 
 	targetBackend := registry.Backend(backendName)
 	if targetBackend == nil {

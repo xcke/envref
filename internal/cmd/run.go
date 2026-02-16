@@ -158,6 +158,7 @@ func resolveEnvEntries(cmd *cobra.Command, profileOverride string, strict bool) 
 	if err != nil {
 		return nil, fmt.Errorf("initializing backends: %w", err)
 	}
+	defer registry.CloseAll()
 
 	// Resolve references.
 	result, err := resolve.Resolve(env, registry, cfg.Project)

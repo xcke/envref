@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/xcke/envref/internal/backend"
@@ -527,13 +528,16 @@ func TestVaultExportCmd_ToFile(t *testing.T) {
 		t.Fatalf("export secrets count: got %d, want 2", len(export.Secrets))
 	}
 
-	// Verify file permissions are restrictive.
-	info, err := os.Stat(exportPath)
-	if err != nil {
-		t.Fatalf("stat export file: %v", err)
-	}
-	if info.Mode().Perm() != 0o600 {
-		t.Errorf("export file permissions: got %o, want 600", info.Mode().Perm())
+	// Verify file permissions are restrictive (skip on Windows where
+	// Unix-style permissions are not supported).
+	if runtime.GOOS != "windows" {
+		info, err := os.Stat(exportPath)
+		if err != nil {
+			t.Fatalf("stat export file: %v", err)
+		}
+		if info.Mode().Perm() != 0o600 {
+			t.Errorf("export file permissions: got %o, want 600", info.Mode().Perm())
+		}
 	}
 }
 

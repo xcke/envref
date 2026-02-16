@@ -121,6 +121,7 @@ func runSecretRotate(cmd *cobra.Command, key string, length int, charset, backen
 	if err != nil {
 		return fmt.Errorf("initializing backends: %w", err)
 	}
+	defer registry.CloseAll()
 
 	// Wrap the target backend with project namespace.
 	targetBackend := registry.Backend(backendName)

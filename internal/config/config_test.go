@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -15,6 +16,16 @@ func writeFile(t *testing.T, dir, name, content string) string {
 		t.Fatalf("writing %s: %v", path, err)
 	}
 	return path
+}
+
+// absTestPath returns an absolute path suitable for the current OS.
+// On Windows, Unix paths like "/etc/.env" aren't absolute, so we
+// convert them to a Windows absolute path.
+func absTestPath(unixPath string) string {
+	if runtime.GOOS == "windows" {
+		return `C:\` + filepath.FromSlash(unixPath[1:])
+	}
+	return unixPath
 }
 
 func TestDefaults(t *testing.T) {
@@ -211,7 +222,7 @@ func TestConfig_Validate(t *testing.T) {
 			name: "absolute env_file path",
 			config: Config{
 				Project:   "myapp",
-				EnvFile:   "/etc/.env",
+				EnvFile:   absTestPath("/etc/.env"),
 				LocalFile: ".env.local",
 			},
 			wantErr: true,
@@ -222,7 +233,7 @@ func TestConfig_Validate(t *testing.T) {
 			config: Config{
 				Project:   "myapp",
 				EnvFile:   ".env",
-				LocalFile: "/etc/.env.local",
+				LocalFile: absTestPath("/etc/.env.local"),
 			},
 			wantErr: true,
 			errMsg:  "local_file must be a relative path",
@@ -1572,9 +1583,7 @@ func TestLoad_ValidatesAbsolutePaths(t *testing.T) {
 	t.Setenv("ENVREF_CONFIG_DIR", t.TempDir())
 
 	projectDir := t.TempDir()
-	writeFile(t, projectDir, FullFileName, `project: myapp
-env_file: /etc/.env
-`)
+	writeFile(t, projectDir, FullFileName, "project: myapp\nenv_file: "+absTestPath("/etc/.env")+"\n")
 
 	_, _, err := Load(projectDir)
 	if err == nil {

@@ -3,6 +3,7 @@ package backend
 import (
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 )
 
@@ -139,6 +140,17 @@ func (r *Registry) Names() []string {
 		names[i] = b.Name()
 	}
 	return names
+}
+
+// CloseAll closes any backends that implement io.Closer. This should be
+// called when the registry is no longer needed to release resources such
+// as database connections.
+func (r *Registry) CloseAll() {
+	for _, b := range r.backends {
+		if c, ok := b.(io.Closer); ok {
+			_ = c.Close()
+		}
+	}
 }
 
 // String returns a human-readable description of the registry.

@@ -315,5 +315,5 @@ func TestConfigShowCmd_ConfigFileLocation(t *testing.T) {
 
 	stdout, _, err := execCmd(t, "config", "show")
 	require.NoError(t, err)
-	assert.Contains(t, stdout, "Config: "+dir+"/"+config.FullFileName)
+	assert.Contains(t, stdout, "Config: "+filepath.Join(dir, config.FullFileName))
 }

@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"os"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -236,6 +237,9 @@ func TestEditCmd_ExplicitFile_Opens(t *testing.T) {
 }
 
 func TestEditCmd_EditorReceivesFilePath(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("skipping on Windows: test uses a shell script as editor")
+	}
 	dir := setupProject(t, "testproject", "KEY=value\n", "")
 	chdir(t, dir)
 

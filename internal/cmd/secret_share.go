@@ -98,6 +98,7 @@ func runSecretShare(cmd *cobra.Command, key, to, toFile, backendName, profile st
 	if err != nil {
 		return fmt.Errorf("initializing backends: %w", err)
 	}
+	defer registry.CloseAll()
 
 	// Wrap the target backend with project namespace.
 	targetBackend := registry.Backend(backendName)

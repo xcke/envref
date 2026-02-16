@@ -111,6 +111,7 @@ func runSecretGet(cmd *cobra.Command, key, backendName, profile string) error {
 	if err != nil {
 		return fmt.Errorf("initializing backends: %w", err)
 	}
+	defer registry.CloseAll()
 
 	// Wrap the target backend with project namespace.
 	targetBackend := registry.Backend(backendName)
@@ -212,6 +213,7 @@ func runSecretList(cmd *cobra.Command, backendName, profile string) error {
 	if err != nil {
 		return fmt.Errorf("initializing backends: %w", err)
 	}
+	defer registry.CloseAll()
 
 	// Wrap the target backend with project namespace.
 	targetBackend := registry.Backend(backendName)
@@ -320,6 +322,7 @@ func runSecretDelete(cmd *cobra.Command, key, backendName string, force bool, pr
 	if err != nil {
 		return fmt.Errorf("initializing backends: %w", err)
 	}
+	defer registry.CloseAll()
 
 	// Wrap the target backend with project namespace.
 	targetBackend := registry.Backend(backendName)
@@ -444,6 +447,7 @@ func runSecretSet(cmd *cobra.Command, key, value, backendName, profile string) e
 	if err != nil {
 		return fmt.Errorf("initializing backends: %w", err)
 	}
+	defer registry.CloseAll()
 
 	// Wrap the target backend with project namespace.
 	targetBackend := registry.Backend(backendName)
@@ -621,6 +625,7 @@ func runSecretGenerate(cmd *cobra.Command, key string, length int, charset, back
 	if err != nil {
 		return fmt.Errorf("initializing backends: %w", err)
 	}
+	defer registry.CloseAll()
 
 	// Wrap the target backend with project namespace.
 	targetBackend := registry.Backend(backendName)
@@ -803,6 +808,7 @@ func runSecretCopy(cmd *cobra.Command, key, fromProject, backendName, profile, f
 	if err != nil {
 		return fmt.Errorf("initializing backends: %w", err)
 	}
+	defer registry.CloseAll()
 
 	// Get the raw backend.
 	targetBackend := registry.Backend(backendName)

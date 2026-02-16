@@ -138,6 +138,7 @@ func runResolve(cmd *cobra.Command, direnv bool, profileOverride, formatStr stri
 	if err != nil {
 		return fmt.Errorf("initializing backends: %w", err)
 	}
+	defer registry.CloseAll()
 
 	w.Debug("registered %d backend(s)\n", len(cfg.Backends))
 
@@ -311,6 +312,7 @@ func resolveAndOutput(cmd *cobra.Command, cfg *config.Config, envPath, profilePa
 	if err != nil {
 		return fmt.Errorf("initializing backends: %w", err)
 	}
+	defer registry.CloseAll()
 
 	result, err := resolve.ResolveWithProfile(env, registry, cfg.Project, profile)
 	if err != nil {
