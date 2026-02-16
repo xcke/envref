@@ -31,6 +31,9 @@ from your OS keychain or other secret backends at runtime.`,
 	rootCmd.PersistentFlags().Bool("debug", false, "show debug information")
 	rootCmd.MarkFlagsMutuallyExclusive("quiet", "verbose", "debug")
 
+	// Color control flag. Also respects NO_COLOR env var (https://no-color.org/).
+	rootCmd.PersistentFlags().Bool("no-color", false, "disable colorized output")
+
 	rootCmd.AddCommand(newVersionCmd())
 	rootCmd.AddCommand(newGetCmd())
 	rootCmd.AddCommand(newSetCmd())

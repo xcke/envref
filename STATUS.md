@@ -1,7 +1,7 @@
 # Project Status
 
 ## Last Completed
-- ENV-112: Added `--quiet`, `--verbose`, `--debug` global flags with `internal/output` package [iter-34]
+- ENV-111: Added colorized terminal output with `--no-color` flag and `NO_COLOR` env var support [iter-35]
 
 ## Current State
 - Go module `github.com/xcke/envref` initialized with Cobra + Viper + go-keyring + testify dependencies
@@ -26,7 +26,8 @@
 - `envref config show` — prints resolved effective config (plain, JSON, table formats)
 - `envref completion <shell>` — generates shell completion scripts (bash, zsh, fish, powershell)
 - **Global verbosity flags:** `--quiet`/`-q` suppresses info output, `--verbose` shows file loading detail, `--debug` shows internal trace; mutually exclusive via Cobra
-- **`internal/output` package:** `Writer` type with `Info`/`Verbose`/`Debug`/`Warn`/`Error` methods keyed to verbosity level
+- **Colorized output:** Errors (red), warnings (yellow), debug labels (cyan), success (green), section headers (bold); auto-detected via TTY; disabled with `--no-color` flag or `NO_COLOR` env var
+- **`internal/output` package:** `Writer` type with `Info`/`Verbose`/`Debug`/`Warn`/`Error`/`Success` methods + color helpers (`Red`/`Green`/`Yellow`/`Cyan`/`Bold`)
 - **Resolution cache:** Duplicate `ref://` URIs within a single resolve call are resolved once, avoiding redundant backend queries
 - **Config validation on load:** `Load()` calls `Validate()` automatically, returning `*ValidationError` for semantic errors
 - **Config inheritance:** Global config at `~/.config/envref/config.yaml` merged with project `.envref.yaml`

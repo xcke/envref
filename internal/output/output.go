@@ -49,20 +49,27 @@ func FromCmd(cmd *cobra.Command) Verbosity {
 }
 
 // Writer is a verbosity-aware writer that wraps a cobra command's output
-// streams and provides leveled printing helpers.
+// streams and provides leveled printing helpers. It optionally colorizes
+// prefixes and labels when writing to a terminal.
 type Writer struct {
 	out       io.Writer
 	errOut    io.Writer
 	verbosity Verbosity
+	color     bool
 }
 
 // NewWriter creates a Writer from a cobra command. It reads the verbosity
-// flags and captures the command's stdout and stderr writers.
+// flags and captures the command's stdout and stderr writers. Color output
+// is automatically enabled when stderr is a terminal and --no-color is not
+// set.
 func NewWriter(cmd *cobra.Command) *Writer {
+	noColor, _ := cmd.Flags().GetBool("no-color")
+	errW := cmd.ErrOrStderr()
 	return &Writer{
 		out:       cmd.OutOrStdout(),
-		errOut:    cmd.ErrOrStderr(),
+		errOut:    errW,
 		verbosity: FromCmd(cmd),
+		color:     colorEnabled(errW, noColor),
 	}
 }
 
@@ -103,20 +110,23 @@ func (w *Writer) Verbose(format string, args ...interface{}) {
 // Debug prints a message to stderr only when --debug is active.
 func (w *Writer) Debug(format string, args ...interface{}) {
 	if w.verbosity >= VerbosityDebug {
-		_, _ = fmt.Fprintf(w.errOut, "debug: "+format, args...)
+		msg := fmt.Sprintf(format, args...)
+		_, _ = fmt.Fprintf(w.errOut, "%s %s", w.debugPrefix(), msg)
 	}
 }
 
 // Warn prints a warning to stderr. Shown at all verbosity levels except quiet.
 func (w *Writer) Warn(format string, args ...interface{}) {
 	if w.verbosity >= VerbosityNormal {
-		_, _ = fmt.Fprintf(w.errOut, "warning: "+format, args...)
+		msg := fmt.Sprintf(format, args...)
+		_, _ = fmt.Fprintf(w.errOut, "%s %s", w.warnPrefix(), msg)
 	}
 }
 
 // Error prints an error to stderr. Always shown regardless of verbosity.
 func (w *Writer) Error(format string, args ...interface{}) {
-	_, _ = fmt.Fprintf(w.errOut, "error: "+format, args...)
+	msg := fmt.Sprintf(format, args...)
+	_, _ = fmt.Fprintf(w.errOut, "%s %s", w.errorPrefix(), msg)
 }
 
 // Stdout returns the stdout writer for data output that should always be

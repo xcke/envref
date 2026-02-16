@@ -60,8 +60,7 @@ Examples:
 
 // runDoctor implements the doctor command logic.
 func runDoctor(cmd *cobra.Command, envPath, localPath string) error {
-	out := cmd.OutOrStdout()
-	errOut := cmd.ErrOrStderr()
+	w := output.NewWriter(cmd)
 
 	var allIssues []issue
 
@@ -82,15 +81,14 @@ func runDoctor(cmd *cobra.Command, envPath, localPath string) error {
 	allIssues = append(allIssues, checkDirenvTrust()...)
 
 	if len(allIssues) == 0 {
-		w := output.NewWriter(cmd)
 		if !w.IsQuiet() {
-			_, _ = fmt.Fprintf(out, "OK: no issues found\n")
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s: no issues found\n", w.Green("OK"))
 		}
 		return nil
 	}
 
 	// Report issues grouped by file.
-	printIssues(errOut, allIssues)
+	printIssues(w, allIssues)
 
 	return fmt.Errorf("%d issue(s) found", len(allIssues))
 }
@@ -340,7 +338,9 @@ func direnvAllowed(envrcPath string) bool {
 }
 
 // printIssues formats and prints all issues to the writer.
-func printIssues(w io.Writer, issues []issue) {
+func printIssues(w *output.Writer, issues []issue) {
+	out := w.Stderr()
+
 	// Group by file, preserving order of first appearance.
 	var fileOrder []string
 	grouped := make(map[string][]issue)
@@ -352,15 +352,15 @@ func printIssues(w io.Writer, issues []issue) {
 	}
 
 	for _, file := range fileOrder {
-		_, _ = fmt.Fprintf(w, "%s:\n", file)
+		_, _ = fmt.Fprintf(out, "%s:\n", w.Bold(file))
 		for _, iss := range grouped[file] {
 			if iss.Line > 0 {
-				_, _ = fmt.Fprintf(w, "  line %d: %s\n", iss.Line, iss.Message)
+				_, _ = fmt.Fprintf(out, "  line %d: %s\n", iss.Line, w.Yellow(iss.Message))
 			} else {
-				_, _ = fmt.Fprintf(w, "  %s\n", iss.Message)
+				_, _ = fmt.Fprintf(out, "  %s\n", w.Yellow(iss.Message))
 			}
 		}
 	}
 
-	_, _ = fmt.Fprintf(w, "\nDoctor found %d issue(s)\n", len(issues))
+	_, _ = fmt.Fprintf(out, "\nDoctor found %s\n", w.Red(fmt.Sprintf("%d issue(s)", len(issues))))
 }

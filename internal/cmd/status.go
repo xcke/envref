@@ -3,7 +3,6 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"sort"
 	"strings"
@@ -11,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/xcke/envref/internal/config"
 	"github.com/xcke/envref/internal/envfile"
+	"github.com/xcke/envref/internal/output"
 	"github.com/xcke/envref/internal/ref"
 	"github.com/xcke/envref/internal/resolve"
 )
@@ -86,14 +86,14 @@ type statusReport struct {
 
 // runStatus implements the status command logic.
 func runStatus(cmd *cobra.Command, profileOverride string) error {
-	out := cmd.OutOrStdout()
+	w := output.NewWriter(cmd)
 
 	report, err := buildStatusReport(cmd, profileOverride)
 	if err != nil {
 		return err
 	}
 
-	printStatusReport(out, report)
+	printStatusReport(w, report)
 	return nil
 }
 
@@ -263,7 +263,8 @@ func buildStatusReport(cmd *cobra.Command, profileOverride string) (*statusRepor
 }
 
 // printStatusReport formats and prints the status report.
-func printStatusReport(out io.Writer, report *statusReport) {
+func printStatusReport(w *output.Writer, report *statusReport) {
+	out := w.Stdout()
 	write := func(format string, args ...interface{}) {
 		_, _ = fmt.Fprintf(out, format, args...)
 	}
@@ -271,42 +272,42 @@ func printStatusReport(out io.Writer, report *statusReport) {
 	if !report.configExists {
 		write("No project configured.\n")
 		if len(report.hints) > 0 {
-			write("\nHints:\n")
+			write("\n%s\n", w.Bold("Hints:"))
 			for _, hint := range report.hints {
-				write("  - %s\n", hint)
+				write("  - %s\n", w.Yellow(hint))
 			}
 		}
 		return
 	}
 
 	// Project header.
-	write("Project: %s\n", report.project)
+	write("%s %s\n", w.Bold("Project:"), report.project)
 
 	if report.activeProfile != "" {
-		write("Profile: %s\n", report.activeProfile)
+		write("%s %s\n", w.Bold("Profile:"), report.activeProfile)
 	}
 
 	// Files section.
-	write("\nFiles:\n")
-	write("  %s %s\n", statusIcon(report.envFileExists), report.envFilePath)
+	write("\n%s\n", w.Bold("Files:"))
+	write("  %s %s\n", statusIcon(w, report.envFileExists), report.envFilePath)
 	if report.profileFilePath != "" {
-		write("  %s %s\n", statusIcon(report.profileFileExists), report.profileFilePath)
+		write("  %s %s\n", statusIcon(w, report.profileFileExists), report.profileFilePath)
 	}
-	write("  %s %s\n", statusIcon(report.localFileExists), report.localFilePath)
-	write("  %s %s\n", statusIcon(report.exampleFileExists), report.exampleFilePath)
+	write("  %s %s\n", statusIcon(w, report.localFileExists), report.localFilePath)
+	write("  %s %s\n", statusIcon(w, report.exampleFileExists), report.exampleFilePath)
 
 	if !report.envFileExists {
 		if len(report.hints) > 0 {
-			write("\nHints:\n")
+			write("\n%s\n", w.Bold("Hints:"))
 			for _, hint := range report.hints {
-				write("  - %s\n", hint)
+				write("  - %s\n", w.Yellow(hint))
 			}
 		}
 		return
 	}
 
 	// Environment summary.
-	write("\nEnvironment: %d keys", report.totalKeys)
+	write("\n%s %d keys", w.Bold("Environment:"), report.totalKeys)
 	if report.totalKeys > 0 {
 		parts := []string{}
 		if report.configKeys > 0 {
@@ -321,58 +322,58 @@ func printStatusReport(out io.Writer, report *statusReport) {
 
 	// Secrets resolution.
 	if report.refKeys > 0 {
-		write("\nSecrets:\n")
+		write("\n%s\n", w.Bold("Secrets:"))
 		if len(report.backendNames) > 0 {
 			write("  Backends: %s\n", strings.Join(report.backendNames, ", "))
 		} else {
-			write("  Backends: (none configured)\n")
+			write("  Backends: %s\n", w.Yellow("(none configured)"))
 		}
 		write("  Resolved: %d/%d\n", report.resolvedKeys, report.refKeys)
 		if len(report.unresolvedKeys) > 0 {
-			write("  Missing:  %s\n", strings.Join(report.unresolvedKeys, ", "))
+			write("  Missing:  %s\n", w.Red(strings.Join(report.unresolvedKeys, ", ")))
 		}
 	}
 
 	// Validation summary.
 	if report.exampleFileExists {
-		write("\nValidation:\n")
+		write("\n%s\n", w.Bold("Validation:"))
 		if len(report.missingKeys) == 0 && len(report.extraKeys) == 0 {
-			write("  OK: all keys match %s\n", report.exampleFilePath)
+			write("  %s: all keys match %s\n", w.Green("OK"), report.exampleFilePath)
 		} else {
 			if len(report.missingKeys) > 0 {
-				write("  Missing from %s: %s\n", report.exampleFilePath, strings.Join(report.missingKeys, ", "))
+				write("  %s %s: %s\n", w.Red("Missing from"), report.exampleFilePath, strings.Join(report.missingKeys, ", "))
 			}
 			if len(report.extraKeys) > 0 {
-				write("  Extra (not in %s): %s\n", report.exampleFilePath, strings.Join(report.extraKeys, ", "))
+				write("  %s %s: %s\n", w.Yellow("Extra (not in"), report.exampleFilePath+")", strings.Join(report.extraKeys, ", "))
 			}
 		}
 	}
 
 	// Hints.
 	if len(report.hints) > 0 {
-		write("\nHints:\n")
+		write("\n%s\n", w.Bold("Hints:"))
 		for _, hint := range report.hints {
-			write("  - %s\n", hint)
+			write("  - %s\n", w.Yellow(hint))
 		}
 	}
 
 	// Overall status.
 	if len(report.unresolvedKeys) == 0 && len(report.missingKeys) == 0 {
-		write("\nStatus: OK\n")
+		write("\nStatus: %s\n", w.Green("OK"))
 	} else {
 		issues := 0
 		issues += len(report.unresolvedKeys)
 		issues += len(report.missingKeys)
-		write("\nStatus: %d issue(s) found\n", issues)
+		write("\nStatus: %s\n", w.Red(fmt.Sprintf("%d issue(s) found", issues)))
 	}
 }
 
-// statusIcon returns a check or cross indicator for file existence.
-func statusIcon(exists bool) string {
+// statusIcon returns a colored check or cross indicator for file existence.
+func statusIcon(w *output.Writer, exists bool) string {
 	if exists {
-		return "[ok]"
+		return w.Green("[ok]")
 	}
-	return "[--]"
+	return w.Yellow("[--]")
 }
 
 // collectRefKeys returns the keys of all ref:// entries in the env.

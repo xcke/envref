@@ -17,6 +17,7 @@ func newTestCmd(args ...string) (*cobra.Command, *bytes.Buffer, *bytes.Buffer) {
 	root.PersistentFlags().BoolP("quiet", "q", false, "suppress informational output")
 	root.PersistentFlags().Bool("verbose", false, "show additional detail")
 	root.PersistentFlags().Bool("debug", false, "show debug information")
+	root.PersistentFlags().Bool("no-color", false, "disable colorized output")
 
 	child := &cobra.Command{
 		Use:  "sub",

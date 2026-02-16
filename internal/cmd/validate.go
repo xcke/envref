@@ -102,7 +102,7 @@ func runValidate(cmd *cobra.Command, envPath, profilePath, localPath, examplePat
 	w := output.NewWriter(cmd)
 	if len(missing) == 0 && len(extra) == 0 {
 		if !ci && !w.IsQuiet() {
-			_, _ = fmt.Fprintf(out, "OK: all %d keys match %s\n", len(exampleKeys), examplePath)
+			_, _ = fmt.Fprintf(out, "%s: all %d keys match %s\n", w.Green("OK"), len(exampleKeys), examplePath)
 		}
 		return nil
 	}
@@ -112,14 +112,14 @@ func runValidate(cmd *cobra.Command, envPath, profilePath, localPath, examplePat
 	}
 
 	if len(missing) > 0 {
-		_, _ = fmt.Fprintf(errOut, "Missing keys (defined in %s but not in environment):\n", examplePath)
+		_, _ = fmt.Fprintf(errOut, "%s (defined in %s but not in environment):\n", w.Red("Missing keys"), examplePath)
 		for _, key := range missing {
 			_, _ = fmt.Fprintf(errOut, "  - %s\n", key)
 		}
 	}
 
 	if len(extra) > 0 {
-		_, _ = fmt.Fprintf(errOut, "Extra keys (defined in environment but not in %s):\n", examplePath)
+		_, _ = fmt.Fprintf(errOut, "%s (defined in environment but not in %s):\n", w.Yellow("Extra keys"), examplePath)
 		for _, key := range extra {
 			_, _ = fmt.Fprintf(errOut, "  - %s\n", key)
 		}
@@ -133,7 +133,7 @@ func runValidate(cmd *cobra.Command, envPath, profilePath, localPath, examplePat
 	if len(extra) > 0 {
 		parts = append(parts, fmt.Sprintf("%d extra", len(extra)))
 	}
-	_, _ = fmt.Fprintf(errOut, "\nValidation failed: %s\n", strings.Join(parts, ", "))
+	_, _ = fmt.Fprintf(errOut, "\n%s: %s\n", w.Red("Validation failed"), strings.Join(parts, ", "))
 
 	// Missing keys are an error; extra keys alone are a warning.
 	if len(missing) > 0 {
