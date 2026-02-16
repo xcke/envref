@@ -67,6 +67,17 @@ brews:
       - name: go
         type: build
 
+scoops:
+  - name: envref
+    repository:
+      owner: xcke
+      name: scoop-bucket
+      token: "{{ .Env.SCOOP_BUCKET_TOKEN }}"
+    homepage: "https://github.com/xcke/envref"
+    description: "CLI tool for separating config from secrets in .env files"
+    license: "MIT"
+    skip_upload: auto
+
 aurs:
   - name: envref-bin
     homepage: "https://github.com/xcke/envref"

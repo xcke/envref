@@ -16,6 +16,13 @@ envref resolve = config + resolved secrets → direnv / shell env
 brew install xcke/tap/envref
 ```
 
+### Scoop (Windows)
+
+```powershell
+scoop bucket add xcke https://github.com/xcke/scoop-bucket
+scoop install envref
+```
+
 ### From source
 
 ```bash
