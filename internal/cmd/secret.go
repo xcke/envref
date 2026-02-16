@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/xcke/envref/internal/audit"
 	"github.com/xcke/envref/internal/backend"
 	"github.com/xcke/envref/internal/config"
 	"github.com/xcke/envref/internal/output"
@@ -300,7 +301,7 @@ func runSecretDelete(cmd *cobra.Command, key, backendName string, force bool, pr
 		return fmt.Errorf("getting working directory: %w", err)
 	}
 
-	cfg, _, err := config.Load(cwd)
+	cfg, configDir, err := config.Load(cwd)
 	if err != nil {
 		return fmt.Errorf("loading config: %w", err)
 	}
@@ -361,6 +362,15 @@ func runSecretDelete(cmd *cobra.Command, key, backendName string, force bool, pr
 		return fmt.Errorf("deleting secret: %w", err)
 	}
 
+	// Log the operation to the audit log (best-effort).
+	_ = newAuditLogger(configDir).Log(audit.Entry{
+		Operation: audit.OpDelete,
+		Key:       key,
+		Backend:   backendName,
+		Project:   cfg.Project,
+		Profile:   effectiveProfile,
+	})
+
 	output.NewWriter(cmd).Info("secret %q deleted from %s\n", key, scopeLabel)
 	return nil
 }
@@ -415,7 +425,7 @@ func runSecretSet(cmd *cobra.Command, key, value, backendName, profile string) e
 		return fmt.Errorf("getting working directory: %w", err)
 	}
 
-	cfg, _, err := config.Load(cwd)
+	cfg, configDir, err := config.Load(cwd)
 	if err != nil {
 		return fmt.Errorf("loading config: %w", err)
 	}
@@ -466,6 +476,15 @@ func runSecretSet(cmd *cobra.Command, key, value, backendName, profile string) e
 	if err := nsBackend.Set(key, value); err != nil {
 		return fmt.Errorf("storing secret: %w", err)
 	}
+
+	// Log the operation to the audit log (best-effort).
+	_ = newAuditLogger(configDir).Log(audit.Entry{
+		Operation: audit.OpSet,
+		Key:       key,
+		Backend:   backendName,
+		Project:   cfg.Project,
+		Profile:   effectiveProfile,
+	})
 
 	scopeLabel := fmt.Sprintf("backend %q", backendName)
 	if effectiveProfile != "" {
@@ -583,7 +602,7 @@ func runSecretGenerate(cmd *cobra.Command, key string, length int, charset, back
 		return fmt.Errorf("getting working directory: %w", err)
 	}
 
-	cfg, _, err := config.Load(cwd)
+	cfg, configDir, err := config.Load(cwd)
 	if err != nil {
 		return fmt.Errorf("loading config: %w", err)
 	}
@@ -625,6 +644,15 @@ func runSecretGenerate(cmd *cobra.Command, key string, length int, charset, back
 	if err := nsBackend.Set(key, value); err != nil {
 		return fmt.Errorf("storing secret: %w", err)
 	}
+
+	// Log the operation to the audit log (best-effort).
+	_ = newAuditLogger(configDir).Log(audit.Entry{
+		Operation: audit.OpGenerate,
+		Key:       key,
+		Backend:   backendName,
+		Project:   cfg.Project,
+		Profile:   effectiveProfile,
+	})
 
 	if printVal {
 		_, _ = fmt.Fprintln(cmd.OutOrStdout(), value)
@@ -756,7 +784,7 @@ func runSecretCopy(cmd *cobra.Command, key, fromProject, backendName, profile, f
 		return fmt.Errorf("getting working directory: %w", err)
 	}
 
-	cfg, _, err := config.Load(cwd)
+	cfg, configDir, err := config.Load(cwd)
 	if err != nil {
 		return fmt.Errorf("loading config: %w", err)
 	}
@@ -819,6 +847,17 @@ func runSecretCopy(cmd *cobra.Command, key, fromProject, backendName, profile, f
 	if err := dstBackend.Set(key, value); err != nil {
 		return fmt.Errorf("storing secret: %w", err)
 	}
+
+	// Log the operation to the audit log (best-effort).
+	detail := fmt.Sprintf("from %s", srcLabel)
+	_ = newAuditLogger(configDir).Log(audit.Entry{
+		Operation: audit.OpCopy,
+		Key:       key,
+		Backend:   backendName,
+		Project:   cfg.Project,
+		Profile:   effectiveProfile,
+		Detail:    detail,
+	})
 
 	dstLabel := fmt.Sprintf("%q", cfg.Project)
 	if effectiveProfile != "" {

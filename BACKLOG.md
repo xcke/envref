@@ -75,7 +75,7 @@
 - [DONE] P3 | ENV-052 | Implement AWS SSM Parameter Store backend and Oracle OCI Vault store backend
 - [DONE] P3 | ENV-053 | Implement HashiCorp Vault backend
 - [DONE] P3 | ENV-054 | Define plugin interface for community-contributed backends
-
+- [TODO] P1 | ENV-115 | Document the backends uses with examples
 ---
 
 ## Phase 4 — Secret Management Commands
@@ -169,7 +169,7 @@
   Plan: Added TeamMember struct to Config, team list/add/remove commands,
   --to-team flag on sync push, validation, AddTeamMember/RemoveTeamMember file ops.
 - [DONE] P3 | ENV-123 | Add `envref onboard` — interactive setup for new team members (walk through all missing secrets)
-- [TODO] P3 | ENV-124 | Add audit log — track who set/changed which secrets (local git-backed log)
+- [DONE] P3 | ENV-124 | Add audit log — track who set/changed which secrets (local git-backed log)
 
 ---
 

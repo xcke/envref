@@ -13,6 +13,7 @@ import (
 	"filippo.io/age"
 	"filippo.io/age/armor"
 	"github.com/spf13/cobra"
+	"github.com/xcke/envref/internal/audit"
 	"github.com/xcke/envref/internal/backend"
 	"github.com/xcke/envref/internal/config"
 	"github.com/xcke/envref/internal/output"
@@ -368,6 +369,17 @@ func runSyncPull(cmd *cobra.Command, identityFile, file, backendName, profile st
 		if err := nsBackend.Set(key, value); err != nil {
 			return fmt.Errorf("storing secret %q: %w", key, err)
 		}
+
+		// Log the operation to the audit log (best-effort).
+		_ = newAuditLogger(configDir).Log(audit.Entry{
+			Operation: audit.OpImport,
+			Key:       key,
+			Backend:   backendName,
+			Project:   cfg.Project,
+			Profile:   effectiveProfile,
+			Detail:    fmt.Sprintf("sync pull from %s", file),
+		})
+
 		w.Verbose("  imported %s\n", key)
 		imported++
 	}

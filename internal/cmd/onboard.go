@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/xcke/envref/internal/audit"
 	"github.com/xcke/envref/internal/backend"
 	"github.com/xcke/envref/internal/config"
 	"github.com/xcke/envref/internal/envfile"
@@ -220,6 +221,16 @@ func runOnboard(cmd *cobra.Command, profileOverride, backendName string, dryRun 
 			skipped++
 			continue
 		}
+
+		// Log the operation to the audit log (best-effort).
+		_ = newAuditLogger(projectDir).Log(audit.Entry{
+			Operation: audit.OpSet,
+			Key:       m.Path,
+			Backend:   backendName,
+			Project:   cfg.Project,
+			Profile:   profile,
+			Detail:    "onboard",
+		})
 
 		_, _ = fmt.Fprintf(out, "  %s\n\n", w.Green("stored"))
 		configured++

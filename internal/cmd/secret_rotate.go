@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/xcke/envref/internal/audit"
 	"github.com/xcke/envref/internal/backend"
 	"github.com/xcke/envref/internal/config"
 	"github.com/xcke/envref/internal/output"
@@ -101,7 +102,7 @@ func runSecretRotate(cmd *cobra.Command, key string, length int, charset, backen
 		return fmt.Errorf("getting working directory: %w", err)
 	}
 
-	cfg, _, err := config.Load(cwd)
+	cfg, configDir, err := config.Load(cwd)
 	if err != nil {
 		return fmt.Errorf("loading config: %w", err)
 	}
@@ -165,6 +166,15 @@ func runSecretRotate(cmd *cobra.Command, key string, length int, charset, backen
 	if err := nsBackend.Set(key, newValue); err != nil {
 		return fmt.Errorf("storing secret: %w", err)
 	}
+
+	// Log the operation to the audit log (best-effort).
+	_ = newAuditLogger(configDir).Log(audit.Entry{
+		Operation: audit.OpRotate,
+		Key:       key,
+		Backend:   backendName,
+		Project:   cfg.Project,
+		Profile:   effectiveProfile,
+	})
 
 	if printVal {
 		_, _ = fmt.Fprintln(cmd.OutOrStdout(), newValue)

@@ -1,7 +1,7 @@
 # Project Status
 
 ## Last Completed
-- ENV-123: Added `envref onboard` command for interactive new-team-member setup [iter-70]
+- ENV-124: Added audit log for tracking secret operations (set, delete, generate, rotate, copy, import) [iter-71]
 
 ## Current State
 - Go module `github.com/xcke/envref` initialized with Cobra + Viper + go-keyring + age + sqlite + testify + x/term dependencies
@@ -27,6 +27,7 @@
 - `envref status` — shows environment overview with actionable hints
 - `envref doctor` — scans .env files for common issues
 - `envref audit` — warns about plaintext secrets via pattern matching, key name heuristics, and Shannon entropy analysis
+- **`envref audit-log`** — displays append-only JSON-lines audit log of secret operations; supports `--last N`, `--key`, `--json` flags
 - `envref config show` — prints resolved effective config (plain, JSON, table formats)
 - `envref completion <shell>` — generates shell completion scripts (bash, zsh, fish, powershell)
 - `envref edit` — opens .env files in `$VISUAL`/`$EDITOR`
@@ -36,6 +37,7 @@
 - **`envref team list/add/remove`** — manage team members and their age public keys in `.envref.yaml`
 - **`envref onboard`** — interactive setup for new team members; identifies missing/unresolved secrets, prompts for values, stores in backend; supports `--dry-run`, `--profile`, `--backend` flags; also checks `.env.example` for missing keys
 - **Seven backend types:** `KeychainBackend` (OS keychain via go-keyring), `VaultBackend` (local SQLite + age encryption), `OnePasswordBackend` (1Password via `op` CLI), `AWSSSMBackend` (AWS SSM Parameter Store via `aws` CLI), `OCIVaultBackend` (Oracle OCI Vault via `oci` CLI), `HashiVaultBackend` (HashiCorp Vault via `vault` CLI), and `PluginBackend` (external executables via JSON protocol)
+- **Audit log:** All secret mutations (set, delete, generate, rotate, copy, import) are logged to `.envref.audit.log` with timestamp, user, operation, key, backend, project, and profile; `AuditBackend` wrapper available for programmatic use
 - **Team config:** `.envref.yaml` supports a `team` section with member names and age public keys; validated on load (unique names/keys, age1... format)
 - **Nested references:** `${ref://secrets/key}` in values and embedded `ref://` URIs after interpolation are resolved via a second pass in the resolution pipeline
 - **Security hardening:** Vault passphrase stored as `[]byte` (clearable), zeroed on Close; decrypted plaintext bytes cleared after use
