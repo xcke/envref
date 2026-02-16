@@ -10,13 +10,6 @@ This guide walks you through installing envref, initializing a project, storing 
 brew install xcke/tap/envref
 ```
 
-### Scoop (Windows)
-
-```powershell
-scoop bucket add xcke https://github.com/xcke/scoop-bucket
-scoop install envref
-```
-
 ### From source (requires Go 1.24+)
 
 ```bash

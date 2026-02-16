@@ -44,7 +44,7 @@
 - **Security hardening:** Vault passphrase stored as `[]byte` (clearable), zeroed on Close; decrypted plaintext bytes cleared after use
 - **Comprehensive README** with architecture diagram, resolution pipeline, project structure, vault docs, benchmarks, and animated SVG terminal demo
 - **docs/ directory** with four usage guides: getting-started, direnv-integration, profiles, secret-backends
-- **Distribution:** Homebrew tap via GoReleaser `brews` config; AUR `envref-bin` package via GoReleaser `aurs` publisher; Scoop bucket via GoReleaser `scoops` publisher (Windows); Nix flake with `buildGoModule` package and dev shell
+- **Distribution:** Homebrew tap via GoReleaser `brews` config; Nix flake with `buildGoModule` package and dev shell
 - **Project website:** Single-page landing page in `site/` with terminal-inspired dark theme, feature overview, backend comparison, CLI reference, installation methods, and documentation links; GitHub Pages deploy workflow in `.github/workflows/pages.yml`
 - **Animated SVG demo:** `site/demo.svg` with 4-step animated terminal showing init, ref://, secret store, and resolve workflow; embedded in README.md
 - **MIT LICENSE** file included
