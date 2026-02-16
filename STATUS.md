@@ -1,7 +1,7 @@
 # Project Status
 
 ## Last Completed
-- ENV-102: Added `envref doctor` command to check for common .env file issues [iter-24]
+- ENV-023: Added config inheritance — global `~/.config/envref/config.yaml` merged with project `.envref.yaml` [iter-25]
 
 ## Current State
 - Go module `github.com/xcke/envref` initialized with Cobra + Viper + go-keyring + testify dependencies
@@ -29,6 +29,7 @@
   - Duplicate keys, trailing whitespace, unquoted values with spaces, empty values without explicit intent
   - .env not in .gitignore check, .envrc direnv trust check
   - Supports `--file` and `--local-file` flags
+- **Config inheritance:** Global config at `~/.config/envref/config.yaml` provides defaults (backends, profiles, etc.) that project-level `.envref.yaml` overrides. Supports `ENVREF_CONFIG_DIR` and `XDG_CONFIG_HOME` env vars for custom paths.
 - **Output format support:** `--format` flag on `get`, `list`, and `resolve` commands (plain, json, shell, table)
 - **Profile support:** `.envref.yaml` `active_profile` field, `profiles` map, convention-based naming, `--profile` flag, 3-layer merge
 - **Config write support:** `SetActiveProfile()` function for targeted YAML field updates
@@ -42,7 +43,7 @@
 - **GoReleaser config** for cross-platform releases (Linux/macOS/Windows × amd64/arm64, tar.gz/zip, checksums, changelog)
 - **GitHub Actions CI pipeline** with test (ubuntu/macos/windows matrix), lint (go vet + golangci-lint), and build jobs
 - Makefile with build/test/lint/install targets
-- Comprehensive test coverage: parser (100+), merge (38+), resolve (50+), integration (55+), profile, validate, status, format, strict mode, run command, doctor tests
+- Comprehensive test coverage: parser (100+), merge (38+), resolve (50+), integration (55+), profile, validate, status, format, strict mode, run command, doctor, config inheritance tests
 - Directory structure: `cmd/envref/`, `internal/cmd/`, `internal/parser/`, `internal/envfile/`, `internal/config/`, `internal/ref/`, `internal/resolve/`, `internal/backend/`, `pkg/`
 - All checks pass: `go build`, `go vet`, `go test`, `golangci-lint`
 

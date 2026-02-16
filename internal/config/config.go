@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/spf13/viper"
@@ -25,6 +26,113 @@ const FileExt = "yaml"
 
 // FullFileName is the complete config file name including extension.
 const FullFileName = FileName + "." + FileExt
+
+// GlobalFileName is the name of the global config file.
+const GlobalFileName = "config.yaml"
+
+// GlobalConfigDir returns the directory for global envref configuration.
+// On Unix-like systems this is $XDG_CONFIG_HOME/envref (defaulting to
+// ~/.config/envref). On Windows this is %APPDATA%/envref.
+func GlobalConfigDir() string {
+	if dir := os.Getenv("ENVREF_CONFIG_DIR"); dir != "" {
+		return dir
+	}
+	if dir := os.Getenv("XDG_CONFIG_HOME"); dir != "" {
+		return filepath.Join(dir, "envref")
+	}
+	if runtime.GOOS == "windows" {
+		if dir := os.Getenv("APPDATA"); dir != "" {
+			return filepath.Join(dir, "envref")
+		}
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(home, ".config", "envref")
+}
+
+// GlobalConfigPath returns the full path to the global config file.
+// Returns an empty string if the home directory cannot be determined.
+func GlobalConfigPath() string {
+	dir := GlobalConfigDir()
+	if dir == "" {
+		return ""
+	}
+	return filepath.Join(dir, GlobalFileName)
+}
+
+// loadGlobalConfig attempts to load the global config file. Returns nil
+// (not an error) if the file does not exist. Only returns an error if the
+// file exists but cannot be parsed.
+func loadGlobalConfig() (*Config, error) {
+	path := GlobalConfigPath()
+	if path == "" {
+		return nil, nil
+	}
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return nil, nil
+	}
+	cfg, err := loadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("loading global config: %w", err)
+	}
+	return cfg, nil
+}
+
+// mergeConfigs merges a global config with a project config. Project values
+// take precedence over global values. For scalar fields, a non-zero project
+// value overrides the global value. For slices and maps (Backends, Profiles),
+// the project config replaces the global config entirely when present.
+func mergeConfigs(global, project *Config) *Config {
+	if global == nil {
+		return project
+	}
+	if project == nil {
+		return global
+	}
+
+	merged := *project
+
+	// Scalar fields: use project value if non-empty, otherwise fall back to global.
+	if merged.Project == "" {
+		merged.Project = global.Project
+	}
+	if merged.EnvFile == "" || merged.EnvFile == ".env" {
+		// Only inherit if project didn't explicitly set env_file.
+		// Since ".env" is the Viper default, we need a way to distinguish
+		// "explicitly set to .env" from "not set at all". We treat the Viper
+		// default as "not set" and let global override in that case.
+		// However, if global also has the default, no change is needed.
+		if global.EnvFile != "" && global.EnvFile != ".env" {
+			merged.EnvFile = global.EnvFile
+		}
+	}
+	if merged.LocalFile == "" || merged.LocalFile == ".env.local" {
+		if global.LocalFile != "" && global.LocalFile != ".env.local" {
+			merged.LocalFile = global.LocalFile
+		}
+	}
+	if merged.ActiveProfile == "" {
+		merged.ActiveProfile = global.ActiveProfile
+	}
+
+	// Backends: project replaces entirely if present, otherwise inherit global.
+	if len(merged.Backends) == 0 && len(global.Backends) > 0 {
+		merged.Backends = make([]BackendConfig, len(global.Backends))
+		copy(merged.Backends, global.Backends)
+	}
+
+	// Profiles: project replaces entirely if present, otherwise inherit global.
+	if len(merged.Profiles) == 0 && len(global.Profiles) > 0 {
+		merged.Profiles = make(map[string]ProfileConfig, len(global.Profiles))
+		for k, v := range global.Profiles {
+			merged.Profiles[k] = v
+		}
+	}
+
+	return &merged
+}
 
 // Config represents the complete .envref.yaml configuration.
 type Config struct {
@@ -172,18 +280,28 @@ func (c *Config) Validate() error {
 // searching upward toward the filesystem root. Returns the parsed config
 // and the directory where the config file was found (the project root).
 //
-// If no config file is found, Load returns ErrNotFound.
+// If a global config file exists at ~/.config/envref/config.yaml (or the
+// path determined by GlobalConfigPath), it is loaded first as a base. The
+// project-level config then overrides global values.
+//
+// If no project-level config file is found, Load returns ErrNotFound.
 func Load(startDir string) (*Config, string, error) {
 	configDir, err := findConfigDir(startDir)
 	if err != nil {
 		return nil, "", err
 	}
 
-	cfg, err := loadFile(filepath.Join(configDir, FullFileName))
+	projectCfg, err := loadFile(filepath.Join(configDir, FullFileName))
 	if err != nil {
 		return nil, "", err
 	}
 
+	globalCfg, err := loadGlobalConfig()
+	if err != nil {
+		return nil, "", err
+	}
+
+	cfg := mergeConfigs(globalCfg, projectCfg)
 	return cfg, configDir, nil
 }
 

@@ -788,6 +788,416 @@ func TestSetActiveProfile_NonexistentFile(t *testing.T) {
 	}
 }
 
+func TestGlobalConfigDir(t *testing.T) {
+	t.Run("uses ENVREF_CONFIG_DIR if set", func(t *testing.T) {
+		t.Setenv("ENVREF_CONFIG_DIR", "/custom/config/dir")
+		got := GlobalConfigDir()
+		if got != "/custom/config/dir" {
+			t.Errorf("GlobalConfigDir() = %q, want %q", got, "/custom/config/dir")
+		}
+	})
+
+	t.Run("uses XDG_CONFIG_HOME if set", func(t *testing.T) {
+		t.Setenv("ENVREF_CONFIG_DIR", "")
+		t.Setenv("XDG_CONFIG_HOME", "/xdg/config")
+		got := GlobalConfigDir()
+		if got != filepath.Join("/xdg/config", "envref") {
+			t.Errorf("GlobalConfigDir() = %q, want %q", got, filepath.Join("/xdg/config", "envref"))
+		}
+	})
+
+	t.Run("falls back to ~/.config/envref", func(t *testing.T) {
+		t.Setenv("ENVREF_CONFIG_DIR", "")
+		t.Setenv("XDG_CONFIG_HOME", "")
+		got := GlobalConfigDir()
+		if got == "" {
+			t.Fatal("GlobalConfigDir() returned empty string")
+		}
+		if !filepath.IsAbs(got) {
+			t.Errorf("GlobalConfigDir() = %q, want absolute path", got)
+		}
+	})
+}
+
+func TestGlobalConfigPath(t *testing.T) {
+	t.Setenv("ENVREF_CONFIG_DIR", "/test/config")
+	got := GlobalConfigPath()
+	want := filepath.Join("/test/config", GlobalFileName)
+	if got != want {
+		t.Errorf("GlobalConfigPath() = %q, want %q", got, want)
+	}
+}
+
+func TestMergeConfigs(t *testing.T) {
+	tests := []struct {
+		name    string
+		global  *Config
+		project *Config
+		check   func(t *testing.T, cfg *Config)
+	}{
+		{
+			name:   "nil global returns project as-is",
+			global: nil,
+			project: &Config{
+				Project:   "myapp",
+				EnvFile:   ".env",
+				LocalFile: ".env.local",
+			},
+			check: func(t *testing.T, cfg *Config) {
+				t.Helper()
+				if cfg.Project != "myapp" {
+					t.Errorf("Project = %q, want %q", cfg.Project, "myapp")
+				}
+			},
+		},
+		{
+			name: "nil project returns global as-is",
+			global: &Config{
+				Project:   "global-app",
+				EnvFile:   ".env",
+				LocalFile: ".env.local",
+			},
+			project: nil,
+			check: func(t *testing.T, cfg *Config) {
+				t.Helper()
+				if cfg.Project != "global-app" {
+					t.Errorf("Project = %q, want %q", cfg.Project, "global-app")
+				}
+			},
+		},
+		{
+			name: "project scalars override global",
+			global: &Config{
+				Project:       "global-app",
+				EnvFile:       "global/.env",
+				LocalFile:     "global/.env.local",
+				ActiveProfile: "staging",
+			},
+			project: &Config{
+				Project:       "my-project",
+				EnvFile:       "project/.env",
+				LocalFile:     "project/.env.local",
+				ActiveProfile: "production",
+			},
+			check: func(t *testing.T, cfg *Config) {
+				t.Helper()
+				if cfg.Project != "my-project" {
+					t.Errorf("Project = %q, want %q", cfg.Project, "my-project")
+				}
+				if cfg.EnvFile != "project/.env" {
+					t.Errorf("EnvFile = %q, want %q", cfg.EnvFile, "project/.env")
+				}
+				if cfg.LocalFile != "project/.env.local" {
+					t.Errorf("LocalFile = %q, want %q", cfg.LocalFile, "project/.env.local")
+				}
+				if cfg.ActiveProfile != "production" {
+					t.Errorf("ActiveProfile = %q, want %q", cfg.ActiveProfile, "production")
+				}
+			},
+		},
+		{
+			name: "project inherits global project name when empty",
+			global: &Config{
+				Project: "global-default",
+			},
+			project: &Config{
+				Project:   "",
+				EnvFile:   ".env",
+				LocalFile: ".env.local",
+			},
+			check: func(t *testing.T, cfg *Config) {
+				t.Helper()
+				if cfg.Project != "global-default" {
+					t.Errorf("Project = %q, want %q", cfg.Project, "global-default")
+				}
+			},
+		},
+		{
+			name: "project inherits global active_profile when empty",
+			global: &Config{
+				ActiveProfile: "staging",
+			},
+			project: &Config{
+				Project:   "myapp",
+				EnvFile:   ".env",
+				LocalFile: ".env.local",
+			},
+			check: func(t *testing.T, cfg *Config) {
+				t.Helper()
+				if cfg.ActiveProfile != "staging" {
+					t.Errorf("ActiveProfile = %q, want %q", cfg.ActiveProfile, "staging")
+				}
+			},
+		},
+		{
+			name: "project inherits global backends when empty",
+			global: &Config{
+				Backends: []BackendConfig{
+					{Name: "keychain", Type: "keychain"},
+					{Name: "vault", Type: "encrypted-vault"},
+				},
+			},
+			project: &Config{
+				Project:   "myapp",
+				EnvFile:   ".env",
+				LocalFile: ".env.local",
+			},
+			check: func(t *testing.T, cfg *Config) {
+				t.Helper()
+				if len(cfg.Backends) != 2 {
+					t.Fatalf("len(Backends) = %d, want 2", len(cfg.Backends))
+				}
+				if cfg.Backends[0].Name != "keychain" {
+					t.Errorf("Backends[0].Name = %q, want %q", cfg.Backends[0].Name, "keychain")
+				}
+				if cfg.Backends[1].Name != "vault" {
+					t.Errorf("Backends[1].Name = %q, want %q", cfg.Backends[1].Name, "vault")
+				}
+			},
+		},
+		{
+			name: "project backends replace global entirely",
+			global: &Config{
+				Backends: []BackendConfig{
+					{Name: "keychain", Type: "keychain"},
+					{Name: "vault", Type: "encrypted-vault"},
+				},
+			},
+			project: &Config{
+				Project:   "myapp",
+				EnvFile:   ".env",
+				LocalFile: ".env.local",
+				Backends: []BackendConfig{
+					{Name: "op", Type: "1password"},
+				},
+			},
+			check: func(t *testing.T, cfg *Config) {
+				t.Helper()
+				if len(cfg.Backends) != 1 {
+					t.Fatalf("len(Backends) = %d, want 1", len(cfg.Backends))
+				}
+				if cfg.Backends[0].Name != "op" {
+					t.Errorf("Backends[0].Name = %q, want %q", cfg.Backends[0].Name, "op")
+				}
+			},
+		},
+		{
+			name: "project inherits global profiles when empty",
+			global: &Config{
+				Profiles: map[string]ProfileConfig{
+					"staging":    {EnvFile: ".env.staging"},
+					"production": {EnvFile: ".env.production"},
+				},
+			},
+			project: &Config{
+				Project:   "myapp",
+				EnvFile:   ".env",
+				LocalFile: ".env.local",
+			},
+			check: func(t *testing.T, cfg *Config) {
+				t.Helper()
+				if len(cfg.Profiles) != 2 {
+					t.Fatalf("len(Profiles) = %d, want 2", len(cfg.Profiles))
+				}
+				if cfg.Profiles["staging"].EnvFile != ".env.staging" {
+					t.Errorf("Profiles[staging].EnvFile = %q, want %q", cfg.Profiles["staging"].EnvFile, ".env.staging")
+				}
+			},
+		},
+		{
+			name: "project profiles replace global entirely",
+			global: &Config{
+				Profiles: map[string]ProfileConfig{
+					"staging": {EnvFile: ".env.staging"},
+				},
+			},
+			project: &Config{
+				Project:   "myapp",
+				EnvFile:   ".env",
+				LocalFile: ".env.local",
+				Profiles: map[string]ProfileConfig{
+					"dev": {EnvFile: ".env.dev"},
+				},
+			},
+			check: func(t *testing.T, cfg *Config) {
+				t.Helper()
+				if len(cfg.Profiles) != 1 {
+					t.Fatalf("len(Profiles) = %d, want 1", len(cfg.Profiles))
+				}
+				if _, ok := cfg.Profiles["dev"]; !ok {
+					t.Error("expected 'dev' profile to be present")
+				}
+				if _, ok := cfg.Profiles["staging"]; ok {
+					t.Error("global 'staging' profile should not be present")
+				}
+			},
+		},
+		{
+			name: "global non-default env_file inherited when project uses default",
+			global: &Config{
+				EnvFile: "config/.env",
+			},
+			project: &Config{
+				Project:   "myapp",
+				EnvFile:   ".env", // Viper default
+				LocalFile: ".env.local",
+			},
+			check: func(t *testing.T, cfg *Config) {
+				t.Helper()
+				if cfg.EnvFile != "config/.env" {
+					t.Errorf("EnvFile = %q, want %q (inherited from global)", cfg.EnvFile, "config/.env")
+				}
+			},
+		},
+		{
+			name: "global non-default local_file inherited when project uses default",
+			global: &Config{
+				LocalFile: "config/.env.local",
+			},
+			project: &Config{
+				Project:   "myapp",
+				EnvFile:   ".env",
+				LocalFile: ".env.local", // Viper default
+			},
+			check: func(t *testing.T, cfg *Config) {
+				t.Helper()
+				if cfg.LocalFile != "config/.env.local" {
+					t.Errorf("LocalFile = %q, want %q (inherited from global)", cfg.LocalFile, "config/.env.local")
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := mergeConfigs(tt.global, tt.project)
+			if tt.check != nil {
+				tt.check(t, got)
+			}
+		})
+	}
+}
+
+func TestLoad_WithGlobalConfig(t *testing.T) {
+	// Create a temp directory for the global config.
+	globalDir := t.TempDir()
+	t.Setenv("ENVREF_CONFIG_DIR", globalDir)
+
+	// Write global config with default backends.
+	writeFile(t, globalDir, GlobalFileName, `backends:
+  - name: keychain
+    type: keychain
+profiles:
+  staging:
+    env_file: .env.staging
+`)
+
+	// Create project directory with minimal project config.
+	projectDir := t.TempDir()
+	writeFile(t, projectDir, FullFileName, `project: myapp
+`)
+
+	cfg, root, err := Load(projectDir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if root != projectDir {
+		t.Errorf("root = %q, want %q", root, projectDir)
+	}
+	if cfg.Project != "myapp" {
+		t.Errorf("Project = %q, want %q", cfg.Project, "myapp")
+	}
+	// Should inherit backends from global.
+	if len(cfg.Backends) != 1 {
+		t.Fatalf("len(Backends) = %d, want 1 (inherited from global)", len(cfg.Backends))
+	}
+	if cfg.Backends[0].Name != "keychain" {
+		t.Errorf("Backends[0].Name = %q, want %q", cfg.Backends[0].Name, "keychain")
+	}
+	// Should inherit profiles from global.
+	if len(cfg.Profiles) != 1 {
+		t.Fatalf("len(Profiles) = %d, want 1 (inherited from global)", len(cfg.Profiles))
+	}
+	if cfg.Profiles["staging"].EnvFile != ".env.staging" {
+		t.Errorf("Profiles[staging].EnvFile = %q, want %q", cfg.Profiles["staging"].EnvFile, ".env.staging")
+	}
+}
+
+func TestLoad_ProjectOverridesGlobal(t *testing.T) {
+	globalDir := t.TempDir()
+	t.Setenv("ENVREF_CONFIG_DIR", globalDir)
+
+	writeFile(t, globalDir, GlobalFileName, `backends:
+  - name: keychain
+    type: keychain
+active_profile: staging
+`)
+
+	projectDir := t.TempDir()
+	writeFile(t, projectDir, FullFileName, `project: myapp
+backends:
+  - name: op
+    type: 1password
+active_profile: production
+`)
+
+	cfg, _, err := Load(projectDir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// Project backends should completely replace global.
+	if len(cfg.Backends) != 1 {
+		t.Fatalf("len(Backends) = %d, want 1", len(cfg.Backends))
+	}
+	if cfg.Backends[0].Name != "op" {
+		t.Errorf("Backends[0].Name = %q, want %q (project should override global)", cfg.Backends[0].Name, "op")
+	}
+	if cfg.ActiveProfile != "production" {
+		t.Errorf("ActiveProfile = %q, want %q (project should override global)", cfg.ActiveProfile, "production")
+	}
+}
+
+func TestLoad_NoGlobalConfig(t *testing.T) {
+	// Point to a non-existent global config directory.
+	t.Setenv("ENVREF_CONFIG_DIR", t.TempDir())
+
+	projectDir := t.TempDir()
+	writeFile(t, projectDir, FullFileName, `project: standalone
+backends:
+  - name: keychain
+    type: keychain
+`)
+
+	cfg, _, err := Load(projectDir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.Project != "standalone" {
+		t.Errorf("Project = %q, want %q", cfg.Project, "standalone")
+	}
+	if len(cfg.Backends) != 1 {
+		t.Errorf("len(Backends) = %d, want 1", len(cfg.Backends))
+	}
+}
+
+func TestLoad_InvalidGlobalConfig(t *testing.T) {
+	globalDir := t.TempDir()
+	t.Setenv("ENVREF_CONFIG_DIR", globalDir)
+	writeFile(t, globalDir, GlobalFileName, "{{invalid yaml")
+
+	projectDir := t.TempDir()
+	writeFile(t, projectDir, FullFileName, `project: myapp
+`)
+
+	_, _, err := Load(projectDir)
+	if err == nil {
+		t.Fatal("expected error for invalid global config")
+	}
+	if !contains(err.Error(), "global config") {
+		t.Errorf("error = %q, want to contain 'global config'", err.Error())
+	}
+}
+
 // contains reports whether s contains substr.
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && containsAt(s, substr)
