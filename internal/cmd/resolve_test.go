@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"bytes"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -178,4 +180,54 @@ func TestEnvToEntries(t *testing.T) {
 	// without importing parser, which is fine for unit testing.
 	// The function is simple enough that the integration through
 	// outputEntries tests covers the behavior.
+}
+
+func TestCollectWatchPaths(t *testing.T) {
+	dir := t.TempDir()
+
+	envFile := filepath.Join(dir, ".env")
+	localFile := filepath.Join(dir, ".env.local")
+	missingFile := filepath.Join(dir, ".env.staging")
+
+	// Create only the files that should exist.
+	if err := os.WriteFile(envFile, []byte("FOO=bar\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(localFile, []byte("BAZ=qux\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Run("returns only existing files", func(t *testing.T) {
+		paths := collectWatchPaths(envFile, missingFile, localFile)
+		if len(paths) != 2 {
+			t.Fatalf("expected 2 paths, got %d: %v", len(paths), paths)
+		}
+		if paths[0] != envFile {
+			t.Errorf("expected %q, got %q", envFile, paths[0])
+		}
+		if paths[1] != localFile {
+			t.Errorf("expected %q, got %q", localFile, paths[1])
+		}
+	})
+
+	t.Run("skips empty strings", func(t *testing.T) {
+		paths := collectWatchPaths(envFile, "", localFile)
+		if len(paths) != 2 {
+			t.Fatalf("expected 2 paths, got %d: %v", len(paths), paths)
+		}
+	})
+
+	t.Run("returns nil for no existing files", func(t *testing.T) {
+		paths := collectWatchPaths(missingFile)
+		if paths != nil {
+			t.Errorf("expected nil, got %v", paths)
+		}
+	})
+
+	t.Run("returns nil for empty input", func(t *testing.T) {
+		paths := collectWatchPaths()
+		if paths != nil {
+			t.Errorf("expected nil, got %v", paths)
+		}
+	})
 }

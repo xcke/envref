@@ -109,7 +109,7 @@
 - [DONE] P1 | ENV-080 | Add `envref init --direnv` — generate `.envrc` with `eval "$(envref resolve --direnv)"`
 - [DONE] P1 | ENV-081 | Ensure `envref resolve --direnv` output is compatible with direnv `eval`
 - [DONE] P2 | ENV-082 | Handle direnv trust/allow flow — prompt user to run `direnv allow` after init
-- [TODO] P2 | ENV-083 | Add `envref resolve --watch` — output on file changes (for direnv reload triggers)
+- [DONE] P2 | ENV-083 | Add `envref resolve --watch` — output on file changes (for direnv reload triggers)
 - [TODO] P2 | ENV-084 | Ensure fast startup (<50ms) for resolve command — benchmark and optimize
 - [TODO] P3 | ENV-085 | Add documentation: direnv integration guide with examples
 

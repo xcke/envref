@@ -1,7 +1,7 @@
 # Project Status
 
 ## Last Completed
-- ENV-042: Added vault lock/unlock commands with persistent lock state and passphrase verification [iter-46]
+- ENV-083: Added resolve --watch flag to re-resolve on .env file changes [iter-47]
 
 ## Current State
 - Go module `github.com/xcke/envref` initialized with Cobra + Viper + go-keyring + age + sqlite + testify + x/term dependencies
@@ -18,6 +18,7 @@
 - `envref resolve --profile <name>` — uses a named profile's env file in the merge chain and resolves profile-scoped secrets
 - `envref resolve --direnv` — outputs `export KEY=VALUE` format for shell integration
 - `envref resolve --strict` — fails with no output if any reference cannot be resolved (CI-safe)
+- `envref resolve --watch` / `-w` — watches .env files via fsnotify and re-resolves on changes with debouncing
 - `envref run -- <command>` — resolves env vars and executes a subprocess with them injected
 - `envref profile list/use/create/diff` — full profile management commands
 - `envref validate` — checks .env against .env.example schema with `--ci` and `--schema` modes

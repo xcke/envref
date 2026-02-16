@@ -3,8 +3,12 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
+	"time"
 
+	"github.com/fsnotify/fsnotify"
 	"github.com/spf13/cobra"
 	"github.com/xcke/envref/internal/config"
 	"github.com/xcke/envref/internal/envfile"
@@ -33,12 +37,17 @@ to select from plain, json, shell, or table.
 Use --strict to suppress output entirely if any reference fails to resolve.
 This is useful in CI pipelines where partial output is unsafe.
 
+Use --watch to continuously monitor .env files for changes and re-resolve
+automatically. This is useful for development workflows where env files
+change frequently. The output is re-printed on each detected file change.
+
 Examples:
   envref resolve                         # output KEY=VALUE pairs
   envref resolve --profile staging       # use staging profile
   envref resolve --direnv                # output export KEY=VALUE for direnv
   envref resolve --format json           # output as JSON array
   envref resolve --strict                # fail with no output if any ref fails
+  envref resolve --watch                 # re-resolve on file changes
   eval "$(envref resolve --direnv)"      # inject into current shell`,
 		Args: cobra.NoArgs,
 		PreRun: func(cmd *cobra.Command, args []string) {
@@ -52,6 +61,10 @@ Examples:
 			profile, _ := cmd.Flags().GetString("profile")
 			formatStr, _ := cmd.Flags().GetString("format")
 			strict, _ := cmd.Flags().GetBool("strict")
+			watch, _ := cmd.Flags().GetBool("watch")
+			if watch {
+				return runResolveWatch(cmd, direnv, profile, formatStr, strict)
+			}
 			return runResolve(cmd, direnv, profile, formatStr, strict)
 		},
 	}
@@ -60,6 +73,7 @@ Examples:
 	cmd.Flags().StringP("profile", "P", "", "environment profile to use (e.g., staging, production)")
 	cmd.Flags().String("format", "plain", "output format: plain, json, shell, table")
 	cmd.Flags().Bool("strict", false, "fail with no output if any reference cannot be resolved")
+	cmd.Flags().BoolP("watch", "w", false, "watch .env files for changes and re-resolve automatically")
 
 	return cmd
 }
@@ -153,6 +167,188 @@ func runResolve(cmd *cobra.Command, direnv bool, profileOverride, formatStr stri
 	}
 
 	return nil
+}
+
+// runResolveWatch implements the resolve --watch mode. It performs an initial
+// resolve, then watches the relevant .env files for changes and re-resolves
+// on each detected change. File system events are debounced to avoid redundant
+// resolves during rapid edits.
+func runResolveWatch(cmd *cobra.Command, direnv bool, profileOverride, formatStr string, strict bool) error {
+	w := output.NewWriter(cmd)
+
+	if direnv {
+		formatStr = "shell"
+	}
+	format, err := parseFormat(formatStr)
+	if err != nil {
+		return err
+	}
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("getting working directory: %w", err)
+	}
+
+	cfg, projectDir, err := config.Load(cwd)
+	if err != nil {
+		return fmt.Errorf("loading config: %w", err)
+	}
+
+	envPath := resolveFilePath(projectDir, cfg.EnvFile)
+	localPath := resolveFilePath(projectDir, cfg.LocalFile)
+
+	var profilePath string
+	profile := cfg.EffectiveProfile(profileOverride)
+	if profile != "" {
+		profilePath = resolveFilePath(projectDir, cfg.ProfileEnvFile(profile))
+	}
+
+	// Perform the initial resolve.
+	if err := resolveAndOutput(cmd, cfg, envPath, profilePath, localPath, profile, format, strict); err != nil {
+		// In watch mode, print the error but continue watching.
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "error: %s\n", err)
+	}
+
+	// Set up file watcher.
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		return fmt.Errorf("creating file watcher: %w", err)
+	}
+	defer func() { _ = watcher.Close() }()
+
+	// Watch the env files that exist.
+	watchPaths := collectWatchPaths(envPath, profilePath, localPath)
+	for _, p := range watchPaths {
+		if err := watcher.Add(p); err != nil {
+			w.Verbose("cannot watch %s: %v\n", p, err)
+		} else {
+			w.Verbose("watching %s\n", p)
+		}
+	}
+
+	if len(watchPaths) == 0 {
+		return fmt.Errorf("no env files found to watch")
+	}
+
+	_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "watching %d file(s) for changes... (Ctrl+C to stop)\n", len(watchPaths))
+
+	// Handle signals for clean shutdown.
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+	defer signal.Stop(sigCh)
+
+	// Debounce timer: coalesce rapid file changes.
+	const debounceDelay = 100 * time.Millisecond
+	var debounceTimer *time.Timer
+	debounceCh := make(chan struct{}, 1)
+
+	for {
+		select {
+		case <-sigCh:
+			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "\nstopping watch\n")
+			return nil
+
+		case event, ok := <-watcher.Events:
+			if !ok {
+				return nil
+			}
+			// Only react to writes and creates (covers most editors).
+			if !event.Has(fsnotify.Write) && !event.Has(fsnotify.Create) {
+				continue
+			}
+			w.Debug("file changed: %s (%s)\n", event.Name, event.Op)
+
+			// Reset debounce timer.
+			if debounceTimer != nil {
+				debounceTimer.Stop()
+			}
+			debounceTimer = time.AfterFunc(debounceDelay, func() {
+				select {
+				case debounceCh <- struct{}{}:
+				default:
+				}
+			})
+
+		case <-debounceCh:
+			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "change detected, re-resolving...\n")
+
+			// Re-add watch paths in case files were recreated (some editors
+			// delete + create rather than in-place write).
+			for _, p := range watchPaths {
+				_ = watcher.Add(p)
+			}
+
+			if err := resolveAndOutput(cmd, cfg, envPath, profilePath, localPath, profile, format, strict); err != nil {
+				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "error: %s\n", err)
+			}
+
+		case watchErr, ok := <-watcher.Errors:
+			if !ok {
+				return nil
+			}
+			w.Warn("watch error: %v\n", watchErr)
+		}
+	}
+}
+
+// resolveAndOutput runs the full resolve pipeline and outputs the result.
+// It is used by the watch loop to re-resolve on each file change.
+func resolveAndOutput(cmd *cobra.Command, cfg *config.Config, envPath, profilePath, localPath, profile string, format OutputFormat, strict bool) error {
+	env, err := loadAndMergeEnv(cmd, envPath, profilePath, localPath)
+	if err != nil {
+		return err
+	}
+
+	if !env.HasRefs() {
+		return outputEntries(cmd, envToEntries(env), format)
+	}
+
+	if len(cfg.Backends) == 0 {
+		return fmt.Errorf("ref:// references found but no backends configured in %s", config.FullFileName)
+	}
+
+	registry, err := buildRegistry(cfg)
+	if err != nil {
+		return fmt.Errorf("initializing backends: %w", err)
+	}
+
+	result, err := resolve.ResolveWithProfile(env, registry, cfg.Project, profile)
+	if err != nil {
+		return fmt.Errorf("resolving references: %w", err)
+	}
+
+	for _, keyErr := range result.Errors {
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "error: %s\n", keyErr.Error())
+	}
+
+	if strict && !result.Resolved() {
+		return fmt.Errorf("%d reference(s) could not be resolved (strict mode: no output produced)", len(result.Errors))
+	}
+
+	if err := outputEntries(cmd, result.Entries, format); err != nil {
+		return err
+	}
+
+	if !result.Resolved() {
+		return fmt.Errorf("%d reference(s) could not be resolved", len(result.Errors))
+	}
+
+	return nil
+}
+
+// collectWatchPaths returns the subset of file paths that exist on disk
+// and should be watched for changes.
+func collectWatchPaths(paths ...string) []string {
+	var result []string
+	for _, p := range paths {
+		if p == "" {
+			continue
+		}
+		if _, err := os.Stat(p); err == nil {
+			result = append(result, p)
+		}
+	}
+	return result
 }
 
 // resolveFilePath resolves a potentially relative file path against the project directory.
