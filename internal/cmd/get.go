@@ -6,6 +6,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/xcke/envref/internal/output"
 	"github.com/xcke/envref/internal/parser"
+	"github.com/xcke/envref/internal/suggest"
 )
 
 // newGetCmd creates the get subcommand.
@@ -55,7 +56,8 @@ func runGet(cmd *cobra.Command, key, envPath, profilePath, localPath, formatStr 
 
 	entry, found := env.Get(key)
 	if !found {
-		return fmt.Errorf("key %q not found", key)
+		hint := suggest.FormatSuggestion(suggest.Keys(key, env.Keys()))
+		return fmt.Errorf("key %q not found%s", key, hint)
 	}
 
 	return formatSingleValue(cmd.OutOrStdout(), entry.Key, entry.Value, format)

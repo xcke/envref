@@ -1,7 +1,7 @@
 # Project Status
 
 ## Last Completed
-- ENV-111: Added colorized terminal output with `--no-color` flag and `NO_COLOR` env var support [iter-35]
+- ENV-113: Implemented fuzzy key matching in error messages with "did you mean?" suggestions [iter-36]
 
 ## Current State
 - Go module `github.com/xcke/envref` initialized with Cobra + Viper + go-keyring + testify dependencies
@@ -28,6 +28,7 @@
 - **Global verbosity flags:** `--quiet`/`-q` suppresses info output, `--verbose` shows file loading detail, `--debug` shows internal trace; mutually exclusive via Cobra
 - **Colorized output:** Errors (red), warnings (yellow), debug labels (cyan), success (green), section headers (bold); auto-detected via TTY; disabled with `--no-color` flag or `NO_COLOR` env var
 - **`internal/output` package:** `Writer` type with `Info`/`Verbose`/`Debug`/`Warn`/`Error`/`Success` methods + color helpers (`Red`/`Green`/`Yellow`/`Cyan`/`Bold`)
+- **Fuzzy key matching:** `internal/suggest` package with Levenshtein distance based "did you mean?" suggestions in `get` command errors; case-insensitive matching, up to 3 suggestions within edit distance 3
 - **Resolution cache:** Duplicate `ref://` URIs within a single resolve call are resolved once, avoiding redundant backend queries
 - **Config validation on load:** `Load()` calls `Validate()` automatically, returning `*ValidationError` for semantic errors
 - **Config inheritance:** Global config at `~/.config/envref/config.yaml` merged with project `.envref.yaml`
@@ -41,7 +42,7 @@
 - **GitHub Actions CI pipeline** with test, lint, build jobs
 - Makefile with build/test/lint/install targets
 - Comprehensive test coverage across all packages
-- Directory structure: `cmd/envref/`, `internal/cmd/`, `internal/parser/`, `internal/envfile/`, `internal/config/`, `internal/ref/`, `internal/resolve/`, `internal/backend/`, `internal/output/`, `pkg/`
+- Directory structure: `cmd/envref/`, `internal/cmd/`, `internal/parser/`, `internal/envfile/`, `internal/config/`, `internal/ref/`, `internal/resolve/`, `internal/backend/`, `internal/output/`, `internal/suggest/`, `pkg/`
 - All checks pass: `go build`, `go vet`, `go test`, `golangci-lint`
 
 ## Known Issues

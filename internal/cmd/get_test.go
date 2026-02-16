@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -90,6 +91,50 @@ func TestGetCmd_KeyNotFound(t *testing.T) {
 	err := root.Execute()
 	if err == nil {
 		t.Fatal("expected error for missing key, got nil")
+	}
+}
+
+func TestGetCmd_KeyNotFoundSuggestion(t *testing.T) {
+	dir := t.TempDir()
+	envPath := writeTestFile(t, dir, ".env", "API_KEY=secret\nAPI_SECRET=hidden\nDB_HOST=localhost\n")
+
+	root := NewRootCmd()
+	root.SetOut(new(bytes.Buffer))
+	errBuf := new(bytes.Buffer)
+	root.SetErr(errBuf)
+	root.SetArgs([]string{"get", "API_KYE", "--file", envPath, "--local-file", filepath.Join(dir, ".env.local")})
+
+	err := root.Execute()
+	if err == nil {
+		t.Fatal("expected error for missing key, got nil")
+	}
+
+	errMsg := err.Error()
+	if !strings.Contains(errMsg, "did you mean") {
+		t.Errorf("expected suggestion in error, got: %s", errMsg)
+	}
+	if !strings.Contains(errMsg, "API_KEY") {
+		t.Errorf("expected API_KEY in suggestion, got: %s", errMsg)
+	}
+}
+
+func TestGetCmd_KeyNotFoundNoSuggestion(t *testing.T) {
+	dir := t.TempDir()
+	envPath := writeTestFile(t, dir, ".env", "DB_HOST=localhost\n")
+
+	root := NewRootCmd()
+	root.SetOut(new(bytes.Buffer))
+	root.SetErr(new(bytes.Buffer))
+	root.SetArgs([]string{"get", "COMPLETELY_UNRELATED", "--file", envPath, "--local-file", filepath.Join(dir, ".env.local")})
+
+	err := root.Execute()
+	if err == nil {
+		t.Fatal("expected error for missing key, got nil")
+	}
+
+	errMsg := err.Error()
+	if strings.Contains(errMsg, "did you mean") {
+		t.Errorf("expected no suggestion for distant key, got: %s", errMsg)
 	}
 }
 
