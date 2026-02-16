@@ -20,6 +20,9 @@
 *.swo
 *~
 
+# Nix
+/result
+
 # OS
 .DS_Store
 Thumbs.db
