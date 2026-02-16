@@ -96,13 +96,18 @@ func (v *VaultBackend) Name() string {
 }
 
 // Get retrieves and decrypts the secret value for the given key.
-// Returns ErrNotFound if the key does not exist.
+// Returns ErrNotFound if the key does not exist, or ErrVaultLocked if
+// the vault is locked.
 func (v *VaultBackend) Get(key string) (string, error) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 
 	db, err := v.open()
 	if err != nil {
+		return "", fmt.Errorf("vault get: %w", err)
+	}
+
+	if err := v.checkLocked(db); err != nil {
 		return "", fmt.Errorf("vault get: %w", err)
 	}
 
@@ -124,13 +129,18 @@ func (v *VaultBackend) Get(key string) (string, error) {
 }
 
 // Set encrypts and stores a secret value under the given key. If the
-// key already exists, its value is overwritten.
+// key already exists, its value is overwritten. Returns ErrVaultLocked
+// if the vault is locked.
 func (v *VaultBackend) Set(key, value string) error {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 
 	db, err := v.open()
 	if err != nil {
+		return fmt.Errorf("vault set: %w", err)
+	}
+
+	if err := v.checkLocked(db); err != nil {
 		return fmt.Errorf("vault set: %w", err)
 	}
 
@@ -151,13 +161,17 @@ func (v *VaultBackend) Set(key, value string) error {
 }
 
 // Delete removes the secret for the given key. Returns ErrNotFound if
-// the key does not exist.
+// the key does not exist, or ErrVaultLocked if the vault is locked.
 func (v *VaultBackend) Delete(key string) error {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 
 	db, err := v.open()
 	if err != nil {
+		return fmt.Errorf("vault delete: %w", err)
+	}
+
+	if err := v.checkLocked(db); err != nil {
 		return fmt.Errorf("vault delete: %w", err)
 	}
 
@@ -178,12 +192,17 @@ func (v *VaultBackend) Delete(key string) error {
 }
 
 // List returns all secret keys stored in the vault, sorted alphabetically.
+// Returns ErrVaultLocked if the vault is locked.
 func (v *VaultBackend) List() ([]string, error) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 
 	db, err := v.open()
 	if err != nil {
+		return nil, fmt.Errorf("vault list: %w", err)
+	}
+
+	if err := v.checkLocked(db); err != nil {
 		return nil, fmt.Errorf("vault list: %w", err)
 	}
 
@@ -243,6 +262,12 @@ var ErrVaultNotInitialized = errors.New("vault not initialized: run 'envref vaul
 // ErrWrongPassphrase is returned when the verification token cannot be
 // decrypted with the provided passphrase.
 var ErrWrongPassphrase = errors.New("wrong vault passphrase")
+
+// ErrVaultLocked is returned when an operation is attempted on a locked vault.
+var ErrVaultLocked = errors.New("vault is locked: run 'envref vault unlock'")
+
+// metadataLockedKey is the metadata key used to persist the vault lock state.
+const metadataLockedKey = "__envref_locked__"
 
 // Initialize stores an encrypted verification token in the vault. This
 // must be called once before regular use. It returns an error if the
@@ -331,6 +356,139 @@ func (v *VaultBackend) VerifyPassphrase() error {
 		return ErrWrongPassphrase
 	}
 
+	return nil
+}
+
+// IsLocked returns true if the vault has been explicitly locked via the
+// lock command. A locked vault refuses all Get/Set/Delete/List operations.
+func (v *VaultBackend) IsLocked() (bool, error) {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+
+	db, err := v.open()
+	if err != nil {
+		return false, fmt.Errorf("vault: %w", err)
+	}
+
+	var val string
+	err = db.QueryRow("SELECT value FROM metadata WHERE key = ?", metadataLockedKey).Scan(&val)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("vault: checking lock state: %w", err)
+	}
+	return val == "true", nil
+}
+
+// Lock locks the vault by writing a persistent lock flag to the metadata
+// table. The passphrase is verified before locking. A locked vault refuses
+// all Get/Set/Delete/List operations until unlocked.
+func (v *VaultBackend) Lock() error {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+
+	db, err := v.open()
+	if err != nil {
+		return fmt.Errorf("vault lock: %w", err)
+	}
+
+	// Verify passphrase before locking.
+	if err := v.verifyPassphraseUnlocked(db); err != nil {
+		return fmt.Errorf("vault lock: %w", err)
+	}
+
+	// Check if already locked.
+	var existing string
+	err = db.QueryRow("SELECT value FROM metadata WHERE key = ?", metadataLockedKey).Scan(&existing)
+	if err == nil && existing == "true" {
+		return fmt.Errorf("vault is already locked")
+	}
+
+	_, err = db.Exec(
+		"INSERT INTO metadata (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+		metadataLockedKey, "true",
+	)
+	if err != nil {
+		return fmt.Errorf("vault lock: writing lock flag: %w", err)
+	}
+
+	return nil
+}
+
+// Unlock removes the lock flag from the vault metadata, allowing
+// Get/Set/Delete/List operations to proceed again. The passphrase is
+// verified before unlocking.
+func (v *VaultBackend) Unlock() error {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+
+	db, err := v.open()
+	if err != nil {
+		return fmt.Errorf("vault unlock: %w", err)
+	}
+
+	// Verify passphrase before unlocking.
+	if err := v.verifyPassphraseUnlocked(db); err != nil {
+		return fmt.Errorf("vault unlock: %w", err)
+	}
+
+	// Check if actually locked.
+	var existing string
+	err = db.QueryRow("SELECT value FROM metadata WHERE key = ?", metadataLockedKey).Scan(&existing)
+	if errors.Is(err, sql.ErrNoRows) || (err == nil && existing != "true") {
+		return fmt.Errorf("vault is not locked")
+	}
+	if err != nil {
+		return fmt.Errorf("vault unlock: checking lock state: %w", err)
+	}
+
+	_, err = db.Exec("DELETE FROM metadata WHERE key = ?", metadataLockedKey)
+	if err != nil {
+		return fmt.Errorf("vault unlock: removing lock flag: %w", err)
+	}
+
+	return nil
+}
+
+// verifyPassphraseUnlocked verifies the passphrase against the stored
+// verification token. Must be called with v.mu held. Returns
+// ErrVaultNotInitialized or ErrWrongPassphrase on failure.
+func (v *VaultBackend) verifyPassphraseUnlocked(db *sql.DB) error {
+	var token string
+	err := db.QueryRow("SELECT value FROM metadata WHERE key = ?", metadataVerifyKey).Scan(&token)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrVaultNotInitialized
+	}
+	if err != nil {
+		return fmt.Errorf("reading verification token: %w", err)
+	}
+
+	plaintext, err := v.decrypt(token)
+	if err != nil {
+		return ErrWrongPassphrase
+	}
+	if plaintext != metadataVerifyPlaintext {
+		return ErrWrongPassphrase
+	}
+
+	return nil
+}
+
+// checkLocked checks whether the vault is locked. Must be called with v.mu held
+// and db already opened. Returns ErrVaultLocked if the vault is locked.
+func (v *VaultBackend) checkLocked(db *sql.DB) error {
+	var val string
+	err := db.QueryRow("SELECT value FROM metadata WHERE key = ?", metadataLockedKey).Scan(&val)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("checking lock state: %w", err)
+	}
+	if val == "true" {
+		return ErrVaultLocked
+	}
 	return nil
 }
 

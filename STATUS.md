@@ -1,7 +1,7 @@
 # Project Status
 
 ## Last Completed
-- ENV-041: Added vault init command with master passphrase setup flow and verification [iter-45]
+- ENV-042: Added vault lock/unlock commands with persistent lock state and passphrase verification [iter-46]
 
 ## Current State
 - Go module `github.com/xcke/envref` initialized with Cobra + Viper + go-keyring + age + sqlite + testify + x/term dependencies
@@ -27,8 +27,11 @@
 - `envref completion <shell>` — generates shell completion scripts (bash, zsh, fish, powershell)
 - `envref edit` — opens .env files in `$VISUAL`/`$EDITOR`
 - `envref vault init` — initialize vault with master passphrase (interactive prompt with confirmation, or via env var)
+- `envref vault lock` — lock vault to prevent all secret access; persists across CLI invocations
+- `envref vault unlock` — unlock vault after verifying passphrase to restore secret access
 - **Two secret backends:** `KeychainBackend` (OS keychain via go-keyring) and `VaultBackend` (local SQLite + age encryption)
 - **VaultBackend:** per-value age scrypt encryption, passphrase via `ENVREF_VAULT_PASSPHRASE` env var or `config.passphrase` or interactive terminal prompt, configurable DB path, lazy connection, WAL mode
+- **Vault lock/unlock:** persistent lock flag in metadata table; locked vault refuses Get/Set/Delete/List with `ErrVaultLocked`; passphrase verified before lock/unlock; lock state persists across process restarts
 - **Vault setup flow:** `vault init` stores encrypted verification token; subsequent access verifies passphrase against token; wrong passphrase returns clear error
 - **Interactive passphrase prompt:** secret/resolve/run/status commands prompt for vault passphrase at terminal when not configured via env var or config
 - **Global verbosity flags, colorized output, fuzzy key matching, resolution cache**

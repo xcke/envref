@@ -66,7 +66,7 @@
 
 - [DONE] P2 | ENV-040 | Implement local vault backend (SQLite + age encryption at `~/.config/envref/vault.db`)
 - [DONE] P2 | ENV-041 | Add master password or age key setup flow on first use
-- [TODO] P2 | ENV-042 | Add vault `lock` / `unlock` commands
+- [DONE] P2 | ENV-042 | Add vault `lock` / `unlock` commands
 - [TODO] P3 | ENV-043 | Add vault export/import for backup/migration
 
 ### 3d — External Backends (plugins)

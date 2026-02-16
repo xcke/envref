@@ -23,6 +23,8 @@ Use 'vault init' to set up the vault with a master passphrase on first use.`,
 	}
 
 	cmd.AddCommand(newVaultInitCmd())
+	cmd.AddCommand(newVaultLockCmd())
+	cmd.AddCommand(newVaultUnlockCmd())
 
 	return cmd
 }
@@ -112,6 +114,127 @@ func runVaultInit(cmd *cobra.Command) error {
 	out.Info("vault initialized at %s\n", v.DBPath())
 	out.Verbose("passphrase verification token stored\n")
 	return nil
+}
+
+// newVaultLockCmd creates the vault lock subcommand.
+func newVaultLockCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "lock",
+		Short: "Lock the vault to prevent secret access",
+		Long: `Lock the local encrypted vault to prevent all secret access.
+
+When the vault is locked, all get, set, delete, and list operations will be
+refused until the vault is unlocked with 'envref vault unlock'.
+
+Your passphrase is verified before locking to ensure only authorized users
+can lock the vault.
+
+Examples:
+  envref vault lock                                 # interactive passphrase prompt
+  ENVREF_VAULT_PASSPHRASE=secret envref vault lock  # non-interactive`,
+		Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runVaultLock(cmd)
+		},
+	}
+
+	return cmd
+}
+
+// runVaultLock locks the vault after verifying the passphrase.
+func runVaultLock(cmd *cobra.Command) error {
+	out := output.NewWriter(cmd)
+
+	v, err := createVaultForCommand(cmd)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = v.Close() }()
+
+	if err := v.Lock(); err != nil {
+		return fmt.Errorf("locking vault: %w", err)
+	}
+
+	out.Info("vault locked at %s\n", v.DBPath())
+	return nil
+}
+
+// newVaultUnlockCmd creates the vault unlock subcommand.
+func newVaultUnlockCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "unlock",
+		Short: "Unlock the vault to allow secret access",
+		Long: `Unlock the local encrypted vault to allow secret access again.
+
+The vault must have been previously locked with 'envref vault lock'. Your
+passphrase is verified before unlocking.
+
+Examples:
+  envref vault unlock                                 # interactive passphrase prompt
+  ENVREF_VAULT_PASSPHRASE=secret envref vault unlock  # non-interactive`,
+		Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runVaultUnlock(cmd)
+		},
+	}
+
+	return cmd
+}
+
+// runVaultUnlock unlocks the vault after verifying the passphrase.
+func runVaultUnlock(cmd *cobra.Command) error {
+	out := output.NewWriter(cmd)
+
+	v, err := createVaultForCommand(cmd)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = v.Close() }()
+
+	if err := v.Unlock(); err != nil {
+		return fmt.Errorf("unlocking vault: %w", err)
+	}
+
+	out.Info("vault unlocked at %s\n", v.DBPath())
+	return nil
+}
+
+// createVaultForCommand creates a VaultBackend for vault management commands
+// (lock, unlock). It loads config, resolves the passphrase, and creates the
+// backend without verifying the passphrase (lock/unlock verify internally).
+func createVaultForCommand(cmd *cobra.Command) (*backend.VaultBackend, error) {
+	var bc config.BackendConfig
+	cwd, err := os.Getwd()
+	if err == nil {
+		cfg, _, loadErr := config.Load(cwd)
+		if loadErr == nil {
+			bc = findVaultBackendConfig(cfg)
+		}
+	}
+
+	passphrase := os.Getenv("ENVREF_VAULT_PASSPHRASE")
+	if passphrase == "" {
+		passphrase = bc.Config["passphrase"]
+	}
+	if passphrase == "" {
+		prompted, promptErr := promptVaultPassphraseForAccess(cmd)
+		if promptErr != nil {
+			return nil, promptErr
+		}
+		passphrase = prompted
+	}
+
+	var opts []backend.VaultOption
+	if path := bc.Config["path"]; path != "" {
+		opts = append(opts, backend.WithVaultPath(path))
+	}
+
+	v, err := backend.NewVaultBackend(passphrase, opts...)
+	if err != nil {
+		return nil, fmt.Errorf("creating vault: %w", err)
+	}
+
+	return v, nil
 }
 
 // promptVaultPassphrase prompts the user to enter a vault passphrase from

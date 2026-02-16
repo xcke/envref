@@ -424,6 +424,202 @@ func TestVaultBackend_SecretsWorkWithInitialization(t *testing.T) {
 	}
 }
 
+func TestVaultBackend_LockUnlock(t *testing.T) {
+	v := testVault(t)
+
+	// Initialize the vault (required for lock/unlock).
+	if err := v.Initialize(); err != nil {
+		t.Fatalf("Initialize: %v", err)
+	}
+
+	// Store a secret while unlocked.
+	if err := v.Set("api_key", "secret123"); err != nil {
+		t.Fatalf("Set before lock: %v", err)
+	}
+
+	// Vault starts unlocked.
+	locked, err := v.IsLocked()
+	if err != nil {
+		t.Fatalf("IsLocked: %v", err)
+	}
+	if locked {
+		t.Fatal("vault should not be locked initially")
+	}
+
+	// Lock the vault.
+	if err := v.Lock(); err != nil {
+		t.Fatalf("Lock: %v", err)
+	}
+
+	locked, err = v.IsLocked()
+	if err != nil {
+		t.Fatalf("IsLocked after lock: %v", err)
+	}
+	if !locked {
+		t.Fatal("vault should be locked after Lock()")
+	}
+
+	// All CRUD operations should fail when locked.
+	_, err = v.Get("api_key")
+	if !errors.Is(err, ErrVaultLocked) {
+		t.Fatalf("Get on locked vault: got %v, want ErrVaultLocked", err)
+	}
+
+	err = v.Set("new_key", "value")
+	if !errors.Is(err, ErrVaultLocked) {
+		t.Fatalf("Set on locked vault: got %v, want ErrVaultLocked", err)
+	}
+
+	err = v.Delete("api_key")
+	if !errors.Is(err, ErrVaultLocked) {
+		t.Fatalf("Delete on locked vault: got %v, want ErrVaultLocked", err)
+	}
+
+	_, err = v.List()
+	if !errors.Is(err, ErrVaultLocked) {
+		t.Fatalf("List on locked vault: got %v, want ErrVaultLocked", err)
+	}
+
+	// Unlock the vault.
+	if err := v.Unlock(); err != nil {
+		t.Fatalf("Unlock: %v", err)
+	}
+
+	locked, err = v.IsLocked()
+	if err != nil {
+		t.Fatalf("IsLocked after unlock: %v", err)
+	}
+	if locked {
+		t.Fatal("vault should not be locked after Unlock()")
+	}
+
+	// Operations should work again after unlock.
+	val, err := v.Get("api_key")
+	if err != nil {
+		t.Fatalf("Get after unlock: %v", err)
+	}
+	if val != "secret123" {
+		t.Fatalf("Get after unlock: got %q, want %q", val, "secret123")
+	}
+}
+
+func TestVaultBackend_LockAlreadyLocked(t *testing.T) {
+	v := testVault(t)
+	if err := v.Initialize(); err != nil {
+		t.Fatalf("Initialize: %v", err)
+	}
+
+	if err := v.Lock(); err != nil {
+		t.Fatalf("Lock: %v", err)
+	}
+
+	// Second lock should fail.
+	err := v.Lock()
+	if err == nil {
+		t.Fatal("double Lock should fail")
+	}
+}
+
+func TestVaultBackend_UnlockNotLocked(t *testing.T) {
+	v := testVault(t)
+	if err := v.Initialize(); err != nil {
+		t.Fatalf("Initialize: %v", err)
+	}
+
+	// Unlocking when not locked should fail.
+	err := v.Unlock()
+	if err == nil {
+		t.Fatal("Unlock when not locked should fail")
+	}
+}
+
+func TestVaultBackend_LockNotInitialized(t *testing.T) {
+	v := testVault(t)
+
+	// Lock on uninitialized vault should fail.
+	err := v.Lock()
+	if err == nil {
+		t.Fatal("Lock on uninitialized vault should fail")
+	}
+}
+
+func TestVaultBackend_LockPersistence(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "vault.db")
+
+	// Create, initialize, lock, close.
+	v1, err := NewVaultBackend("pass123", WithVaultPath(dbPath))
+	if err != nil {
+		t.Fatalf("NewVaultBackend v1: %v", err)
+	}
+	if err := v1.Initialize(); err != nil {
+		t.Fatalf("Initialize: %v", err)
+	}
+	if err := v1.Lock(); err != nil {
+		t.Fatalf("Lock: %v", err)
+	}
+	if err := v1.Close(); err != nil {
+		t.Fatalf("Close v1: %v", err)
+	}
+
+	// Reopen — lock state should persist.
+	v2, err := NewVaultBackend("pass123", WithVaultPath(dbPath))
+	if err != nil {
+		t.Fatalf("NewVaultBackend v2: %v", err)
+	}
+	defer func() { _ = v2.Close() }()
+
+	locked, err := v2.IsLocked()
+	if err != nil {
+		t.Fatalf("IsLocked v2: %v", err)
+	}
+	if !locked {
+		t.Fatal("lock state should persist across close/reopen")
+	}
+
+	// Unlock should work after reopen.
+	if err := v2.Unlock(); err != nil {
+		t.Fatalf("Unlock v2: %v", err)
+	}
+
+	locked, err = v2.IsLocked()
+	if err != nil {
+		t.Fatalf("IsLocked after unlock v2: %v", err)
+	}
+	if locked {
+		t.Fatal("vault should be unlocked after Unlock()")
+	}
+}
+
+func TestVaultBackend_LockWrongPassphrase(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "vault.db")
+
+	// Initialize with correct passphrase.
+	v1, err := NewVaultBackend("correct-pass", WithVaultPath(dbPath))
+	if err != nil {
+		t.Fatalf("NewVaultBackend v1: %v", err)
+	}
+	if err := v1.Initialize(); err != nil {
+		t.Fatalf("Initialize: %v", err)
+	}
+	if err := v1.Close(); err != nil {
+		t.Fatalf("Close v1: %v", err)
+	}
+
+	// Try to lock with wrong passphrase.
+	v2, err := NewVaultBackend("wrong-pass", WithVaultPath(dbPath))
+	if err != nil {
+		t.Fatalf("NewVaultBackend v2: %v", err)
+	}
+	defer func() { _ = v2.Close() }()
+
+	err = v2.Lock()
+	if err == nil {
+		t.Fatal("Lock with wrong passphrase should fail")
+	}
+}
+
 func TestVaultBackend_ReopenAfterClose(t *testing.T) {
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "vault.db")

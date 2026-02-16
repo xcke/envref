@@ -255,6 +255,182 @@ func TestVaultCmd_Help(t *testing.T) {
 	}
 }
 
+func TestVaultLockCmd(t *testing.T) {
+	dir := t.TempDir()
+	vaultPath := filepath.Join(dir, "test-vault.db")
+	writeVaultTestConfig(t, dir, "testproject", vaultPath)
+
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getting cwd: %v", err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(origDir)
+	})
+
+	t.Setenv("ENVREF_VAULT_PASSPHRASE", "test-passphrase")
+
+	// Initialize the vault first.
+	root1 := NewRootCmd()
+	root1.SetOut(new(bytes.Buffer))
+	root1.SetErr(new(bytes.Buffer))
+	root1.SetArgs([]string{"vault", "init"})
+	if err := root1.Execute(); err != nil {
+		t.Fatalf("vault init failed: %v", err)
+	}
+
+	// Lock the vault.
+	root2 := NewRootCmd()
+	lockBuf := new(bytes.Buffer)
+	root2.SetOut(lockBuf)
+	root2.SetErr(new(bytes.Buffer))
+	root2.SetArgs([]string{"vault", "lock"})
+	if err := root2.Execute(); err != nil {
+		t.Fatalf("vault lock failed: %v", err)
+	}
+
+	got := lockBuf.String()
+	if !bytes.Contains([]byte(got), []byte("vault locked")) {
+		t.Errorf("expected 'vault locked' in output, got: %q", got)
+	}
+
+	// Secret operations should fail while locked.
+	root3 := NewRootCmd()
+	root3.SetOut(new(bytes.Buffer))
+	root3.SetErr(new(bytes.Buffer))
+	root3.SetArgs([]string{"secret", "set", "API_KEY", "--value", "test"})
+	err = root3.Execute()
+	if err == nil {
+		t.Fatal("secret set should fail on locked vault")
+	}
+}
+
+func TestVaultUnlockCmd(t *testing.T) {
+	dir := t.TempDir()
+	vaultPath := filepath.Join(dir, "test-vault.db")
+	writeVaultTestConfig(t, dir, "testproject", vaultPath)
+
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getting cwd: %v", err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(origDir)
+	})
+
+	t.Setenv("ENVREF_VAULT_PASSPHRASE", "test-passphrase")
+
+	// Initialize and lock the vault.
+	root1 := NewRootCmd()
+	root1.SetOut(new(bytes.Buffer))
+	root1.SetErr(new(bytes.Buffer))
+	root1.SetArgs([]string{"vault", "init"})
+	if err := root1.Execute(); err != nil {
+		t.Fatalf("vault init failed: %v", err)
+	}
+
+	root2 := NewRootCmd()
+	root2.SetOut(new(bytes.Buffer))
+	root2.SetErr(new(bytes.Buffer))
+	root2.SetArgs([]string{"vault", "lock"})
+	if err := root2.Execute(); err != nil {
+		t.Fatalf("vault lock failed: %v", err)
+	}
+
+	// Unlock the vault.
+	root3 := NewRootCmd()
+	unlockBuf := new(bytes.Buffer)
+	root3.SetOut(unlockBuf)
+	root3.SetErr(new(bytes.Buffer))
+	root3.SetArgs([]string{"vault", "unlock"})
+	if err := root3.Execute(); err != nil {
+		t.Fatalf("vault unlock failed: %v", err)
+	}
+
+	got := unlockBuf.String()
+	if !bytes.Contains([]byte(got), []byte("vault unlocked")) {
+		t.Errorf("expected 'vault unlocked' in output, got: %q", got)
+	}
+
+	// Secret operations should work again.
+	root4 := NewRootCmd()
+	root4.SetOut(new(bytes.Buffer))
+	root4.SetErr(new(bytes.Buffer))
+	root4.SetArgs([]string{"secret", "set", "API_KEY", "--value", "test-123"})
+	if err := root4.Execute(); err != nil {
+		t.Fatalf("secret set after unlock failed: %v", err)
+	}
+
+	root5 := NewRootCmd()
+	getBuf := new(bytes.Buffer)
+	root5.SetOut(getBuf)
+	root5.SetErr(new(bytes.Buffer))
+	root5.SetArgs([]string{"secret", "get", "API_KEY"})
+	if err := root5.Execute(); err != nil {
+		t.Fatalf("secret get after unlock failed: %v", err)
+	}
+
+	if getBuf.String() != "test-123\n" {
+		t.Errorf("secret get after unlock: got %q, want %q", getBuf.String(), "test-123\n")
+	}
+}
+
+func TestVaultLockCmd_NotInitialized(t *testing.T) {
+	dir := t.TempDir()
+	vaultPath := filepath.Join(dir, "test-vault.db")
+	writeVaultTestConfig(t, dir, "testproject", vaultPath)
+
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getting cwd: %v", err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(origDir)
+	})
+
+	t.Setenv("ENVREF_VAULT_PASSPHRASE", "test-passphrase")
+
+	// Lock without initializing should fail.
+	root := NewRootCmd()
+	root.SetOut(new(bytes.Buffer))
+	root.SetErr(new(bytes.Buffer))
+	root.SetArgs([]string{"vault", "lock"})
+	err = root.Execute()
+	if err == nil {
+		t.Fatal("vault lock on uninitialized vault should fail")
+	}
+}
+
+func TestVaultCmd_HelpShowsLockUnlock(t *testing.T) {
+	root := NewRootCmd()
+	buf := new(bytes.Buffer)
+	root.SetOut(buf)
+	root.SetErr(new(bytes.Buffer))
+	root.SetArgs([]string{"vault", "--help"})
+
+	err := root.Execute()
+	if err != nil {
+		t.Fatalf("vault --help failed: %v", err)
+	}
+
+	got := buf.String()
+	if !bytes.Contains([]byte(got), []byte("Lock the vault")) {
+		t.Errorf("expected 'Lock the vault' in help output, got: %q", got)
+	}
+	if !bytes.Contains([]byte(got), []byte("Unlock the vault")) {
+		t.Errorf("expected 'Unlock the vault' in help output, got: %q", got)
+	}
+}
+
 func TestGetTerminalFd_NonTerminal(t *testing.T) {
 	root := NewRootCmd()
 	root.SetIn(bytes.NewReader(nil))
