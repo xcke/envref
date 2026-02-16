@@ -16,7 +16,7 @@ COVER_PROFILE := $(COVER_DIR)/coverage.out
 GO          := go
 LINT        := golangci-lint
 
-.PHONY: all build test lint vet check install clean help cover cover-html cover-func
+.PHONY: all build test lint vet check install clean help cover cover-html cover-func stats
 
 ## all: Run lint, test, and build (default target)
 all: check build
@@ -65,6 +65,29 @@ install:
 clean:
 	rm -rf $(BUILD_DIR) $(COVER_DIR)
 	$(GO) clean -cache -testcache
+
+## stats: Show codebase statistics
+stats:
+	@echo "── envref codebase stats ──"
+	@echo ""
+	@printf "%-24s %s\n" "Go source files:" "$$(find . -name '*.go' -not -path './vendor/*' | wc -l | tr -d ' ')"
+	@printf "%-24s %s\n" "Go lines (total):" "$$(find . -name '*.go' -not -path './vendor/*' -exec cat {} + | wc -l | tr -d ' ')"
+	@printf "%-24s %s\n" "Go lines (no blank/comment):" "$$(find . -name '*.go' -not -path './vendor/*' -exec cat {} + | grep -cvE '^\s*$$|^\s*//' | tr -d ' ')"
+	@printf "%-24s %s\n" "Test files:" "$$(find . -name '*_test.go' -not -path './vendor/*' | wc -l | tr -d ' ')"
+	@printf "%-24s %s\n" "Test lines:" "$$(find . -name '*_test.go' -not -path './vendor/*' -exec cat {} + | wc -l | tr -d ' ')"
+	@echo ""
+	@echo "By package:"
+	@find . -name '*.go' -not -path './vendor/*' -not -name '*_test.go' | \
+		sed 's|/[^/]*$$||' | sort | uniq -c | sort -rn | \
+		while read count dir; do \
+			lines=$$(cat "$$dir"/*.go 2>/dev/null | grep -cvE '^\s*$$|^\s*//' || echo 0); \
+			printf "  %-36s %3d files  %5d lines\n" "$$dir" "$$count" "$$lines"; \
+		done
+	@echo ""
+	@printf "%-24s %s\n" "Packages:" "$$(find . -name '*.go' -not -path './vendor/*' -exec dirname {} \; | sort -u | wc -l | tr -d ' ')"
+	@printf "%-24s %s\n" "Dependencies (direct):" "$$(grep -c '^\t[^/]*/' go.mod 2>/dev/null || echo 0)"
+	@printf "%-24s %s\n" "Git commits:" "$$(git rev-list --count HEAD 2>/dev/null || echo '?')"
+	@printf "%-24s %s\n" "Version:" "$(VERSION)"
 
 ## help: Show this help message
 help:
