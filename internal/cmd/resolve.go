@@ -26,29 +26,42 @@ a profile-specific env file is loaded between .env and .env.local:
   .env ← .env.<profile> ← .env.local
 
 By default, output is in KEY=VALUE format (one per line). Use --direnv
-to output in direnv-compatible format (export KEY=VALUE).
+to output in direnv-compatible format (export KEY=VALUE), or use --format
+to select from plain, json, shell, or table.
 
 Examples:
   envref resolve                         # output KEY=VALUE pairs
   envref resolve --profile staging       # use staging profile
   envref resolve --direnv                # output export KEY=VALUE for direnv
+  envref resolve --format json           # output as JSON array
   eval "$(envref resolve --direnv)"      # inject into current shell`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			direnv, _ := cmd.Flags().GetBool("direnv")
 			profile, _ := cmd.Flags().GetString("profile")
-			return runResolve(cmd, direnv, profile)
+			formatStr, _ := cmd.Flags().GetString("format")
+			return runResolve(cmd, direnv, profile, formatStr)
 		},
 	}
 
 	cmd.Flags().Bool("direnv", false, "output in direnv-compatible format (export KEY=VALUE)")
 	cmd.Flags().StringP("profile", "P", "", "environment profile to use (e.g., staging, production)")
+	cmd.Flags().String("format", "plain", "output format: plain, json, shell, table")
 
 	return cmd
 }
 
 // runResolve implements the resolve command logic.
-func runResolve(cmd *cobra.Command, direnv bool, profileOverride string) error {
+func runResolve(cmd *cobra.Command, direnv bool, profileOverride, formatStr string) error {
+	// --direnv is a shorthand for --format shell.
+	if direnv {
+		formatStr = "shell"
+	}
+	format, err := parseFormat(formatStr)
+	if err != nil {
+		return err
+	}
+
 	// Load project config to get project name, backend config, and file paths.
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -79,7 +92,7 @@ func runResolve(cmd *cobra.Command, direnv bool, profileOverride string) error {
 
 	// If no refs, just output without backend resolution.
 	if !env.HasRefs() {
-		return outputEntries(cmd, envToEntries(env), direnv)
+		return outputEntries(cmd, envToEntries(env), format)
 	}
 
 	// Build the backend registry.
@@ -104,7 +117,7 @@ func runResolve(cmd *cobra.Command, direnv bool, profileOverride string) error {
 	}
 
 	// Output resolved entries.
-	if err := outputEntries(cmd, result.Entries, direnv); err != nil {
+	if err := outputEntries(cmd, result.Entries, format); err != nil {
 		return err
 	}
 
@@ -181,16 +194,12 @@ func envToEntries(env *envfile.Env) []resolve.Entry {
 }
 
 // outputEntries writes entries to stdout in the appropriate format.
-func outputEntries(cmd *cobra.Command, entries []resolve.Entry, direnv bool) error {
-	out := cmd.OutOrStdout()
-	for _, entry := range entries {
-		if direnv {
-			_, _ = fmt.Fprintf(out, "export %s=%s\n", entry.Key, shellQuote(entry.Value))
-		} else {
-			_, _ = fmt.Fprintf(out, "%s=%s\n", entry.Key, entry.Value)
-		}
+func outputEntries(cmd *cobra.Command, entries []resolve.Entry, format OutputFormat) error {
+	pairs := make([]kvPair, len(entries))
+	for i, entry := range entries {
+		pairs[i] = kvPair{Key: entry.Key, Value: entry.Value}
 	}
-	return nil
+	return formatKVPairs(cmd.OutOrStdout(), pairs, format)
 }
 
 // shellQuote wraps a value in single quotes for safe shell usage.

@@ -119,7 +119,7 @@ func TestOutputEntries_KeyValue(t *testing.T) {
 	buf := new(bytes.Buffer)
 	root.SetOut(buf)
 
-	if err := outputEntries(root, entries, false); err != nil {
+	if err := outputEntries(root, entries, FormatPlain); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -143,7 +143,7 @@ func TestOutputEntries_DirenvFormat(t *testing.T) {
 	buf := new(bytes.Buffer)
 	root.SetOut(buf)
 
-	if err := outputEntries(root, entries, true); err != nil {
+	if err := outputEntries(root, entries, FormatShell); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 

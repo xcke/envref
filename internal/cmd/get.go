@@ -19,25 +19,34 @@ When a profile file is specified with --profile-file, it is loaded between
 .env and .env.local: .env ← profile ← .env.local.
 
 If the value is an unresolved ref:// reference, it is printed as-is.
-Use --file to specify a custom .env file path.`,
+Use --file to specify a custom .env file path.
+
+Output format can be specified with --format (plain, json, shell, table).`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			envFile, _ := cmd.Flags().GetString("file")
 			localFile, _ := cmd.Flags().GetString("local-file")
 			profileFile, _ := cmd.Flags().GetString("profile-file")
-			return runGet(cmd, args[0], envFile, profileFile, localFile)
+			formatStr, _ := cmd.Flags().GetString("format")
+			return runGet(cmd, args[0], envFile, profileFile, localFile, formatStr)
 		},
 	}
 
 	cmd.Flags().StringP("file", "f", ".env", "path to the .env file")
 	cmd.Flags().String("local-file", ".env.local", "path to the .env.local override file")
 	cmd.Flags().String("profile-file", "", "path to a profile-specific .env file (e.g., .env.staging)")
+	cmd.Flags().String("format", "plain", "output format: plain, json, shell, table")
 
 	return cmd
 }
 
 // runGet loads env files, merges them, and prints the value for the given key.
-func runGet(cmd *cobra.Command, key, envPath, profilePath, localPath string) error {
+func runGet(cmd *cobra.Command, key, envPath, profilePath, localPath, formatStr string) error {
+	format, err := parseFormat(formatStr)
+	if err != nil {
+		return err
+	}
+
 	env, err := loadAndMergeEnv(cmd, envPath, profilePath, localPath)
 	if err != nil {
 		return err
@@ -48,8 +57,7 @@ func runGet(cmd *cobra.Command, key, envPath, profilePath, localPath string) err
 		return fmt.Errorf("key %q not found", key)
 	}
 
-	_, _ = fmt.Fprintln(cmd.OutOrStdout(), entry.Value)
-	return nil
+	return formatSingleValue(cmd.OutOrStdout(), entry.Key, entry.Value, format)
 }
 
 // printWarnings writes parser warnings to stderr for the given file.

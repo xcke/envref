@@ -1,7 +1,7 @@
 # Project Status
 
 ## Last Completed
-- ENV-006: Added GitHub Actions CI pipeline with test (multi-OS matrix), lint, and build jobs [iter-20]
+- ENV-019: Added --format flag (plain, json, shell, table) to get, list, and resolve commands [iter-21]
 
 ## Current State
 - Go module `github.com/xcke/envref` initialized with Cobra + Viper + go-keyring + testify dependencies
@@ -19,6 +19,7 @@
 - `envref profile use <name>` — sets active profile in `.envref.yaml`, validates against config and disk, supports `--clear`
 - `envref validate` — checks .env against .env.example schema, reports missing/extra keys, supports `--example`, `--profile-file` flags
 - `envref status` — shows environment overview: project info, file existence, key counts, backend resolution status, validation, actionable hints
+- **Output format support:** `--format` flag on `get`, `list`, and `resolve` commands (plain, json, shell, table)
 - **Profile support:** `.envref.yaml` `active_profile` field, `profiles` map, convention-based naming, `--profile` flag, 3-layer merge
 - **Config write support:** `SetActiveProfile()` function for targeted YAML field updates
 - Resolution pipeline: `internal/resolve` package with `Resolve()` function, per-key error collection, direct backend matching + fallback chain
@@ -31,7 +32,7 @@
 - **GoReleaser config** for cross-platform releases (Linux/macOS/Windows × amd64/arm64, tar.gz/zip, checksums, changelog)
 - **GitHub Actions CI pipeline** with test (ubuntu/macos/windows matrix), lint (go vet + golangci-lint), and build jobs
 - Makefile with build/test/lint/install targets
-- Comprehensive test coverage: parser (100+), merge (38+), resolve (50+), integration (50+), profile, validate, status tests
+- Comprehensive test coverage: parser (100+), merge (38+), resolve (50+), integration (50+), profile, validate, status, format tests
 - Directory structure: `cmd/envref/`, `internal/cmd/`, `internal/parser/`, `internal/envfile/`, `internal/config/`, `internal/ref/`, `internal/resolve/`, `internal/backend/`, `pkg/`
 - All checks pass: `go build`, `go vet`, `go test`, `golangci-lint`
 
