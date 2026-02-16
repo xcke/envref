@@ -1,7 +1,7 @@
 # Project Status
 
 ## Last Completed
-- ENV-114: Added `envref run -- <command>` to execute commands with resolved env vars injected [iter-23]
+- ENV-102: Added `envref doctor` command to check for common .env file issues [iter-24]
 
 ## Current State
 - Go module `github.com/xcke/envref` initialized with Cobra + Viper + go-keyring + testify dependencies
@@ -25,6 +25,10 @@
 - `envref profile use <name>` — sets active profile in `.envref.yaml`, validates against config and disk, supports `--clear`
 - `envref validate` — checks .env against .env.example schema, reports missing/extra keys, supports `--example`, `--profile-file` flags
 - `envref status` — shows environment overview: project info, file existence, key counts, backend resolution status, validation, actionable hints
+- `envref doctor` — scans .env files for common issues with non-zero exit code on failure
+  - Duplicate keys, trailing whitespace, unquoted values with spaces, empty values without explicit intent
+  - .env not in .gitignore check, .envrc direnv trust check
+  - Supports `--file` and `--local-file` flags
 - **Output format support:** `--format` flag on `get`, `list`, and `resolve` commands (plain, json, shell, table)
 - **Profile support:** `.envref.yaml` `active_profile` field, `profiles` map, convention-based naming, `--profile` flag, 3-layer merge
 - **Config write support:** `SetActiveProfile()` function for targeted YAML field updates
@@ -38,7 +42,7 @@
 - **GoReleaser config** for cross-platform releases (Linux/macOS/Windows × amd64/arm64, tar.gz/zip, checksums, changelog)
 - **GitHub Actions CI pipeline** with test (ubuntu/macos/windows matrix), lint (go vet + golangci-lint), and build jobs
 - Makefile with build/test/lint/install targets
-- Comprehensive test coverage: parser (100+), merge (38+), resolve (50+), integration (55+), profile, validate, status, format, strict mode, run command tests
+- Comprehensive test coverage: parser (100+), merge (38+), resolve (50+), integration (55+), profile, validate, status, format, strict mode, run command, doctor tests
 - Directory structure: `cmd/envref/`, `internal/cmd/`, `internal/parser/`, `internal/envfile/`, `internal/config/`, `internal/ref/`, `internal/resolve/`, `internal/backend/`, `pkg/`
 - All checks pass: `go build`, `go vet`, `go test`, `golangci-lint`
 

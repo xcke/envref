@@ -134,7 +134,7 @@
 
 - [DONE] P1 | ENV-100 | Add `envref validate` — check `.env` against `.env.example` schema (missing/extra keys)
 - [DONE] P1 | ENV-101 | Add `envref status` — show resolved/missing/unresolved overview with actionable hints
-- [TODO] P2 | ENV-102 | Add `envref doctor` — check for common issues:
+- [DONE] P2 | ENV-102 | Add `envref doctor` — check for common issues:
   - Duplicate keys
   - Trailing whitespace
   - Unquoted values with spaces
