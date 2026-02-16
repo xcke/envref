@@ -1,7 +1,7 @@
 # Project Status
 
 ## Last Completed
-- ENV-131: Added docs/ directory with four usage guides (getting-started, direnv-integration, profiles, secret-backends) [iter-51]
+- ENV-133: Added Homebrew tap formula with GoReleaser integration and release workflow [iter-52]
 
 ## Current State
 - Go module `github.com/xcke/envref` initialized with Cobra + Viper + go-keyring + age + sqlite + testify + x/term dependencies
@@ -33,9 +33,10 @@
 - **Two secret backends:** `KeychainBackend` (OS keychain via go-keyring) and `VaultBackend` (local SQLite + age encryption)
 - **Comprehensive README** with architecture diagram, resolution pipeline, backend chain, project structure, vault docs, and benchmarks
 - **docs/ directory** with four usage guides: getting-started, direnv-integration, profiles, secret-backends
+- **Homebrew tap:** GoReleaser `brews` config auto-publishes to `xcke/homebrew-tap`; `Formula/envref.rb` template for build-from-source; release workflow on tag push
 - `.env` file parser with full quote/multiline/comment/BOM/CRLF support
 - `ref://` URI parser, `Backend` interface, `Registry`, `NamespacedBackend`
-- GoReleaser config, GitHub Actions CI pipeline, Makefile with coverage targets
+- GoReleaser config, GitHub Actions CI + release pipelines, Makefile with coverage targets
 - Comprehensive test coverage across all packages (~85.8%)
 - Performance benchmarks for parser, envfile, resolve, config packages
 - All checks pass: `go build`, `go vet`, `go test`, `golangci-lint`

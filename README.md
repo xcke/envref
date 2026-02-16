@@ -10,6 +10,12 @@ envref resolve = config + resolved secrets → direnv / shell env
 
 ## Install
 
+### Homebrew (macOS / Linux)
+
+```bash
+brew install xcke/tap/envref
+```
+
 ### From source
 
 ```bash

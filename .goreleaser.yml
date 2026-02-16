@@ -50,6 +50,23 @@ changelog:
       - "^chore:"
       - "^test:"
 
+brews:
+  - repository:
+      owner: xcke
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    directory: Formula
+    homepage: "https://github.com/xcke/envref"
+    description: "CLI tool for separating config from secrets in .env files"
+    license: "MIT"
+    install: |
+      bin.install "envref"
+    test: |
+      assert_match "envref", shell_output("#{bin}/envref --help")
+    dependencies:
+      - name: go
+        type: build
+
 release:
   github:
     owner: xcke
