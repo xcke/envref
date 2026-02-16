@@ -1,7 +1,7 @@
 # Project Status
 
 ## Last Completed
-- ENV-097: Added `envref profile export <name>` command with JSON/plain/shell/table output formats [iter-66]
+- ENV-120: Added `envref secret share <KEY> --to <age-public-key>` command for encrypting secrets to specific recipients [iter-67]
 
 ## Current State
 - Go module `github.com/xcke/envref` initialized with Cobra + Viper + go-keyring + age + sqlite + testify + x/term dependencies
@@ -12,8 +12,9 @@
 - `envref get <KEY>` command loads `.env` + optional profile + `.env.local`, merges, interpolates, prints value
 - `envref set <KEY>=<VALUE>` command writes key-value pairs to .env files
 - `envref list` command prints all merged and interpolated key-value pairs
-- `envref secret set/get/delete/list/generate/copy/rotate` — full secret CRUD + generation + cross-project copy + rotation via configured backends with project namespace
+- `envref secret set/get/delete/list/generate/copy/rotate/share` — full secret CRUD + generation + cross-project copy + rotation + sharing via configured backends
 - `envref secret rotate <KEY>` — generates new random value, archives old value as `<KEY>.__history.<N>`, supports `--keep` for configurable history retention
+- **`envref secret share <KEY> --to <age-key>`** — retrieves secret from backend, encrypts with recipient's age X25519 public key, outputs ASCII-armored ciphertext; supports `--to-file` for reading key from file
 - **Profile-scoped secrets:** `--profile` flag on all secret subcommands stores/retrieves secrets as `<project>/<profile>/<key>`
 - `envref resolve` — loads .env + optional profile + .env.local, merges, interpolates, resolves `ref://` references
 - `envref resolve --direnv` — outputs `export KEY=VALUE` format for shell integration

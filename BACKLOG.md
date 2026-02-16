@@ -111,7 +111,7 @@
 - [DONE] P2 | ENV-082 | Handle direnv trust/allow flow — prompt user to run `direnv allow` after init
 - [DONE] P2 | ENV-083 | Add `envref resolve --watch` — output on file changes (for direnv reload triggers)
 - [DONE] P2 | ENV-084 | Ensure fast startup (<50ms) for resolve command — benchmark and optimize
-- [TODO] P3 | ENV-085 | Add documentation: direnv integration guide with examples
+- [DONE] P3 | ENV-085 | Add documentation: direnv integration guide with examples
 
 ---
 
@@ -163,7 +163,7 @@
 
 ## Phase 10 — Team & Sharing Features
 
-- [TODO] P3 | ENV-120 | Add `envref secret share <key> --to <teammate>` — encrypt secret for specific recipient (age public key)
+- [DONE] P3 | ENV-120 | Add `envref secret share <key> --to <teammate>` — encrypt secret for specific recipient (age public key)
 - [TODO] P3 | ENV-121 | Add `envref sync push` / `envref sync pull` — sync secrets via shared encrypted git file
 - [TODO] P3 | ENV-122 | Add `.envref.team.yaml` — team-level config with member public keys
 - [TODO] P3 | ENV-123 | Add `envref onboard` — interactive setup for new team members (walk through all missing secrets)
