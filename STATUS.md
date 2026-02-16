@@ -1,7 +1,7 @@
 # Project Status
 
 ## Last Completed
-- ENV-067: Added `envref secret rotate` command with history archival and configurable retention [iter-58]
+- ENV-054: Added plugin interface for community-contributed backends with JSON-over-stdin/stdout protocol [iter-59]
 
 ## Current State
 - Go module `github.com/xcke/envref` initialized with Cobra + Viper + go-keyring + age + sqlite + testify + x/term dependencies
@@ -13,10 +13,9 @@
 - `envref set <KEY>=<VALUE>` command writes key-value pairs to .env files
 - `envref list` command prints all merged and interpolated key-value pairs
 - `envref secret set/get/delete/list/generate/copy/rotate` — full secret CRUD + generation + cross-project copy + rotation via configured backends with project namespace
-- `envref secret rotate <KEY>` — generates new random value, archives old value as `<KEY>.__history.<N>`, supports `--keep` for configurable history retention, `--length`/`--charset`/`--print`/`--profile`/`--backend` flags
-- **Profile-scoped secrets:** `--profile` flag on all secret subcommands stores/retrieves secrets as `<project>/<profile>/<key>`; `secret get` falls back from profile to project scope; resolve pipeline tries profile-scoped first then project-scoped
+- `envref secret rotate <KEY>` — generates new random value, archives old value as `<KEY>.__history.<N>`, supports `--keep` for configurable history retention
+- **Profile-scoped secrets:** `--profile` flag on all secret subcommands stores/retrieves secrets as `<project>/<profile>/<key>`
 - `envref resolve` — loads .env + optional profile + .env.local, merges, interpolates, resolves `ref://` references
-- `envref resolve --profile <name>` — uses a named profile's env file in the merge chain and resolves profile-scoped secrets
 - `envref resolve --direnv` — outputs `export KEY=VALUE` format for shell integration
 - `envref resolve --strict` — fails with no output if any reference cannot be resolved (CI-safe)
 - `envref resolve --watch` / `-w` — watches .env files via fsnotify and re-resolves on changes with debouncing
@@ -25,27 +24,23 @@
 - `envref validate` — checks .env against .env.example schema with `--ci` and `--schema` modes
 - `envref status` — shows environment overview with actionable hints
 - `envref doctor` — scans .env files for common issues
-- `envref audit` — warns about plaintext secrets via pattern matching (15 known formats), key name heuristics, and Shannon entropy analysis; `--min-entropy` flag for tuning; CI-safe exit codes
+- `envref audit` — warns about plaintext secrets via pattern matching, key name heuristics, and Shannon entropy analysis
 - `envref config show` — prints resolved effective config (plain, JSON, table formats)
 - `envref completion <shell>` — generates shell completion scripts (bash, zsh, fish, powershell)
 - `envref edit` — opens .env files in `$VISUAL`/`$EDITOR`
-- `envref vault init` — initialize vault with master passphrase (interactive prompt with confirmation, or via env var)
-- `envref vault lock` — lock vault to prevent all secret access; persists across CLI invocations
-- `envref vault unlock` — unlock vault after verifying passphrase to restore secret access
-- `envref vault export` — export all vault secrets to JSON file or stdout for backup/migration
-- `envref vault import` — import secrets from JSON file or stdin into the vault
-- **Two secret backends:** `KeychainBackend` (OS keychain via go-keyring) and `VaultBackend` (local SQLite + age encryption)
-- **Security hardening:** Vault passphrase stored as `[]byte` (clearable), zeroed on Close; decrypted plaintext bytes cleared after use; terminal passphrase input bytes cleared; ErrVaultClosed prevents use-after-close; error messages never contain secret values
-- **Comprehensive README** with architecture diagram, resolution pipeline, backend chain, project structure, vault docs, and benchmarks
+- `envref vault init/lock/unlock/export/import` — full vault management
+- **Three backend types:** `KeychainBackend` (OS keychain via go-keyring), `VaultBackend` (local SQLite + age encryption), and `PluginBackend` (external executables via JSON protocol)
+- **Plugin interface:** External backends communicate via JSON-over-stdin/stdout protocol; plugins discovered by convention (`envref-backend-<name>` on $PATH) or explicit `command` config; configured as `type: plugin` in `.envref.yaml`
+- **Security hardening:** Vault passphrase stored as `[]byte` (clearable), zeroed on Close; decrypted plaintext bytes cleared after use
+- **Comprehensive README** with architecture diagram, resolution pipeline, project structure, vault docs, and benchmarks
 - **docs/ directory** with four usage guides: getting-started, direnv-integration, profiles, secret-backends
-- **Homebrew tap:** GoReleaser `brews` config auto-publishes to `xcke/homebrew-tap`; `Formula/envref.rb` template for build-from-source; release workflow on tag push
+- **Homebrew tap:** GoReleaser `brews` config auto-publishes to `xcke/homebrew-tap`
 - **MIT LICENSE** file included
 - `.env` file parser with full quote/multiline/comment/BOM/CRLF support
 - `ref://` URI parser, `Backend` interface, `Registry`, `NamespacedBackend`
 - GoReleaser config, GitHub Actions CI + release pipelines, Makefile with coverage targets
-- Comprehensive test coverage across all packages (~85.8%)
-- Performance benchmarks for parser, envfile, resolve, config packages
-- **Fuzz tests** for .env parser (4 fuzz targets), ref:// URI parser (2 fuzz targets), and variable interpolation (3 fuzz targets) — all validated with 10s runs
+- Comprehensive test coverage across all packages
+- Fuzz tests for .env parser, ref:// URI parser, and variable interpolation
 - All checks pass: `go build`, `go vet`, `go test`, `golangci-lint`
 
 ## Known Issues

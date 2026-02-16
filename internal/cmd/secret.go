@@ -852,6 +852,8 @@ func createBackend(bc config.BackendConfig) (backend.Backend, error) {
 		return backend.NewKeychainBackend(), nil
 	case "vault":
 		return createVaultBackend(bc)
+	case "plugin":
+		return createPluginBackend(bc)
 	default:
 		return nil, fmt.Errorf("unknown backend type %q", bc.EffectiveType())
 	}
@@ -864,4 +866,20 @@ func createBackend(bc config.BackendConfig) (backend.Backend, error) {
 // can be obtained.
 func createVaultBackend(bc config.BackendConfig) (*backend.VaultBackend, error) {
 	return createVaultBackendWithContext(bc)
+}
+
+// createPluginBackend creates a PluginBackend from the backend config.
+// If config.command is set, it is used as the plugin executable path.
+// Otherwise, the plugin is discovered by searching $PATH for
+// "envref-backend-<name>".
+func createPluginBackend(bc config.BackendConfig) (*backend.PluginBackend, error) {
+	command := bc.Config["command"]
+	if command == "" {
+		var err error
+		command, err = backend.DiscoverPlugin(bc.Name)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return backend.NewPluginBackend(bc.Name, command), nil
 }
