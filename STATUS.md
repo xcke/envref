@@ -1,7 +1,7 @@
 # Project Status
 
 ## Last Completed
-- ENV-100: Added `envref validate` command — compares merged .env against .env.example schema, reports missing/extra keys, non-zero exit on missing keys for CI [iter-17]
+- ENV-101: Added `envref status` command — shows project overview with file status, key counts, ref resolution, .env.example validation, and actionable hints [iter-18]
 
 ## Current State
 - Go module `github.com/xcke/envref` initialized with Cobra + Viper + go-keyring + testify dependencies
@@ -18,6 +18,7 @@
 - `envref profile list` — shows available profiles from config and convention-based `.env.*` files, marks active profile
 - `envref profile use <name>` — sets active profile in `.envref.yaml`, validates against config and disk, supports `--clear`
 - `envref validate` — checks .env against .env.example schema, reports missing/extra keys, supports `--example`, `--profile-file` flags
+- `envref status` — shows environment overview: project info, file existence, key counts (config vs secrets), backend resolution status, .env.example validation, actionable hints; supports `--profile` flag
 - **Profile support:** `.envref.yaml` `active_profile` field, `profiles` map with custom `env_file` paths, convention-based naming (`.env.<name>`), `--profile` flag overrides config, 3-layer merge: base ← profile ← local
 - **Config write support:** `SetActiveProfile()` function for targeted YAML field updates preserving file formatting
 - Resolution pipeline: `internal/resolve` package with `Resolve()` function, per-key error collection, direct backend matching + fallback chain
@@ -40,6 +41,7 @@
 - **Profile use test coverage: 10 test cases**
 - **Config SetActiveProfile test coverage: 5 test cases**
 - **Validate test coverage: 11 test cases**
+- **Status test coverage: 12 test cases**
 - Directory structure: `cmd/envref/`, `internal/cmd/`, `internal/parser/`, `internal/envfile/`, `internal/config/`, `internal/ref/`, `internal/resolve/`, `internal/backend/`, `pkg/`
 - All checks pass: `go build`, `go vet`, `go test`, `golangci-lint`
 
