@@ -1,12 +1,10 @@
 name: Deploy GitHub Pages
 
 on:
-  # Push trigger disabled: GitHub Pages requires a public repo or a paid plan.
-  # Re-enable once the repo is public:
-  #   push:
-  #     branches: [main, master]
-  #     paths:
-  #       - 'site/**'
+  push:
+    branches: [main, master]
+    paths:
+      - 'site/**'
   workflow_dispatch:
 
 permissions:
