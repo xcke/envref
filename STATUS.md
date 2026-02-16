@@ -1,7 +1,7 @@
 # Project Status
 
 ## Last Completed
-- ENV-147: Set up code coverage reporting with Makefile targets and CI pipeline [iter-49]
+- ENV-130: Enhanced README with architecture diagram, resolution pipeline, backend chain, project structure, vault docs, and benchmark info [iter-50]
 
 ## Current State
 - Go module `github.com/xcke/envref` initialized with Cobra + Viper + go-keyring + age + sqlite + testify + x/term dependencies
@@ -31,18 +31,12 @@
 - `envref vault lock` — lock vault to prevent all secret access; persists across CLI invocations
 - `envref vault unlock` — unlock vault after verifying passphrase to restore secret access
 - **Two secret backends:** `KeychainBackend` (OS keychain via go-keyring) and `VaultBackend` (local SQLite + age encryption)
-- **VaultBackend:** per-value age scrypt encryption, passphrase via `ENVREF_VAULT_PASSPHRASE` env var or `config.passphrase` or interactive terminal prompt, configurable DB path, lazy connection, WAL mode
-- **Vault lock/unlock:** persistent lock flag in metadata table; locked vault refuses Get/Set/Delete/List with `ErrVaultLocked`; passphrase verified before lock/unlock; lock state persists across process restarts
-- **Vault setup flow:** `vault init` stores encrypted verification token; subsequent access verifies passphrase against token; wrong passphrase returns clear error
-- **Interactive passphrase prompt:** secret/resolve/run/status commands prompt for vault passphrase at terminal when not configured via env var or config
-- **Global verbosity flags, colorized output, fuzzy key matching, resolution cache**
-- **Performance benchmarks:** parser, envfile, resolve, config packages all benchmarked; optimizations reduce allocations 20-37% across pipeline
-- **Code coverage reporting:** `make cover` generates coverage profile, `make cover-html` generates HTML report, `make cover-func` shows per-function breakdown; CI uploads coverage artifacts; current total coverage: 85.8%
-- **README.md** with project overview, install instructions, quickstart, and command reference
+- **Comprehensive README** with architecture diagram, resolution pipeline, backend chain, project structure, vault docs, and benchmarks
 - `.env` file parser with full quote/multiline/comment/BOM/CRLF support
 - `ref://` URI parser, `Backend` interface, `Registry`, `NamespacedBackend`
-- GoReleaser config, GitHub Actions CI pipeline, Makefile
-- Comprehensive test coverage across all packages
+- GoReleaser config, GitHub Actions CI pipeline, Makefile with coverage targets
+- Comprehensive test coverage across all packages (~85.8%)
+- Performance benchmarks for parser, envfile, resolve, config packages
 - All checks pass: `go build`, `go vet`, `go test`, `golangci-lint`
 
 ## Known Issues

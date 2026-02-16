@@ -91,6 +91,107 @@ envref uses a layered merge strategy:
 
 During resolution, `ref://` URIs are resolved through configured secret backends (OS keychain by default). Variable interpolation (`${VAR}`) is supported within values.
 
+## Architecture
+
+### Resolution pipeline
+
+The core of envref is the resolve pipeline. When you run `envref resolve`, this is what happens:
+
+```
+                        envref resolve --profile staging
+                                    |
+                    +---------------v----------------+
+                    |        Load & Merge .env       |
+                    |                                |
+                    |  .env (base, committed)        |
+                    |    <- .env.staging (profile)   |
+                    |    <- .env.local (personal)    |
+                    |                                |
+                    |  Later files override earlier  |
+                    +---------------+----------------+
+                                    |
+                    +---------------v----------------+
+                    |    Variable Interpolation      |
+                    |                                |
+                    |  DB_URL=postgres://${DB_HOST}  |
+                    |  -> postgres://localhost       |
+                    +---------------+----------------+
+                                    |
+                          +---------v---------+
+                          | Has ref:// values? |
+                          +---------+---------+
+                            yes |       | no
+                    +-----------+       +-------> output as-is
+                    |
+        +-----------v-------------+
+        |   Reference Resolution  |
+        |                         |
+        |  ref://secrets/api_key  |
+        |       |                 |
+        |       v                 |
+        |  Parse URI -> backend   |
+        |       |                 |
+        |       v                 |
+        |  Backend Lookup         |
+        |  (with caching)         |
+        +---+--------+--------+--+
+            |        |        |
+    +-------v--+ +---v----+ +-v--------+
+    | Keychain | | Vault  | | (future) |
+    | (OS)     | | (local)| | 1P / SSM |
+    +----------+ +--------+ +----------+
+            |        |        |
+            +--------v--------+
+                     |
+        +------------v-----------+
+        |   Format & Output      |
+        |                        |
+        |  plain: KEY=VALUE      |
+        |  shell: export KEY=VAL |
+        |  json:  [{key, value}] |
+        |  table: bordered       |
+        +------------------------+
+```
+
+### Secret backend chain
+
+Backends are tried in the order defined in `.envref.yaml`. The first backend that has the key wins. Each secret is namespaced by project (and optionally by profile) to prevent collisions:
+
+```
+Backend key format:
+
+  Without profile:  <project>/<key>         e.g. my-app/api_key
+  With profile:     <project>/<profile>/<key> e.g. my-app/staging/api_key
+
+Lookup order (with --profile staging):
+  1. my-app/staging/api_key   <- profile-scoped (tried first)
+  2. my-app/api_key           <- project-scoped (fallback)
+```
+
+Two backends are built in:
+
+| Backend | Storage | Encryption | Use case |
+|---------|---------|-----------|----------|
+| `keychain` | OS keychain (macOS Keychain, Linux Secret Service, Windows Credential Manager) | OS-managed | Default — zero setup |
+| `vault` | Local SQLite at `~/.config/envref/vault.db` | age scrypt per-value | Fallback when keychain unavailable |
+
+### Project structure
+
+```
+cmd/envref/              Entry point (minimal main.go)
+internal/
+  cmd/                   CLI commands (Cobra)
+  parser/                .env file lexer (quotes, multiline, BOM, CRLF)
+  envfile/               Env container, merge, interpolation
+  ref/                   ref:// URI parser
+  resolve/               Reference resolution pipeline
+  backend/               Backend interface + keychain/vault implementations
+  config/                .envref.yaml loader (Viper)
+  schema/                .env.schema.json validator
+  suggest/               Fuzzy key matching (Levenshtein)
+  output/                Verbosity-aware writer + color
+```
+
 ## Commands
 
 | Command | Description |
@@ -173,6 +274,26 @@ direnv allow
 
 This generates an `.envrc` that runs `eval "$(envref resolve --direnv)"` on directory entry.
 
+## Encrypted vault
+
+For environments without OS keychain access (headless servers, containers), envref includes a local encrypted vault:
+
+```bash
+# Initialize with a master passphrase
+envref vault init
+
+# Use vault as the backend
+# (set secret_backend: vault in .envref.yaml)
+
+# Lock vault to prevent access
+envref vault lock
+
+# Unlock to restore access
+envref vault unlock
+```
+
+The vault stores each secret individually encrypted with age scrypt in a local SQLite database. The passphrase can be provided interactively, via the `ENVREF_VAULT_PASSPHRASE` environment variable, or in config.
+
 ## Global flags
 
 | Flag | Description |
@@ -203,12 +324,22 @@ Global defaults can be set at `~/.config/envref/config.yaml` — project config 
 Requires Go 1.24+.
 
 ```bash
-make build     # Compile to ./build/envref
-make test      # Run tests with race detector
-make lint      # Run golangci-lint
-make check     # vet + lint + test
-make install   # Install to $GOPATH/bin
+make build      # Compile to ./build/envref
+make test       # Run tests with race detector
+make lint       # Run golangci-lint
+make check      # vet + lint + test
+make install    # Install to $GOPATH/bin
+make cover      # Run tests with coverage reporting
+make cover-html # Generate HTML coverage report
 ```
+
+### Running benchmarks
+
+```bash
+go test -bench=. -benchmem ./internal/parser/ ./internal/resolve/ ./internal/envfile/
+```
+
+The resolve pipeline is optimized for <50ms startup with 100 variables to support direnv integration where `envref resolve` runs on every `cd`.
 
 ## License
 

@@ -173,9 +173,9 @@
 
 ## Phase 11 — Documentation & Distribution
 
-- [TODO] P2 | ENV-130 | Write comprehensive README with architecture diagram
+- [DONE] P2 | ENV-130 | Write comprehensive README with architecture diagram
 - [TODO] P2 | ENV-131 | Add `docs/` with usage guides per feature (getting started, direnv, profiles, backends)
-- [TODO] P2 | ENV-132 | Set up GoReleaser for GitHub Releases (Linux, macOS, Windows binaries)
+- [DONE] P2 | ENV-132 | Set up GoReleaser for GitHub Releases (Linux, macOS, Windows binaries)
 - [TODO] P2 | ENV-133 | Add Homebrew tap formula
 - [TODO] P3 | ENV-134 | Add AUR package
 - [TODO] P3 | ENV-135 | Add Scoop manifest (Windows)
@@ -193,7 +193,7 @@
 - [DONE] P1 | ENV-143 | Integration tests for CLI commands (cobra test helpers)
 - [TODO] P2 | ENV-144 | Integration tests for keychain backend (platform-specific CI matrix)
 - [TODO] P2 | ENV-145 | Integration tests for direnv integration (end-to-end shell test)
-- [TODO] P2 | ENV-146 | Benchmark `envref resolve` — target <50ms for 100 vars
+- [DONE] P2 | ENV-146 | Benchmark `envref resolve` — target <50ms for 100 vars
 - [DONE] P2 | ENV-147 | Set up code coverage reporting
 - [TODO] P3 | ENV-148 | Fuzz testing for `.env` parser
 - [TODO] P3 | ENV-149 | Security audit of secret handling (memory zeroing, no secrets in logs/errors)
