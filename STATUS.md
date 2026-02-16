@@ -1,7 +1,7 @@
 # Project Status
 
 ## Last Completed
-- ENV-054: Added plugin interface for community-contributed backends with JSON-over-stdin/stdout protocol [iter-59]
+- ENV-144: Added integration tests for keychain backend with platform-specific CI job [iter-60]
 
 ## Current State
 - Go module `github.com/xcke/envref` initialized with Cobra + Viper + go-keyring + age + sqlite + testify + x/term dependencies
@@ -41,6 +41,8 @@
 - GoReleaser config, GitHub Actions CI + release pipelines, Makefile with coverage targets
 - Comprehensive test coverage across all packages
 - Fuzz tests for .env parser, ref:// URI parser, and variable interpolation
+- **Integration tests** for keychain backend (12 tests) with `//go:build integration` tag covering CRUD, namespacing, profile isolation, concurrency, registry fallback, bulk operations, and special character values
+- **CI integration-test job** runs keychain integration tests on macOS (real Keychain)
 - All checks pass: `go build`, `go vet`, `go test`, `golangci-lint`
 
 ## Known Issues
