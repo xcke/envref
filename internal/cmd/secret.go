@@ -858,6 +858,8 @@ func createBackend(bc config.BackendConfig) (backend.Backend, error) {
 		return createAWSSSMBackend(bc), nil
 	case "oci-vault":
 		return createOCIVaultBackend(bc), nil
+	case "hashicorp-vault":
+		return createHashiVaultBackend(bc), nil
 	case "plugin":
 		return createPluginBackend(bc)
 	default:
@@ -946,4 +948,33 @@ func createOCIVaultBackend(bc config.BackendConfig) *backend.OCIVaultBackend {
 		opts = append(opts, backend.WithOCIVaultCommand(command))
 	}
 	return backend.NewOCIVaultBackend(vaultID, compartmentID, keyID, opts...)
+}
+
+// createHashiVaultBackend creates a HashiVaultBackend from the backend config.
+// Optional config keys: "mount" (default "secret"), "prefix" (default "envref"),
+// "addr" (optional), "namespace" (optional), "token" (optional).
+func createHashiVaultBackend(bc config.BackendConfig) *backend.HashiVaultBackend {
+	mount := bc.Config["mount"]
+	if mount == "" {
+		mount = "secret"
+	}
+	prefix := bc.Config["prefix"]
+	if prefix == "" {
+		prefix = "envref"
+	}
+
+	var opts []backend.HashiVaultOption
+	if addr := bc.Config["addr"]; addr != "" {
+		opts = append(opts, backend.WithHashiVaultAddr(addr))
+	}
+	if namespace := bc.Config["namespace"]; namespace != "" {
+		opts = append(opts, backend.WithHashiVaultNamespace(namespace))
+	}
+	if token := bc.Config["token"]; token != "" {
+		opts = append(opts, backend.WithHashiVaultToken(token))
+	}
+	if command := bc.Config["command"]; command != "" {
+		opts = append(opts, backend.WithHashiVaultCommand(command))
+	}
+	return backend.NewHashiVaultBackend(mount, prefix, opts...)
 }

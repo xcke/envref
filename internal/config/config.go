@@ -26,6 +26,7 @@ var KnownBackendTypes = []string{
 	"1password",
 	"aws-ssm",
 	"oci-vault",
+	"hashicorp-vault",
 }
 
 // ValidationError is returned when the config is syntactically valid YAML but
