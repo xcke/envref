@@ -82,7 +82,7 @@
 ## Phase 4 — Secret Management Commands
 
 - [DONE] P1 | ENV-060 | Add `envref secret set <key>` — prompt for value (hidden input), store in backend
-- [TODO] P1 | ENV-061 | Add `envref secret get <key>` — retrieve and print from backend
+- [DONE] P1 | ENV-061 | Add `envref secret get <key>` — retrieve and print from backend
 - [TODO] P1 | ENV-062 | Add `envref secret delete <key>` — remove from backend with confirmation
 - [TODO] P1 | ENV-063 | Add `envref secret list` — list stored secret keys (no values) for current project
 - [DONE] P2 | ENV-064 | Add `envref secret set <key> --value <val>` — non-interactive mode for scripting
