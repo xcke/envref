@@ -63,9 +63,6 @@ brews:
       bin.install "envref"
     test: |
       assert_match "envref", shell_output("#{bin}/envref --help")
-    dependencies:
-      - name: go
-        type: build
 
 scoops:
   - name: envref
