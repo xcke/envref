@@ -33,6 +33,7 @@ Use subcommands to list available profiles.`,
 	cmd.AddCommand(newProfileUseCmd())
 	cmd.AddCommand(newProfileCreateCmd())
 	cmd.AddCommand(newProfileDiffCmd())
+	cmd.AddCommand(newProfileExportCmd())
 
 	return cmd
 }
@@ -587,6 +588,63 @@ func formatDiffJSON(out io.Writer, diffs []diffEntry) error {
 	enc := json.NewEncoder(out)
 	enc.SetIndent("", "  ")
 	return enc.Encode(diffs)
+}
+
+// newProfileExportCmd creates the profile export subcommand.
+func newProfileExportCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "export <name>",
+		Short: "Export a profile as key-value pairs",
+		Long: `Export the effective environment of a profile for CI/CD integration.
+
+Computes the merged environment (base .env ← .env.<profile> ← .env.local)
+with variable interpolation applied, then outputs the key-value pairs.
+
+The default output format is JSON (an array of {"key": ..., "value": ...}
+objects), which is easy to consume in CI/CD pipelines. Use --format to
+change the output format (plain, json, shell, table).
+
+Examples:
+  envref profile export staging                   # export as JSON
+  envref profile export production --format shell # export as shell export lines
+  envref profile export staging --format plain    # export as KEY=VALUE pairs
+  envref profile export staging > staging.json    # redirect to file`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			formatStr, _ := cmd.Flags().GetString("format")
+			return runProfileExport(cmd, args[0], formatStr)
+		},
+	}
+
+	cmd.Flags().String("format", "json", "output format: plain, json, shell, table")
+
+	return cmd
+}
+
+// runProfileExport implements the profile export command logic.
+func runProfileExport(cmd *cobra.Command, name, formatStr string) error {
+	format, err := parseFormat(formatStr)
+	if err != nil {
+		return err
+	}
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("getting working directory: %w", err)
+	}
+
+	cfg, projectDir, err := config.Load(cwd)
+	if err != nil {
+		return fmt.Errorf("loading config: %w", err)
+	}
+
+	env, err := loadProfileEnv(cmd, cfg, projectDir, name)
+	if err != nil {
+		return fmt.Errorf("loading profile %q: %w", name, err)
+	}
+
+	entries := envToEntries(env)
+	return outputEntries(cmd, entries, format)
 }
 
 // formatDiffTable outputs the diff as an aligned table.

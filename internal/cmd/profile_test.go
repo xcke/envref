@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -963,4 +964,242 @@ local_file: .env.local
 	require.NoError(t, err)
 	// Since .env.local overrides DB_HOST in both, they should be identical for DB_HOST
 	assert.Contains(t, stdout, "identical")
+}
+
+// --- profile export tests ----------------------------------------------------
+
+func TestProfileExportCmd_JSONDefault(t *testing.T) {
+	dir := t.TempDir()
+	cfgContent := `project: myapp
+env_file: .env
+local_file: .env.local
+profiles:
+  staging:
+    env_file: .env.staging
+`
+	writeTestFile(t, dir, config.FullFileName, cfgContent)
+	writeTestFile(t, dir, ".env", "APP_NAME=myapp\nLOG_LEVEL=info\n")
+	writeTestFile(t, dir, ".env.staging", "DB_HOST=staging-db\nLOG_LEVEL=debug\n")
+
+	chdir(t, dir)
+
+	stdout, stderr, err := execCmd(t, "profile", "export", "staging")
+	require.NoError(t, err)
+	assert.Empty(t, stderr)
+
+	// Parse JSON output.
+	var entries []map[string]string
+	require.NoError(t, json.Unmarshal([]byte(stdout), &entries))
+
+	// Should have merged keys from .env + .env.staging.
+	assert.Len(t, entries, 3)
+
+	// Build a map for easier assertions.
+	m := make(map[string]string)
+	for _, e := range entries {
+		m[e["key"]] = e["value"]
+	}
+	assert.Equal(t, "myapp", m["APP_NAME"])
+	assert.Equal(t, "debug", m["LOG_LEVEL"])    // staging overrides base
+	assert.Equal(t, "staging-db", m["DB_HOST"]) // from staging profile
+}
+
+func TestProfileExportCmd_PlainFormat(t *testing.T) {
+	dir := t.TempDir()
+	cfgContent := `project: myapp
+env_file: .env
+local_file: .env.local
+`
+	writeTestFile(t, dir, config.FullFileName, cfgContent)
+	writeTestFile(t, dir, ".env", "KEY=base\n")
+	writeTestFile(t, dir, ".env.staging", "KEY=staging\nEXTRA=val\n")
+
+	chdir(t, dir)
+
+	stdout, _, err := execCmd(t, "profile", "export", "staging", "--format", "plain")
+	require.NoError(t, err)
+	assert.Contains(t, stdout, "KEY=staging")
+	assert.Contains(t, stdout, "EXTRA=val")
+}
+
+func TestProfileExportCmd_ShellFormat(t *testing.T) {
+	dir := t.TempDir()
+	cfgContent := `project: myapp
+env_file: .env
+local_file: .env.local
+`
+	writeTestFile(t, dir, config.FullFileName, cfgContent)
+	writeTestFile(t, dir, ".env", "KEY=value\n")
+	writeTestFile(t, dir, ".env.production", "KEY=prod value\n")
+
+	chdir(t, dir)
+
+	stdout, _, err := execCmd(t, "profile", "export", "production", "--format", "shell")
+	require.NoError(t, err)
+	assert.Contains(t, stdout, "export KEY=")
+	assert.Contains(t, stdout, "prod value")
+}
+
+func TestProfileExportCmd_TableFormat(t *testing.T) {
+	dir := t.TempDir()
+	cfgContent := `project: myapp
+env_file: .env
+local_file: .env.local
+`
+	writeTestFile(t, dir, config.FullFileName, cfgContent)
+	writeTestFile(t, dir, ".env", "KEY=value\n")
+	writeTestFile(t, dir, ".env.staging", "DB=staging\n")
+
+	chdir(t, dir)
+
+	stdout, _, err := execCmd(t, "profile", "export", "staging", "--format", "table")
+	require.NoError(t, err)
+	assert.Contains(t, stdout, "KEY")
+	assert.Contains(t, stdout, "VALUE")
+	assert.Contains(t, stdout, "DB")
+	assert.Contains(t, stdout, "staging")
+}
+
+func TestProfileExportCmd_WithLocalOverride(t *testing.T) {
+	dir := t.TempDir()
+	cfgContent := `project: myapp
+env_file: .env
+local_file: .env.local
+profiles:
+  staging:
+    env_file: .env.staging
+`
+	writeTestFile(t, dir, config.FullFileName, cfgContent)
+	writeTestFile(t, dir, ".env", "APP=myapp\n")
+	writeTestFile(t, dir, ".env.staging", "DB=staging-db\n")
+	writeTestFile(t, dir, ".env.local", "DB=local-db\n")
+
+	chdir(t, dir)
+
+	stdout, _, err := execCmd(t, "profile", "export", "staging")
+	require.NoError(t, err)
+
+	var entries []map[string]string
+	require.NoError(t, json.Unmarshal([]byte(stdout), &entries))
+
+	m := make(map[string]string)
+	for _, e := range entries {
+		m[e["key"]] = e["value"]
+	}
+	// .env.local should override .env.staging
+	assert.Equal(t, "local-db", m["DB"])
+	assert.Equal(t, "myapp", m["APP"])
+}
+
+func TestProfileExportCmd_WithInterpolation(t *testing.T) {
+	dir := t.TempDir()
+	cfgContent := `project: myapp
+env_file: .env
+local_file: .env.local
+`
+	writeTestFile(t, dir, config.FullFileName, cfgContent)
+	writeTestFile(t, dir, ".env", "HOST=localhost\nPORT=5432\n")
+	writeTestFile(t, dir, ".env.staging", "DB_URL=postgres://${HOST}:${PORT}/app\n")
+
+	chdir(t, dir)
+
+	stdout, _, err := execCmd(t, "profile", "export", "staging")
+	require.NoError(t, err)
+
+	var entries []map[string]string
+	require.NoError(t, json.Unmarshal([]byte(stdout), &entries))
+
+	m := make(map[string]string)
+	for _, e := range entries {
+		m[e["key"]] = e["value"]
+	}
+	assert.Equal(t, "postgres://localhost:5432/app", m["DB_URL"])
+}
+
+func TestProfileExportCmd_ConventionProfile(t *testing.T) {
+	dir := t.TempDir()
+	cfgContent := `project: myapp
+env_file: .env
+local_file: .env.local
+`
+	writeTestFile(t, dir, config.FullFileName, cfgContent)
+	writeTestFile(t, dir, ".env", "KEY=base\n")
+	writeTestFile(t, dir, ".env.development", "KEY=dev\n")
+
+	chdir(t, dir)
+
+	stdout, _, err := execCmd(t, "profile", "export", "development")
+	require.NoError(t, err)
+
+	var entries []map[string]string
+	require.NoError(t, json.Unmarshal([]byte(stdout), &entries))
+	require.Len(t, entries, 1)
+	assert.Equal(t, "dev", entries[0]["value"])
+}
+
+func TestProfileExportCmd_MissingProfileFile(t *testing.T) {
+	dir := t.TempDir()
+	cfgContent := `project: myapp
+env_file: .env
+local_file: .env.local
+`
+	writeTestFile(t, dir, config.FullFileName, cfgContent)
+	writeTestFile(t, dir, ".env", "KEY=base\n")
+
+	chdir(t, dir)
+
+	// Profile file doesn't exist — export should still work (just base .env).
+	stdout, _, err := execCmd(t, "profile", "export", "nonexistent")
+	require.NoError(t, err)
+
+	var entries []map[string]string
+	require.NoError(t, json.Unmarshal([]byte(stdout), &entries))
+	require.Len(t, entries, 1)
+	assert.Equal(t, "KEY", entries[0]["key"])
+	assert.Equal(t, "base", entries[0]["value"])
+}
+
+func TestProfileExportCmd_InvalidFormat(t *testing.T) {
+	dir := t.TempDir()
+	cfgContent := `project: myapp
+env_file: .env
+local_file: .env.local
+`
+	writeTestFile(t, dir, config.FullFileName, cfgContent)
+	writeTestFile(t, dir, ".env", "KEY=value\n")
+	writeTestFile(t, dir, ".env.staging", "KEY=staging\n")
+
+	chdir(t, dir)
+
+	_, _, err := execCmd(t, "profile", "export", "staging", "--format", "xml")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid format")
+}
+
+func TestProfileExportCmd_NoArgs(t *testing.T) {
+	_, _, err := execCmd(t, "profile", "export")
+	assert.Error(t, err)
+}
+
+func TestProfileExportCmd_NoConfig(t *testing.T) {
+	dir := t.TempDir()
+	chdir(t, dir)
+
+	_, _, err := execCmd(t, "profile", "export", "staging")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "loading config")
+}
+
+func TestProfileExportCmd_Help(t *testing.T) {
+	stdout, _, err := execCmd(t, "profile", "export", "--help")
+	require.NoError(t, err)
+	assert.Contains(t, stdout, "Export the effective environment of a profile")
+	assert.Contains(t, stdout, "--format")
+	assert.Contains(t, stdout, "envref profile export staging")
+}
+
+func TestProfileExportCmd_VisibleInHelp(t *testing.T) {
+	stdout, _, err := execCmd(t, "profile", "--help")
+	require.NoError(t, err)
+	assert.Contains(t, stdout, "export")
 }

@@ -126,7 +126,7 @@
 - [DONE] P2 | ENV-094 | Add `envref profile create <name>` — scaffold new profile file
 - [DONE] P2 | ENV-095 | Add `envref profile diff <a> <b>` — show key/value differences between profiles
 - [DONE] P2 | ENV-096 | Support profile-scoped secrets (`<project>/<profile>/<key>`)
-- [TODO] P3 | ENV-097 | Add `envref profile export <name>` — export profile as JSON for CI/CD
+- [DONE] P3 | ENV-097 | Add `envref profile export <name>` — export profile as JSON for CI/CD
 
 ---
 

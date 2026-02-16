@@ -1,7 +1,7 @@
 # Project Status
 
 ## Last Completed
-- ENV-053: Implemented HashiCorp Vault backend with `vault` CLI wrapper and mock-based tests [iter-65]
+- ENV-097: Added `envref profile export <name>` command with JSON/plain/shell/table output formats [iter-66]
 
 ## Current State
 - Go module `github.com/xcke/envref` initialized with Cobra + Viper + go-keyring + age + sqlite + testify + x/term dependencies
@@ -20,7 +20,8 @@
 - `envref resolve --strict` — fails with no output if any reference cannot be resolved (CI-safe)
 - `envref resolve --watch` / `-w` — watches .env files via fsnotify and re-resolves on changes with debouncing
 - `envref run -- <command>` — resolves env vars and executes a subprocess with them injected
-- `envref profile list/use/create/diff` — full profile management commands
+- `envref profile list/use/create/diff/export` — full profile management commands
+- **`envref profile export <name>`** — exports merged profile environment as JSON (default), plain, shell, or table format for CI/CD integration
 - `envref validate` — checks .env against .env.example schema with `--ci` and `--schema` modes
 - `envref status` — shows environment overview with actionable hints
 - `envref doctor` — scans .env files for common issues
@@ -30,11 +31,6 @@
 - `envref edit` — opens .env files in `$VISUAL`/`$EDITOR`
 - `envref vault init/lock/unlock/export/import` — full vault management
 - **Seven backend types:** `KeychainBackend` (OS keychain via go-keyring), `VaultBackend` (local SQLite + age encryption), `OnePasswordBackend` (1Password via `op` CLI), `AWSSSMBackend` (AWS SSM Parameter Store via `aws` CLI), `OCIVaultBackend` (Oracle OCI Vault via `oci` CLI), `HashiVaultBackend` (HashiCorp Vault via `vault` CLI), and `PluginBackend` (external executables via JSON protocol)
-- **HashiCorp Vault backend:** Stores secrets in KV v2 engine with configurable mount and prefix; supports addr, namespace, token config; metadata delete for permanent removal; mock-based tests via compiled vault_mock helper
-- **AWS SSM backend:** Stores secrets as SecureString parameters with configurable prefix; supports region, profile, and command config options; mock-based tests via compiled aws_mock helper
-- **OCI Vault backend:** Stores secrets as base64-encoded vault secret bundles; supports vault_id, compartment_id, key_id, profile config; schedule-deletion semantics for Delete; mock-based tests via compiled oci_mock helper
-- **1Password backend:** Stores secrets as Secure Note items; supports vault, account, and command config options; edit-or-create semantics for Set; mock-based tests via compiled op_mock helper
-- **Plugin interface:** External backends communicate via JSON-over-stdin/stdout protocol; plugins discovered by convention (`envref-backend-<name>` on $PATH) or explicit `command` config; configured as `type: plugin` in `.envref.yaml`
 - **Nested references:** `${ref://secrets/key}` in values and embedded `ref://` URIs after interpolation are resolved via a second pass in the resolution pipeline
 - **Security hardening:** Vault passphrase stored as `[]byte` (clearable), zeroed on Close; decrypted plaintext bytes cleared after use
 - **Comprehensive README** with architecture diagram, resolution pipeline, project structure, vault docs, and benchmarks
@@ -47,7 +43,7 @@
 - Comprehensive test coverage across all packages
 - Fuzz tests for .env parser, ref:// URI parser, and variable interpolation
 - **Integration tests** for keychain backend (12 tests) with `//go:build integration` tag
-- **Direnv integration tests** (22 tests) with `//go:build integration` tag covering end-to-end shell eval, init --direnv, profile switching, shell quoting safety, strict mode, multiline values, special characters, .envrc sourcing, and real direnv binary tests
+- **Direnv integration tests** (22 tests) with `//go:build integration` tag
 - **CI jobs** for keychain integration tests (macOS) and direnv integration tests (ubuntu + macOS with direnv installed)
 - All checks pass: `go build`, `go vet`, `go test`, `golangci-lint`
 
