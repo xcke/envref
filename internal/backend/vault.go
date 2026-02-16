@@ -503,6 +503,9 @@ func (v *VaultBackend) checkLocked(db *sql.DB) error {
 // open lazily opens (or returns) the SQLite database connection and
 // ensures the secrets and metadata tables exist. Must be called with v.mu held.
 func (v *VaultBackend) open() (*sql.DB, error) {
+	if v.passphrase == nil {
+		return nil, ErrVaultClosed
+	}
 	if v.db != nil {
 		return v.db, nil
 	}
