@@ -606,6 +606,12 @@ func TestDirenvIntegration_RealDirenv_EvalFlow(t *testing.T) {
 
 	bin := ensureTestBinary(t)
 	dir := t.TempDir()
+	// Resolve symlinks so direnv allow/exec use consistent paths
+	// (on macOS /var is a symlink to /private/var).
+	dir, err = filepath.EvalSymlinks(dir)
+	if err != nil {
+		t.Fatalf("resolving symlinks: %v", err)
+	}
 
 	writeFile(t, dir, config.FullFileName, "project: testproject\nenv_file: .env\nlocal_file: .env.local\n")
 	writeFile(t, dir, ".env", "DIRENV_TEST_KEY=direnv_works\n")
@@ -651,6 +657,12 @@ func TestDirenvIntegration_RealDirenv_ProfileSwitch(t *testing.T) {
 
 	bin := ensureTestBinary(t)
 	dir := t.TempDir()
+	// Resolve symlinks so direnv allow/exec use consistent paths
+	// (on macOS /var is a symlink to /private/var).
+	dir, err = filepath.EvalSymlinks(dir)
+	if err != nil {
+		t.Fatalf("resolving symlinks: %v", err)
+	}
 
 	cfgContent := "project: testproject\nactive_profile: staging\nprofiles:\n  staging:\n    env_file: .env.staging\n"
 	writeFile(t, dir, config.FullFileName, cfgContent)

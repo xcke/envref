@@ -252,10 +252,13 @@ func TestIntegrationKeychain_RegistryFallback(t *testing.T) {
 	require.NoError(t, err)
 
 	// Set up a registry with a memory backend (primary) and keychain (secondary).
+	// Register the raw keychain (not the namespaced wrapper) so the registry
+	// doesn't double-prefix keys — NamespacedBackend.Get prepends the project
+	// namespace, but registry.Get passes the full key to each backend as-is.
 	mem := newMemoryBackend("memory")
 	reg := NewRegistry()
 	require.NoError(t, reg.Register(mem))
-	require.NoError(t, reg.Register(nb))
+	require.NoError(t, reg.Register(kb))
 
 	// Store a secret only in keychain.
 	require.NoError(t, nb.Set("kc_only", "from_keychain"))

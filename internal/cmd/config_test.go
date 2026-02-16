@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"encoding/json"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -303,6 +304,10 @@ profiles:
 
 func TestConfigShowCmd_ConfigFileLocation(t *testing.T) {
 	dir := t.TempDir()
+	// Resolve symlinks so the path matches what filepath.Join produces
+	// (on macOS /var is a symlink to /private/var).
+	dir, err := filepath.EvalSymlinks(dir)
+	require.NoError(t, err)
 	cfgContent := `project: myapp
 `
 	writeTestFile(t, dir, config.FullFileName, cfgContent)

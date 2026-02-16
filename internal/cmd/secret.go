@@ -662,7 +662,7 @@ func runSecretGenerate(cmd *cobra.Command, key string, length int, charset, back
 	if effectiveProfile != "" {
 		scopeLabel = fmt.Sprintf("backend %q (profile %q)", backendName, effectiveProfile)
 	}
-	output.NewWriter(cmd).Info("secret %q generated and stored in %s (%d chars, %s)\n", key, scopeLabel, length, charset)
+	fmt.Fprintf(cmd.ErrOrStderr(), "secret %q generated and stored in %s (%d chars, %s)\n", key, scopeLabel, length, charset)
 	return nil
 }
 
