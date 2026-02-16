@@ -1,7 +1,7 @@
 # Project Status
 
 ## Last Completed
-- ENV-120: Added `envref secret share <KEY> --to <age-public-key>` command for encrypting secrets to specific recipients [iter-67]
+- ENV-121: Added `envref sync push` / `envref sync pull` commands for syncing secrets via shared age-encrypted git file [iter-68]
 
 ## Current State
 - Go module `github.com/xcke/envref` initialized with Cobra + Viper + go-keyring + age + sqlite + testify + x/term dependencies
@@ -14,7 +14,7 @@
 - `envref list` command prints all merged and interpolated key-value pairs
 - `envref secret set/get/delete/list/generate/copy/rotate/share` — full secret CRUD + generation + cross-project copy + rotation + sharing via configured backends
 - `envref secret rotate <KEY>` — generates new random value, archives old value as `<KEY>.__history.<N>`, supports `--keep` for configurable history retention
-- **`envref secret share <KEY> --to <age-key>`** — retrieves secret from backend, encrypts with recipient's age X25519 public key, outputs ASCII-armored ciphertext; supports `--to-file` for reading key from file
+- `envref secret share <KEY> --to <age-key>` — retrieves secret from backend, encrypts with recipient's age X25519 public key, outputs ASCII-armored ciphertext; supports `--to-file` for reading key from file
 - **Profile-scoped secrets:** `--profile` flag on all secret subcommands stores/retrieves secrets as `<project>/<profile>/<key>`
 - `envref resolve` — loads .env + optional profile + .env.local, merges, interpolates, resolves `ref://` references
 - `envref resolve --direnv` — outputs `export KEY=VALUE` format for shell integration
@@ -22,7 +22,7 @@
 - `envref resolve --watch` / `-w` — watches .env files via fsnotify and re-resolves on changes with debouncing
 - `envref run -- <command>` — resolves env vars and executes a subprocess with them injected
 - `envref profile list/use/create/diff/export` — full profile management commands
-- **`envref profile export <name>`** — exports merged profile environment as JSON (default), plain, shell, or table format for CI/CD integration
+- `envref profile export <name>` — exports merged profile environment as JSON (default), plain, shell, or table format for CI/CD integration
 - `envref validate` — checks .env against .env.example schema with `--ci` and `--schema` modes
 - `envref status` — shows environment overview with actionable hints
 - `envref doctor` — scans .env files for common issues
@@ -31,6 +31,7 @@
 - `envref completion <shell>` — generates shell completion scripts (bash, zsh, fish, powershell)
 - `envref edit` — opens .env files in `$VISUAL`/`$EDITOR`
 - `envref vault init/lock/unlock/export/import` — full vault management
+- **`envref sync push/pull`** — sync secrets via shared age-encrypted git file; push exports all secrets from a backend encrypted for multiple recipients; pull decrypts and imports into a backend with skip/force semantics
 - **Seven backend types:** `KeychainBackend` (OS keychain via go-keyring), `VaultBackend` (local SQLite + age encryption), `OnePasswordBackend` (1Password via `op` CLI), `AWSSSMBackend` (AWS SSM Parameter Store via `aws` CLI), `OCIVaultBackend` (Oracle OCI Vault via `oci` CLI), `HashiVaultBackend` (HashiCorp Vault via `vault` CLI), and `PluginBackend` (external executables via JSON protocol)
 - **Nested references:** `${ref://secrets/key}` in values and embedded `ref://` URIs after interpolation are resolved via a second pass in the resolution pipeline
 - **Security hardening:** Vault passphrase stored as `[]byte` (clearable), zeroed on Close; decrypted plaintext bytes cleared after use
