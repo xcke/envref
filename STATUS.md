@@ -1,7 +1,7 @@
 # Project Status
 
 ## Last Completed
-- ENV-133: Added Homebrew tap formula with GoReleaser integration and release workflow [iter-52]
+- ENV-008: Added MIT LICENSE file [iter-53]
 
 ## Current State
 - Go module `github.com/xcke/envref` initialized with Cobra + Viper + go-keyring + age + sqlite + testify + x/term dependencies
@@ -34,6 +34,7 @@
 - **Comprehensive README** with architecture diagram, resolution pipeline, backend chain, project structure, vault docs, and benchmarks
 - **docs/ directory** with four usage guides: getting-started, direnv-integration, profiles, secret-backends
 - **Homebrew tap:** GoReleaser `brews` config auto-publishes to `xcke/homebrew-tap`; `Formula/envref.rb` template for build-from-source; release workflow on tag push
+- **MIT LICENSE** file included
 - `.env` file parser with full quote/multiline/comment/BOM/CRLF support
 - `ref://` URI parser, `Backend` interface, `Registry`, `NamespacedBackend`
 - GoReleaser config, GitHub Actions CI + release pipelines, Makefile with coverage targets

@@ -349,4 +349,4 @@ The resolve pipeline is optimized for <50ms startup with 100 variables to suppor
 
 ## License
 
-See [LICENSE](LICENSE) for details.
+MIT — see [LICENSE](LICENSE) for details.

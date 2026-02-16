@@ -16,7 +16,7 @@
 - [DONE] P2 | ENV-005 | Add `.goreleaser.yml` for cross-platform binary releases
 - [DONE] P2 | ENV-006 | Set up CI pipeline (GitHub Actions: test, lint, build)
 - [DONE] P2 | ENV-007 | Add `README.md` with project overview, install instructions, and quickstart
-- [TODO] P3 | ENV-008 | Add `LICENSE` (MIT or Apache 2.0)
+- [DONE] P3 | ENV-008 | Add `LICENSE` (MIT or Apache 2.0)
 - [DONE] P3 | ENV-009 | Add `.gitignore` for Go projects
 
 ---
