@@ -419,3 +419,242 @@ func TestValidateCmd_RejectsArguments(t *testing.T) {
 		t.Fatal("expected error for unexpected argument, got nil")
 	}
 }
+
+func TestValidateCmd_SchemaAllPass(t *testing.T) {
+	dir := t.TempDir()
+	writeTestFile(t, dir, ".env.example", "DB_HOST=localhost\nDB_PORT=5432\n")
+	envPath := writeTestFile(t, dir, ".env", "DB_HOST=myhost\nDB_PORT=3306\n")
+	schemaPath := writeTestFile(t, dir, ".env.schema.json", `{
+		"keys": {
+			"DB_HOST": {"type": "string", "required": true},
+			"DB_PORT": {"type": "port", "required": true}
+		}
+	}`)
+
+	root := NewRootCmd()
+	buf := new(bytes.Buffer)
+	root.SetOut(buf)
+	root.SetErr(new(bytes.Buffer))
+	root.SetArgs([]string{"validate",
+		"--file", envPath,
+		"--local-file", filepath.Join(dir, ".env.local"),
+		"--example", filepath.Join(dir, ".env.example"),
+		"--schema", schemaPath,
+	})
+
+	if err := root.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !strings.Contains(buf.String(), "OK") {
+		t.Errorf("expected OK message, got %q", buf.String())
+	}
+	if !strings.Contains(buf.String(), "schema") {
+		t.Errorf("expected schema mention in OK message, got %q", buf.String())
+	}
+}
+
+func TestValidateCmd_SchemaTypeError(t *testing.T) {
+	dir := t.TempDir()
+	writeTestFile(t, dir, ".env.example", "DB_HOST=localhost\nDB_PORT=5432\n")
+	envPath := writeTestFile(t, dir, ".env", "DB_HOST=myhost\nDB_PORT=not-a-port\n")
+	schemaPath := writeTestFile(t, dir, ".env.schema.json", `{
+		"keys": {
+			"DB_HOST": {"type": "string"},
+			"DB_PORT": {"type": "port"}
+		}
+	}`)
+
+	root := NewRootCmd()
+	errBuf := new(bytes.Buffer)
+	root.SetOut(new(bytes.Buffer))
+	root.SetErr(errBuf)
+	root.SetArgs([]string{"validate",
+		"--file", envPath,
+		"--local-file", filepath.Join(dir, ".env.local"),
+		"--example", filepath.Join(dir, ".env.example"),
+		"--schema", schemaPath,
+	})
+
+	err := root.Execute()
+	if err == nil {
+		t.Fatal("expected error for schema type failure, got nil")
+	}
+
+	stderr := errBuf.String()
+	if !strings.Contains(stderr, "DB_PORT") {
+		t.Errorf("expected DB_PORT in type errors, got %q", stderr)
+	}
+	if !strings.Contains(stderr, "Type errors") {
+		t.Errorf("expected 'Type errors' header, got %q", stderr)
+	}
+	if !strings.Contains(stderr, "1 type error") {
+		t.Errorf("expected '1 type error' in summary, got %q", stderr)
+	}
+}
+
+func TestValidateCmd_SchemaRequiredMissing(t *testing.T) {
+	dir := t.TempDir()
+	writeTestFile(t, dir, ".env.example", "DB_HOST=localhost\n")
+	envPath := writeTestFile(t, dir, ".env", "DB_HOST=myhost\n")
+	schemaPath := writeTestFile(t, dir, ".env.schema.json", `{
+		"keys": {
+			"DB_HOST": {"type": "string"},
+			"API_KEY": {"type": "string", "required": true}
+		}
+	}`)
+
+	root := NewRootCmd()
+	errBuf := new(bytes.Buffer)
+	root.SetOut(new(bytes.Buffer))
+	root.SetErr(errBuf)
+	root.SetArgs([]string{"validate",
+		"--file", envPath,
+		"--local-file", filepath.Join(dir, ".env.local"),
+		"--example", filepath.Join(dir, ".env.example"),
+		"--schema", schemaPath,
+	})
+
+	err := root.Execute()
+	if err == nil {
+		t.Fatal("expected error for schema required key, got nil")
+	}
+
+	stderr := errBuf.String()
+	if !strings.Contains(stderr, "API_KEY") {
+		t.Errorf("expected API_KEY in schema errors, got %q", stderr)
+	}
+}
+
+func TestValidateCmd_SchemaEnumValidation(t *testing.T) {
+	dir := t.TempDir()
+	writeTestFile(t, dir, ".env.example", "LOG_LEVEL=info\n")
+	envPath := writeTestFile(t, dir, ".env", "LOG_LEVEL=trace\n")
+	schemaPath := writeTestFile(t, dir, ".env.schema.json", `{
+		"keys": {
+			"LOG_LEVEL": {"type": "enum", "values": ["debug", "info", "warn", "error"]}
+		}
+	}`)
+
+	root := NewRootCmd()
+	errBuf := new(bytes.Buffer)
+	root.SetOut(new(bytes.Buffer))
+	root.SetErr(errBuf)
+	root.SetArgs([]string{"validate",
+		"--file", envPath,
+		"--local-file", filepath.Join(dir, ".env.local"),
+		"--example", filepath.Join(dir, ".env.example"),
+		"--schema", schemaPath,
+	})
+
+	err := root.Execute()
+	if err == nil {
+		t.Fatal("expected error for invalid enum value, got nil")
+	}
+
+	stderr := errBuf.String()
+	if !strings.Contains(stderr, "LOG_LEVEL") {
+		t.Errorf("expected LOG_LEVEL in type errors, got %q", stderr)
+	}
+	if !strings.Contains(stderr, "expected one of") {
+		t.Errorf("expected enum error message, got %q", stderr)
+	}
+}
+
+func TestValidateCmd_SchemaCIMode(t *testing.T) {
+	dir := t.TempDir()
+	writeTestFile(t, dir, ".env.example", "DB_HOST=localhost\nDB_PORT=5432\n")
+	envPath := writeTestFile(t, dir, ".env", "DB_HOST=myhost\nDB_PORT=bad\n")
+	schemaPath := writeTestFile(t, dir, ".env.schema.json", `{
+		"keys": {
+			"DB_PORT": {"type": "port"}
+		}
+	}`)
+
+	root := NewRootCmd()
+	errBuf := new(bytes.Buffer)
+	root.SetOut(new(bytes.Buffer))
+	root.SetErr(errBuf)
+	root.SetArgs([]string{"validate",
+		"--ci",
+		"--file", envPath,
+		"--local-file", filepath.Join(dir, ".env.local"),
+		"--example", filepath.Join(dir, ".env.example"),
+		"--schema", schemaPath,
+	})
+
+	err := root.Execute()
+	if err == nil {
+		t.Fatal("expected error in CI mode with schema errors, got nil")
+	}
+
+	stderr := errBuf.String()
+	if !strings.Contains(stderr, "error: DB_PORT") {
+		t.Errorf("expected compact error for DB_PORT, got %q", stderr)
+	}
+	if !strings.Contains(err.Error(), "type error") {
+		t.Errorf("expected 'type error' in error message, got %q", err.Error())
+	}
+}
+
+func TestValidateCmd_SchemaInvalidFile(t *testing.T) {
+	dir := t.TempDir()
+	writeTestFile(t, dir, ".env.example", "DB_HOST=localhost\n")
+	envPath := writeTestFile(t, dir, ".env", "DB_HOST=myhost\n")
+
+	root := NewRootCmd()
+	root.SetOut(new(bytes.Buffer))
+	root.SetErr(new(bytes.Buffer))
+	root.SetArgs([]string{"validate",
+		"--file", envPath,
+		"--local-file", filepath.Join(dir, ".env.local"),
+		"--example", filepath.Join(dir, ".env.example"),
+		"--schema", filepath.Join(dir, "nonexistent.json"),
+	})
+
+	err := root.Execute()
+	if err == nil {
+		t.Fatal("expected error for missing schema file, got nil")
+	}
+}
+
+func TestValidateCmd_SchemaMixedKeyAndTypeErrors(t *testing.T) {
+	dir := t.TempDir()
+	writeTestFile(t, dir, ".env.example", "DB_HOST=localhost\nMISSING_KEY=val\n")
+	envPath := writeTestFile(t, dir, ".env", "DB_HOST=myhost\nDB_PORT=bad\n")
+	schemaPath := writeTestFile(t, dir, ".env.schema.json", `{
+		"keys": {
+			"DB_PORT": {"type": "port"}
+		}
+	}`)
+
+	root := NewRootCmd()
+	errBuf := new(bytes.Buffer)
+	root.SetOut(new(bytes.Buffer))
+	root.SetErr(errBuf)
+	root.SetArgs([]string{"validate",
+		"--file", envPath,
+		"--local-file", filepath.Join(dir, ".env.local"),
+		"--example", filepath.Join(dir, ".env.example"),
+		"--schema", schemaPath,
+	})
+
+	err := root.Execute()
+	if err == nil {
+		t.Fatal("expected error for mixed key and type errors, got nil")
+	}
+
+	stderr := errBuf.String()
+	if !strings.Contains(stderr, "Missing keys") {
+		t.Errorf("expected 'Missing keys' section, got %q", stderr)
+	}
+	if !strings.Contains(stderr, "Type errors") {
+		t.Errorf("expected 'Type errors' section, got %q", stderr)
+	}
+	if !strings.Contains(stderr, "1 missing") {
+		t.Errorf("expected '1 missing' in summary, got %q", stderr)
+	}
+	if !strings.Contains(stderr, "1 type error") {
+		t.Errorf("expected '1 type error' in summary, got %q", stderr)
+	}
+}

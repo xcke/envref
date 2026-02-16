@@ -1,7 +1,7 @@
 # Project Status
 
 ## Last Completed
-- ENV-096: Added profile-scoped secrets with `--profile` flag on all secret commands [iter-39]
+- ENV-103: Added `.env.schema.json` support with type checking (string, number, boolean, url, enum, email, port) [iter-40]
 
 ## Current State
 - Go module `github.com/xcke/envref` initialized with Cobra + Viper + go-keyring + testify dependencies
@@ -24,6 +24,7 @@
 - `envref profile diff <a> <b>` — compares effective environments between two profiles
 - `envref validate` — checks .env against .env.example schema
 - `envref validate --ci` — CI mode with exit code 1 on failure
+- `envref validate --schema` — validates values against `.env.schema.json` with type constraints (string, number, boolean, url, enum, email, port), regex patterns, required/optional declarations
 - `envref status` — shows environment overview with actionable hints
 - `envref doctor` — scans .env files for common issues
 - `envref config show` — prints resolved effective config (plain, JSON, table formats)
@@ -31,6 +32,7 @@
 - **Global verbosity flags:** `--quiet`/`-q`, `--verbose`, `--debug`; mutually exclusive
 - **Colorized output:** auto-detected via TTY; disabled with `--no-color` flag or `NO_COLOR` env var
 - **`internal/output` package:** `Writer` type with verbosity and color support
+- **`internal/schema` package:** JSON schema loader, type validators, pattern matching, required/optional enforcement
 - **Fuzzy key matching:** `internal/suggest` package with "did you mean?" suggestions
 - **Resolution cache:** Duplicate `ref://` URIs resolved once per resolve call
 - **Config validation on load:** `Load()` calls `Validate()` automatically
@@ -45,7 +47,7 @@
 - **GitHub Actions CI pipeline** with test, lint, build jobs
 - Makefile with build/test/lint/install targets
 - Comprehensive test coverage across all packages
-- Directory structure: `cmd/envref/`, `internal/cmd/`, `internal/parser/`, `internal/envfile/`, `internal/config/`, `internal/ref/`, `internal/resolve/`, `internal/backend/`, `internal/output/`, `internal/suggest/`, `pkg/`
+- Directory structure: `cmd/envref/`, `internal/cmd/`, `internal/parser/`, `internal/envfile/`, `internal/config/`, `internal/ref/`, `internal/resolve/`, `internal/backend/`, `internal/output/`, `internal/suggest/`, `internal/schema/`, `pkg/`
 - All checks pass: `go build`, `go vet`, `go test`, `golangci-lint`
 
 ## Known Issues
