@@ -854,6 +854,10 @@ func createBackend(bc config.BackendConfig) (backend.Backend, error) {
 		return createVaultBackend(bc)
 	case "1password":
 		return createOnePasswordBackend(bc), nil
+	case "aws-ssm":
+		return createAWSSSMBackend(bc), nil
+	case "oci-vault":
+		return createOCIVaultBackend(bc), nil
 	case "plugin":
 		return createPluginBackend(bc)
 	default:
@@ -902,4 +906,44 @@ func createPluginBackend(bc config.BackendConfig) (*backend.PluginBackend, error
 		}
 	}
 	return backend.NewPluginBackend(bc.Name, command), nil
+}
+
+// createAWSSSMBackend creates an AWSSSMBackend from the backend config.
+// Optional config keys: "prefix" (default "/envref"), "region" (optional),
+// "profile" (optional).
+func createAWSSSMBackend(bc config.BackendConfig) *backend.AWSSSMBackend {
+	prefix := bc.Config["prefix"]
+	if prefix == "" {
+		prefix = "/envref"
+	}
+
+	var opts []backend.AWSSSMOption
+	if region := bc.Config["region"]; region != "" {
+		opts = append(opts, backend.WithAWSSSMRegion(region))
+	}
+	if profile := bc.Config["profile"]; profile != "" {
+		opts = append(opts, backend.WithAWSSSMProfile(profile))
+	}
+	if command := bc.Config["command"]; command != "" {
+		opts = append(opts, backend.WithAWSSSMCommand(command))
+	}
+	return backend.NewAWSSSMBackend(prefix, opts...)
+}
+
+// createOCIVaultBackend creates an OCIVaultBackend from the backend config.
+// Required config keys: "vault_id", "compartment_id", "key_id".
+// Optional config keys: "profile" (optional).
+func createOCIVaultBackend(bc config.BackendConfig) *backend.OCIVaultBackend {
+	vaultID := bc.Config["vault_id"]
+	compartmentID := bc.Config["compartment_id"]
+	keyID := bc.Config["key_id"]
+
+	var opts []backend.OCIVaultOption
+	if profile := bc.Config["profile"]; profile != "" {
+		opts = append(opts, backend.WithOCIVaultProfile(profile))
+	}
+	if command := bc.Config["command"]; command != "" {
+		opts = append(opts, backend.WithOCIVaultCommand(command))
+	}
+	return backend.NewOCIVaultBackend(vaultID, compartmentID, keyID, opts...)
 }

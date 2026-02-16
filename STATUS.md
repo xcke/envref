@@ -1,7 +1,7 @@
 # Project Status
 
 ## Last Completed
-- ENV-077: Added nested reference support — `${ref://...}` in interpolation and embedded `ref://` URIs in values are now resolved [iter-63]
+- ENV-052: Implemented AWS SSM Parameter Store backend and Oracle OCI Vault backend with CLI wrappers and mock-based tests [iter-64]
 
 ## Current State
 - Go module `github.com/xcke/envref` initialized with Cobra + Viper + go-keyring + age + sqlite + testify + x/term dependencies
@@ -29,7 +29,9 @@
 - `envref completion <shell>` — generates shell completion scripts (bash, zsh, fish, powershell)
 - `envref edit` — opens .env files in `$VISUAL`/`$EDITOR`
 - `envref vault init/lock/unlock/export/import` — full vault management
-- **Four backend types:** `KeychainBackend` (OS keychain via go-keyring), `VaultBackend` (local SQLite + age encryption), `OnePasswordBackend` (1Password via `op` CLI), and `PluginBackend` (external executables via JSON protocol)
+- **Six backend types:** `KeychainBackend` (OS keychain via go-keyring), `VaultBackend` (local SQLite + age encryption), `OnePasswordBackend` (1Password via `op` CLI), `AWSSSMBackend` (AWS SSM Parameter Store via `aws` CLI), `OCIVaultBackend` (Oracle OCI Vault via `oci` CLI), and `PluginBackend` (external executables via JSON protocol)
+- **AWS SSM backend:** Stores secrets as SecureString parameters with configurable prefix; supports region, profile, and command config options; mock-based tests via compiled aws_mock helper
+- **OCI Vault backend:** Stores secrets as base64-encoded vault secret bundles; supports vault_id, compartment_id, key_id, profile config; schedule-deletion semantics for Delete; mock-based tests via compiled oci_mock helper
 - **1Password backend:** Stores secrets as Secure Note items; supports vault, account, and command config options; edit-or-create semantics for Set; mock-based tests via compiled op_mock helper
 - **Plugin interface:** External backends communicate via JSON-over-stdin/stdout protocol; plugins discovered by convention (`envref-backend-<name>` on $PATH) or explicit `command` config; configured as `type: plugin` in `.envref.yaml`
 - **Nested references:** `${ref://secrets/key}` in values and embedded `ref://` URIs after interpolation are resolved via a second pass in the resolution pipeline

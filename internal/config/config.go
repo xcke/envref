@@ -24,6 +24,8 @@ import (
 var KnownBackendTypes = []string{
 	"keychain",
 	"1password",
+	"aws-ssm",
+	"oci-vault",
 }
 
 // ValidationError is returned when the config is syntactically valid YAML but

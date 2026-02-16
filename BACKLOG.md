@@ -72,7 +72,7 @@
 ### 3d — External Backends (plugins)
 
 - [DONE] P3 | ENV-050 | Implement 1Password CLI backend (`op` CLI wrapper)
-- [TODO] P3 | ENV-052 | Implement AWS SSM Parameter Store backend and Oracle OCI Vault store backend
+- [DONE] P3 | ENV-052 | Implement AWS SSM Parameter Store backend and Oracle OCI Vault store backend
 - [TODO] P3 | ENV-053 | Implement HashiCorp Vault backend
 - [DONE] P3 | ENV-054 | Define plugin interface for community-contributed backends
 
