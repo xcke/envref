@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Profiles — envref docs</title>
+  <meta name="description" content="Manage environment profiles with three-layer merge strategy, profile-scoped secrets, and environment switching.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="doc.css">
+</head>
+<body>
+  <!-- Nav -->
+  <nav>
+    <div class="nav-inner">
+      <a href="../index.html" class="nav-logo">envref<span> /</span></a>
+      <ul class="nav-links">
+        <li><a href="../index.html#features">Features</a></li>
+        <li><a href="../index.html#backends">Backends</a></li>
+        <li><a href="../index.html#commands">Commands</a></li>
+        <li><a href="../index.html#install">Install</a></li>
+        <li><a href="../index.html#docs">Docs</a></li>
+      </ul>
+      <a href="https://github.com/xcke/envref" class="nav-github">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+        GitHub
+      </a>
+    </div>
+  </nav>
+
+  <div class="doc-layout">
+    <aside class="doc-sidebar">
+      <a href="../index.html" class="back-link">&larr; Home</a>
+      <h4>Documentation</h4>
+      <ul>
+        <li><a href="getting-started.html">Getting Started</a></li>
+        <li><a href="secret-backends.html">Secret Backends</a></li>
+        <li class="active"><a href="profiles.html">Profiles</a></li>
+        <li><a href="direnv-integration.html">direnv Integration</a></li>
+      </ul>
+    </aside>
+
+    <main class="doc-content">
+      <h1>Profiles</h1>
+      <p class="doc-lead">Profiles let you maintain separate configurations for different environments — development, staging, production, or any custom setup. Each profile has its own <code>.env.&lt;name&gt;</code> file that overrides the base <code>.env</code>.</p>
+
+      <h2>How profiles work</h2>
+
+      <p>envref uses a three-layer merge strategy:</p>
+
+      <pre><code>.env  &lt;-  .env.&lt;profile&gt;  &lt;-  .env.local</code></pre>
+
+      <ol>
+        <li><strong><code>.env</code></strong> — Base configuration, committed to git. Contains shared defaults and <code>ref://</code> secret references.</li>
+        <li><strong><code>.env.&lt;profile&gt;</code></strong> — Profile-specific overrides (e.g., <code>.env.staging</code>). Committed to git.</li>
+        <li><strong><code>.env.local</code></strong> — Personal overrides. Gitignored, never committed.</li>
+      </ol>
+
+      <p>Each layer overrides keys from the previous layer. The last value wins.</p>
+
+      <h3>Example</h3>
+
+      <pre><code># .env (base)
+APP_NAME=my-app
+APP_PORT=3000
+LOG_LEVEL=info
+DATABASE_URL=ref://secrets/database_url</code></pre>
+
+      <pre><code># .env.staging
+APP_PORT=8080
+LOG_LEVEL=debug
+DATABASE_URL=ref://secrets/database_url</code></pre>
+
+      <pre><code># .env.local (personal)
+APP_PORT=9999</code></pre>
+
+      <p>With the <code>staging</code> profile active, <code>envref resolve</code> produces:</p>
+
+      <pre><code>APP_NAME=my-app           &lt;- from .env (no override)
+APP_PORT=9999             &lt;- from .env.local (overrides staging)
+LOG_LEVEL=debug           &lt;- from .env.staging (overrides base)
+DATABASE_URL=&lt;resolved&gt;   &lt;- ref:// resolved from backend</code></pre>
+
+      <h2>Managing profiles</h2>
+
+      <h3>Create a profile</h3>
+
+      <pre><code>envref profile create staging</code></pre>
+
+      <p>This creates <code>.env.staging</code> with a starter template. You can also:</p>
+
+      <pre><code># Copy from an existing file as a starting point
+envref profile create staging --from .env
+
+# Register the profile in .envref.yaml
+envref profile create staging --register
+
+# Overwrite an existing profile file
+envref profile create staging --force
+
+# Use a custom file path
+envref profile create staging --env-file configs/staging.env</code></pre>
+
+      <p>Profile names cannot contain dots or slashes, and <code>local</code> is reserved (used by <code>.env.local</code>).</p>
+
+      <h3>List available profiles</h3>
+
+      <pre><code>envref profile list</code></pre>
+
+      <p>Output shows all profiles with their status:</p>
+
+      <pre><code>* development  .env.development      (config, file)
+  staging      .env.staging          (config, file)
+  production   .env.production       (no file)</code></pre>
+
+      <ul>
+        <li><code>*</code> marks the active profile</li>
+        <li><code>config</code> means the profile is registered in <code>.envref.yaml</code></li>
+        <li><code>file</code> means the <code>.env.&lt;name&gt;</code> file exists on disk</li>
+        <li><code>no file</code> means the profile is configured but the file hasn't been created</li>
+      </ul>
+
+      <h3>Set the active profile</h3>
+
+      <pre><code>envref profile use staging</code></pre>
+
+      <p>This updates <code>active_profile</code> in <code>.envref.yaml</code>. The active profile is used by default in <code>envref resolve</code>, <code>envref status</code>, and other commands.</p>
+
+      <p>To deactivate the current profile:</p>
+
+      <pre><code>envref profile use --clear</code></pre>
+
+      <h3>Compare profiles</h3>
+
+      <pre><code>envref profile diff staging production</code></pre>
+
+      <p>Output shows differences between two profiles:</p>
+
+      <pre><code>+ API_URL=https://api.prod.example.com   (only in production)
+- DEBUG=true                              (only in staging)
+~ LOG_LEVEL: debug -&gt; warn                (changed)</code></pre>
+
+      <p>Markers:</p>
+      <ul>
+        <li><code>+</code> — key only in the second profile</li>
+        <li><code>-</code> — key only in the first profile</li>
+        <li><code>~</code> — key in both but with different values</li>
+      </ul>
+
+      <p>Supports <code>--format json</code> and <code>--format table</code> for alternative output.</p>
+
+      <h2>Profiles in configuration</h2>
+
+      <p>Register profiles in <code>.envref.yaml</code>:</p>
+
+      <pre><code>project: my-app
+
+profiles:
+  development:
+    env_file: .env.development
+  staging:
+    env_file: .env.staging
+  production:
+    env_file: .env.production
+
+active_profile: development</code></pre>
+
+      <p>You can also use convention-based discovery — envref detects <code>.env.&lt;name&gt;</code> files on disk even if they're not registered in config.</p>
+
+      <h2>Profile-scoped secrets</h2>
+
+      <p>Secrets can be scoped to a specific profile so that different environments use different secret values for the same key.</p>
+
+      <h3>Storing profile-scoped secrets</h3>
+
+      <pre><code># Store a staging-specific database password
+envref secret set db_password --profile staging
+
+# Store a production-specific database password
+envref secret set db_password --profile production</code></pre>
+
+      <p>These are stored under separate namespaces in the backend:</p>
+
+      <pre><code>my-app/staging/db_password
+my-app/production/db_password</code></pre>
+
+      <h3>How profile-scoped lookup works</h3>
+
+      <p>When resolving <code>ref://secrets/db_password</code> with <code>--profile staging</code>:</p>
+
+      <ol>
+        <li>First, envref looks up <code>my-app/staging/db_password</code> (profile-scoped)</li>
+        <li>If not found, falls back to <code>my-app/db_password</code> (project-scoped)</li>
+      </ol>
+
+      <p>This lets you have a default secret at the project level and override it per profile only when needed.</p>
+
+      <h3>Managing profile-scoped secrets</h3>
+
+      <p>All secret commands support the <code>--profile</code> flag:</p>
+
+      <pre><code>envref secret set api_key --profile staging
+envref secret get api_key --profile staging
+envref secret delete api_key --profile staging
+envref secret list --profile staging
+envref secret generate api_key --profile staging</code></pre>
+
+      <h2>Using profiles with resolve</h2>
+
+      <pre><code># Use the active profile (set via envref profile use)
+envref resolve
+
+# Override with a specific profile
+envref resolve --profile staging
+
+# Combine with direnv output
+envref resolve --profile staging --direnv
+
+# Strict mode — fail if any reference can't resolve
+envref resolve --profile production --strict</code></pre>
+
+      <h2>Using profiles with other commands</h2>
+
+      <pre><code># Get a value with profile merge
+envref get APP_PORT --profile-file .env.staging
+
+# Show status for a specific profile
+envref status --profile staging
+
+# Validate with a profile
+envref validate --profile-file .env.staging
+
+# Run a command with a specific profile
+envref run --profile staging -- ./deploy.sh</code></pre>
+
+      <h2>Recommended workflow</h2>
+
+      <ol>
+        <li>
+          <p><strong>Create profiles</strong> for each environment:</p>
+          <pre><code>envref profile create development --register
+envref profile create staging --register
+envref profile create production --register</code></pre>
+        </li>
+        <li>
+          <p><strong>Set defaults</strong> in <code>.env</code> (shared across all environments)</p>
+        </li>
+        <li>
+          <p><strong>Override per profile</strong> in <code>.env.&lt;name&gt;</code> files</p>
+        </li>
+        <li>
+          <p><strong>Store profile-scoped secrets</strong> where they differ:</p>
+          <pre><code>envref secret set db_password --profile staging
+envref secret set db_password --profile production</code></pre>
+        </li>
+        <li>
+          <p><strong>Switch profiles</strong> during development:</p>
+          <pre><code>envref profile use staging
+envref resolve  # uses staging profile automatically</code></pre>
+        </li>
+        <li>
+          <p><strong>Use in CI/CD</strong> with explicit <code>--profile</code>:</p>
+          <pre><code>envref resolve --profile production --strict</code></pre>
+        </li>
+      </ol>
+
+      <div class="see-also">
+        <h2>See also</h2>
+        <ul>
+          <li><a href="getting-started.html">Getting Started</a> <span>— basic envref setup</span></li>
+          <li><a href="direnv-integration.html">direnv Integration</a> <span>— automatic environment loading with profiles</span></li>
+          <li><a href="secret-backends.html">Secret Backends</a> <span>— configure where secrets are stored</span></li>
+        </ul>
+      </div>
+    </main>
+  </div>
+
+  <footer>
+    <div class="footer-links">
+      <a href="https://github.com/xcke/envref">GitHub</a>
+      <a href="https://github.com/xcke/envref/releases">Releases</a>
+      <a href="getting-started.html">Docs</a>
+      <a href="https://github.com/xcke/envref/blob/main/LICENSE">MIT License</a>
+    </div>
+    <p>envref — separate config from secrets</p>
+  </footer>
+</body>
+</html>

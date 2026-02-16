@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Getting Started — envref docs</title>
+  <meta name="description" content="Install envref, initialize a project, store secrets, and resolve your environment.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="doc.css">
+</head>
+<body>
+  <!-- Nav -->
+  <nav>
+    <div class="nav-inner">
+      <a href="../index.html" class="nav-logo">envref<span> /</span></a>
+      <ul class="nav-links">
+        <li><a href="../index.html#features">Features</a></li>
+        <li><a href="../index.html#backends">Backends</a></li>
+        <li><a href="../index.html#commands">Commands</a></li>
+        <li><a href="../index.html#install">Install</a></li>
+        <li><a href="../index.html#docs">Docs</a></li>
+      </ul>
+      <a href="https://github.com/xcke/envref" class="nav-github">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+        GitHub
+      </a>
+    </div>
+  </nav>
+
+  <div class="doc-layout">
+    <aside class="doc-sidebar">
+      <a href="../index.html" class="back-link">&larr; Home</a>
+      <h4>Documentation</h4>
+      <ul>
+        <li class="active"><a href="getting-started.html">Getting Started</a></li>
+        <li><a href="secret-backends.html">Secret Backends</a></li>
+        <li><a href="profiles.html">Profiles</a></li>
+        <li><a href="direnv-integration.html">direnv Integration</a></li>
+      </ul>
+    </aside>
+
+    <main class="doc-content">
+      <h1>Getting Started with envref</h1>
+      <p class="doc-lead">This guide walks you through installing envref, initializing a project, storing secrets, and resolving your environment.</p>
+
+      <h2>Installation</h2>
+
+      <h3>Homebrew (macOS / Linux)</h3>
+
+      <pre><code>brew install xcke/tap/envref</code></pre>
+
+      <h3>Scoop (Windows)</h3>
+
+      <pre><code>scoop bucket add xcke https://github.com/xcke/scoop-bucket
+scoop install envref</code></pre>
+
+      <h3>From source (requires Go 1.24+)</h3>
+
+      <pre><code>go install github.com/xcke/envref/cmd/envref@latest</code></pre>
+
+      <h3>From GitHub Releases</h3>
+
+      <p>Download the latest binary for your platform from <a href="https://github.com/xcke/envref/releases">GitHub Releases</a>.</p>
+
+      <h3>Build from source</h3>
+
+      <pre><code>git clone https://github.com/xcke/envref.git
+cd envref
+make build
+# Binary is at ./build/envref</code></pre>
+
+      <p>Verify the installation:</p>
+
+      <pre><code>envref version</code></pre>
+
+      <h2>Initialize a project</h2>
+
+      <p>Run <code>envref init</code> inside your project directory:</p>
+
+      <pre><code>cd my-project
+envref init --project my-app</code></pre>
+
+      <p>This creates three files:</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>File</th>
+            <th>Purpose</th>
+            <th>Committed to git?</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>.envref.yaml</code></td>
+            <td>Project config (name, backends, profiles)</td>
+            <td>Yes</td>
+          </tr>
+          <tr>
+            <td><code>.env</code></td>
+            <td>Base environment variables with example entries</td>
+            <td>Yes</td>
+          </tr>
+          <tr>
+            <td><code>.env.local</code></td>
+            <td>Personal overrides</td>
+            <td>No (gitignored)</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>The <code>.env.local</code> file is automatically added to <code>.gitignore</code>.</p>
+
+      <h3>Flags</h3>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Flag</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>-p</code>, <code>--project &lt;name&gt;</code></td>
+            <td>Project name (defaults to current directory name)</td>
+          </tr>
+          <tr>
+            <td><code>--direnv</code></td>
+            <td>Also generate <code>.envrc</code> for direnv integration</td>
+          </tr>
+          <tr>
+            <td><code>--force</code></td>
+            <td>Overwrite existing files</td>
+          </tr>
+          <tr>
+            <td><code>--dir &lt;path&gt;</code></td>
+            <td>Target directory (defaults to current working directory)</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>Add secret references</h2>
+
+      <p>Edit <code>.env</code> to replace secret values with <code>ref://</code> references:</p>
+
+      <pre><code># .env &mdash; safe to commit
+APP_NAME=my-app
+APP_PORT=3000
+DATABASE_URL=ref://secrets/database_url
+API_KEY=ref://secrets/api_key</code></pre>
+
+      <p>The <code>ref://secrets/&lt;key&gt;</code> syntax tells envref to look up <code>&lt;key&gt;</code> from the configured secret backend at resolve time. The <code>.env</code> file never contains actual secret values.</p>
+
+      <h2>Store secrets</h2>
+
+      <p>Use <code>envref secret set</code> to store secrets in your OS keychain (the default backend):</p>
+
+      <pre><code># Interactive &mdash; prompts for the value (hidden input)
+envref secret set database_url
+
+# Non-interactive &mdash; pass the value directly
+envref secret set api_key --value sk-abc123</code></pre>
+
+      <p>You can also generate random secrets:</p>
+
+      <pre><code>envref secret generate session_secret --length 64</code></pre>
+
+      <h3>Secret commands overview</h3>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Command</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>envref secret set &lt;key&gt;</code></td>
+            <td>Store a secret (interactive prompt)</td>
+          </tr>
+          <tr>
+            <td><code>envref secret set &lt;key&gt; --value &lt;val&gt;</code></td>
+            <td>Store a secret (non-interactive)</td>
+          </tr>
+          <tr>
+            <td><code>envref secret get &lt;key&gt;</code></td>
+            <td>Retrieve and print a secret value</td>
+          </tr>
+          <tr>
+            <td><code>envref secret delete &lt;key&gt;</code></td>
+            <td>Remove a secret (with confirmation)</td>
+          </tr>
+          <tr>
+            <td><code>envref secret list</code></td>
+            <td>List all secret keys for the current project</td>
+          </tr>
+          <tr>
+            <td><code>envref secret generate &lt;key&gt;</code></td>
+            <td>Generate and store a random secret</td>
+          </tr>
+          <tr>
+            <td><code>envref secret copy &lt;key&gt; --from &lt;project&gt;</code></td>
+            <td>Copy a secret from another project</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>Resolve your environment</h2>
+
+      <p>The <code>envref resolve</code> command merges your <code>.env</code> files, interpolates variables, and resolves all <code>ref://</code> references:</p>
+
+      <pre><code># Print resolved KEY=VALUE pairs
+envref resolve
+
+# Output as JSON
+envref resolve --format json
+
+# Export format for shell eval
+envref resolve --direnv</code></pre>
+
+      <h3>Inject into a running command</h3>
+
+      <p>Use <code>envref run</code> to launch a subprocess with the resolved environment:</p>
+
+      <pre><code>envref run -- node server.js
+envref run -- docker compose up</code></pre>
+
+      <p>The <code>--</code> separates envref flags from the command to run.</p>
+
+      <h3>Use with direnv</h3>
+
+      <p>For automatic resolution on <code>cd</code>:</p>
+
+      <pre><code>envref init --direnv
+direnv allow</code></pre>
+
+      <p>This generates an <code>.envrc</code> containing <code>eval "$(envref resolve --direnv)"</code>. See the <a href="direnv-integration.html">direnv integration guide</a> for details.</p>
+
+      <h2>Read and write individual variables</h2>
+
+      <pre><code># Get a single value
+envref get APP_PORT
+
+# Set a value in .env
+envref set APP_PORT=8080
+
+# Set a value in .env.local (personal override)
+envref set DB_HOST=localhost --local
+
+# List all merged variables
+envref list</code></pre>
+
+      <p>The <code>list</code> command masks secret references by default (<code>ref://***</code>). Use <code>--show-secrets</code> to display the full <code>ref://</code> URIs.</p>
+
+      <h2>Output formats</h2>
+
+      <p>Most commands support <code>--format</code> with these options:</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Format</th>
+            <th>Output</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>plain</code> (default)</td>
+            <td><code>KEY=VALUE</code> one per line</td>
+          </tr>
+          <tr>
+            <td><code>shell</code></td>
+            <td><code>export KEY=VALUE</code> with shell-safe quoting</td>
+          </tr>
+          <tr>
+            <td><code>json</code></td>
+            <td>JSON array of <code>{"key": ..., "value": ...}</code> objects</td>
+          </tr>
+          <tr>
+            <td><code>table</code></td>
+            <td>Aligned columns with headers</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>Check your environment</h2>
+
+      <pre><code># Validate .env against .env.example
+envref validate
+
+# Show environment overview with actionable hints
+envref status
+
+# Scan for common issues (duplicate keys, trailing whitespace, etc.)
+envref doctor</code></pre>
+
+      <h2>Edit environment files</h2>
+
+      <p>Open <code>.env</code> files directly in your editor:</p>
+
+      <pre><code>envref edit                     # edit .env
+envref edit --local            # edit .env.local
+envref edit --profile staging  # edit .env.staging
+envref edit --config           # edit .envref.yaml</code></pre>
+
+      <p>Uses <code>$VISUAL</code>, then <code>$EDITOR</code>, then falls back to <code>vi</code>.</p>
+
+      <h2>Global flags</h2>
+
+      <p>These flags are available on all commands:</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Flag</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>-q</code>, <code>--quiet</code></td>
+            <td>Suppress informational output (errors only)</td>
+          </tr>
+          <tr>
+            <td><code>--verbose</code></td>
+            <td>Show additional detail</td>
+          </tr>
+          <tr>
+            <td><code>--debug</code></td>
+            <td>Show debug information</td>
+          </tr>
+          <tr>
+            <td><code>--no-color</code></td>
+            <td>Disable colorized output (also respects <code>NO_COLOR</code>)</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>Shell completions</h2>
+
+      <p>Generate tab-completion scripts for your shell:</p>
+
+      <pre><code># Bash (Linux)
+envref completion bash &gt; /etc/bash_completion.d/envref
+
+# Bash (macOS with Homebrew)
+envref completion bash &gt; $(brew --prefix)/etc/bash_completion.d/envref
+
+# Zsh
+envref completion zsh &gt; "${fpath[1]}/_envref"
+
+# Fish
+envref completion fish &gt; ~/.config/fish/completions/envref.fish
+
+# PowerShell
+envref completion powershell &gt;&gt; $PROFILE</code></pre>
+
+      <div class="see-also">
+        <h2>Next steps</h2>
+        <ul>
+          <li><a href="direnv-integration.html">direnv Integration</a> <span>&mdash; automatic environment loading</span></li>
+          <li><a href="profiles.html">Profiles</a> <span>&mdash; manage development, staging, and production configs</span></li>
+          <li><a href="secret-backends.html">Secret Backends</a> <span>&mdash; keychain, vault, and backend configuration</span></li>
+        </ul>
+      </div>
+    </main>
+  </div>
+
+  <footer>
+    <div class="footer-links">
+      <a href="https://github.com/xcke/envref">GitHub</a>
+      <a href="https://github.com/xcke/envref/releases">Releases</a>
+      <a href="getting-started.html">Docs</a>
+      <a href="https://github.com/xcke/envref/blob/main/LICENSE">MIT License</a>
+    </div>
+    <p>envref — separate config from secrets</p>
+  </footer>
+</body>
+</html>
