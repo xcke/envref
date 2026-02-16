@@ -81,11 +81,11 @@
 
 ## Phase 4 — Secret Management Commands
 
-- [TODO] P1 | ENV-060 | Add `envref secret set <key>` — prompt for value (hidden input), store in backend
+- [DONE] P1 | ENV-060 | Add `envref secret set <key>` — prompt for value (hidden input), store in backend
 - [TODO] P1 | ENV-061 | Add `envref secret get <key>` — retrieve and print from backend
 - [TODO] P1 | ENV-062 | Add `envref secret delete <key>` — remove from backend with confirmation
 - [TODO] P1 | ENV-063 | Add `envref secret list` — list stored secret keys (no values) for current project
-- [TODO] P2 | ENV-064 | Add `envref secret set <key> --value <val>` — non-interactive mode for scripting
+- [DONE] P2 | ENV-064 | Add `envref secret set <key> --value <val>` — non-interactive mode for scripting
 - [TODO] P2 | ENV-065 | Add `envref secret generate <key>` — generate random secret (configurable length, charset)
 - [TODO] P2 | ENV-066 | Add `envref secret copy <key> --from <project>` — copy secret between projects
 - [TODO] P3 | ENV-067 | Add `envref secret rotate <key>` — generate new value, store old in history
