@@ -204,6 +204,66 @@ func ResolveWithProfile(env *envfile.Env, registry *backend.Registry, project, p
 		})
 	}
 
+	// Second pass: resolve embedded ref:// URIs in non-ref values.
+	// This handles nested references like:
+	//   DB_URL=postgres://${ref://secrets/db_user}:${ref://secrets/db_pass}@host
+	// After interpolation, the value may contain literal ref:// URIs that need resolution.
+	for i := range result.Entries {
+		if result.Entries[i].WasRef {
+			continue
+		}
+		if !ref.ContainsRef(result.Entries[i].Value) {
+			continue
+		}
+
+		embedded := ref.FindAll(result.Entries[i].Value)
+		if len(embedded) == 0 {
+			continue
+		}
+
+		// Resolve each embedded ref and build the substituted value.
+		value := result.Entries[i].Value
+		hasError := false
+		// Process in reverse order so byte offsets remain valid after substitution.
+		for j := len(embedded) - 1; j >= 0; j-- {
+			emb := embedded[j]
+			rawURI := emb.Ref.Raw
+
+			cached, ok := cache[rawURI]
+			if !ok {
+				var resolved string
+				var resolveErr error
+
+				if profileBackends != nil {
+					resolved, resolveErr = resolveRef(emb.Ref, profileBackends, profileRegistry)
+				}
+				if profileBackends == nil || isNotFoundError(resolveErr) {
+					resolved, resolveErr = resolveRef(emb.Ref, nsBackends, nsRegistry)
+				}
+
+				cached = cachedResult{value: resolved, err: resolveErr}
+				cache[rawURI] = cached
+			}
+
+			if cached.err != nil {
+				result.Errors = append(result.Errors, KeyErr{
+					Key: result.Entries[i].Key,
+					Ref: rawURI,
+					Err: cached.err,
+				})
+				hasError = true
+				continue
+			}
+
+			value = value[:emb.Start] + cached.value + value[emb.End:]
+		}
+
+		if !hasError || value != result.Entries[i].Value {
+			result.Entries[i].Value = value
+			result.Entries[i].WasRef = true
+		}
+	}
+
 	return result, nil
 }
 

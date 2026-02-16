@@ -124,8 +124,8 @@ func runResolve(cmd *cobra.Command, direnv bool, profileOverride, formatStr stri
 
 	w.Debug("merged %d keys (%d refs)\n", env.Len(), len(env.Refs()))
 
-	// If no refs, just output without backend resolution.
-	if !env.HasRefs() {
+	// If no refs (including embedded nested refs), just output without backend resolution.
+	if !env.HasAnyRefs() {
 		return outputEntries(cmd, envToEntries(env), format)
 	}
 
@@ -299,7 +299,7 @@ func resolveAndOutput(cmd *cobra.Command, cfg *config.Config, envPath, profilePa
 		return err
 	}
 
-	if !env.HasRefs() {
+	if !env.HasAnyRefs() {
 		return outputEntries(cmd, envToEntries(env), format)
 	}
 

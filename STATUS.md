@@ -1,7 +1,7 @@
 # Project Status
 
 ## Last Completed
-- ENV-050: Implemented 1Password CLI backend (`op` CLI wrapper) with full CRUD, mock-based tests, factory registration, and docs [iter-62]
+- ENV-077: Added nested reference support — `${ref://...}` in interpolation and embedded `ref://` URIs in values are now resolved [iter-63]
 
 ## Current State
 - Go module `github.com/xcke/envref` initialized with Cobra + Viper + go-keyring + age + sqlite + testify + x/term dependencies
@@ -32,13 +32,14 @@
 - **Four backend types:** `KeychainBackend` (OS keychain via go-keyring), `VaultBackend` (local SQLite + age encryption), `OnePasswordBackend` (1Password via `op` CLI), and `PluginBackend` (external executables via JSON protocol)
 - **1Password backend:** Stores secrets as Secure Note items; supports vault, account, and command config options; edit-or-create semantics for Set; mock-based tests via compiled op_mock helper
 - **Plugin interface:** External backends communicate via JSON-over-stdin/stdout protocol; plugins discovered by convention (`envref-backend-<name>` on $PATH) or explicit `command` config; configured as `type: plugin` in `.envref.yaml`
+- **Nested references:** `${ref://secrets/key}` in values and embedded `ref://` URIs after interpolation are resolved via a second pass in the resolution pipeline
 - **Security hardening:** Vault passphrase stored as `[]byte` (clearable), zeroed on Close; decrypted plaintext bytes cleared after use
 - **Comprehensive README** with architecture diagram, resolution pipeline, project structure, vault docs, and benchmarks
 - **docs/ directory** with four usage guides: getting-started, direnv-integration, profiles, secret-backends
 - **Homebrew tap:** GoReleaser `brews` config auto-publishes to `xcke/homebrew-tap`
 - **MIT LICENSE** file included
 - `.env` file parser with full quote/multiline/comment/BOM/CRLF support
-- `ref://` URI parser, `Backend` interface, `Registry`, `NamespacedBackend`
+- `ref://` URI parser with `FindAll` for embedded ref discovery, `Backend` interface, `Registry`, `NamespacedBackend`
 - GoReleaser config, GitHub Actions CI + release pipelines, Makefile with coverage targets
 - Comprehensive test coverage across all packages
 - Fuzz tests for .env parser, ref:// URI parser, and variable interpolation

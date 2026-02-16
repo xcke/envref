@@ -100,7 +100,7 @@
 - [DONE] P2 | ENV-074 | Handle resolution failures gracefully — partial resolve with clear error per failed key
 - [DONE] P2 | ENV-075 | Add `--strict` flag — fail entirely if any ref can't be resolved
 - [DONE] P2 | ENV-076 | Cache resolved values in memory during a single resolve call (avoid duplicate backend hits)
-- [TODO] P3 | ENV-077 | Support nested references (`DB_URL=postgres://${ref://secrets/db_user}:${ref://secrets/db_pass}@localhost/app`)
+- [DONE] P3 | ENV-077 | Support nested references (`DB_URL=postgres://${ref://secrets/db_user}:${ref://secrets/db_pass}@localhost/app`)
 
 ---
 

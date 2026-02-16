@@ -90,6 +90,13 @@ func expandVars(s string, lookup map[string]string) string {
 				continue
 			}
 			varName := s[i+2 : i+2+closeIdx]
+			// If the content is a ref:// URI, preserve it literally for
+			// the resolution pass to handle (nested reference support).
+			if strings.HasPrefix(varName, "ref://") {
+				b.WriteString(varName)
+				i = i + 2 + closeIdx + 1
+				continue
+			}
 			if val, ok := lookup[varName]; ok {
 				b.WriteString(val)
 			}

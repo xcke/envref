@@ -75,3 +75,64 @@ func Parse(value string) (Reference, error) {
 		Path:    path,
 	}, nil
 }
+
+// ContainsRef reports whether s contains an embedded ref:// URI.
+// Unlike IsRef, this checks for ref:// anywhere in the string.
+func ContainsRef(s string) bool {
+	return strings.Contains(s, Prefix)
+}
+
+// Embedded represents a ref:// URI found embedded within a larger string,
+// along with its start and end positions.
+type Embedded struct {
+	// Ref is the parsed reference.
+	Ref Reference
+	// Start is the byte offset of "ref://" in the containing string.
+	Start int
+	// End is the byte offset just past the last character of the ref URI.
+	End int
+}
+
+// FindAll returns all ref:// URIs embedded in s, in order of appearance.
+// It extracts ref URIs by scanning for the "ref://" prefix and collecting
+// valid URI characters (alphanumeric, slash, underscore, hyphen, dot) until
+// a delimiter or end of string is reached. Invalid URIs (e.g., missing path)
+// are skipped.
+func FindAll(s string) []Embedded {
+	var results []Embedded
+	offset := 0
+	for {
+		idx := strings.Index(s[offset:], Prefix)
+		if idx < 0 {
+			break
+		}
+		start := offset + idx
+		// Extract the ref:// URI by scanning forward for valid URI chars.
+		end := start + len(Prefix)
+		for end < len(s) && isRefChar(s[end]) {
+			end++
+		}
+		raw := s[start:end]
+		parsed, err := Parse(raw)
+		if err == nil {
+			results = append(results, Embedded{
+				Ref:   parsed,
+				Start: start,
+				End:   end,
+			})
+		}
+		// Move past this ref:// occurrence.
+		offset = start + len(Prefix)
+	}
+	return results
+}
+
+// isRefChar reports whether c is a valid character within a ref:// URI
+// (after the "ref://" prefix). Valid characters are alphanumeric, slash,
+// underscore, hyphen, and dot.
+func isRefChar(c byte) bool {
+	return (c >= 'a' && c <= 'z') ||
+		(c >= 'A' && c <= 'Z') ||
+		(c >= '0' && c <= '9') ||
+		c == '/' || c == '_' || c == '-' || c == '.'
+}

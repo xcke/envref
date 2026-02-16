@@ -166,6 +166,37 @@ func TestInterpolate(t *testing.T) {
 			},
 		},
 		{
+			name: "${ref://...} is preserved literally for nested resolution",
+			entries: []parser.Entry{
+				{Key: "URL", Value: "postgres://${ref://secrets/db_user}:${ref://secrets/db_pass}@host/db", Quote: parser.QuoteNone},
+			},
+			want: map[string]string{
+				"URL": "postgres://ref://secrets/db_user:ref://secrets/db_pass@host/db",
+			},
+		},
+		{
+			name: "${ref://...} mixed with regular vars",
+			entries: []parser.Entry{
+				{Key: "HOST", Value: "localhost", Quote: parser.QuoteNone},
+				{Key: "URL", Value: "postgres://${ref://secrets/db_user}@${HOST}/db", Quote: parser.QuoteNone},
+			},
+			want: map[string]string{
+				"HOST": "localhost",
+				"URL":  "postgres://ref://secrets/db_user@localhost/db",
+			},
+		},
+		{
+			name: "indirect ref via variable expansion",
+			entries: []parser.Entry{
+				{Key: "DB_USER", Value: "ref://secrets/db_user", IsRef: true, Quote: parser.QuoteNone},
+				{Key: "URL", Value: "postgres://${DB_USER}@host/db", Quote: parser.QuoteNone},
+			},
+			want: map[string]string{
+				"DB_USER": "ref://secrets/db_user",
+				"URL":     "postgres://ref://secrets/db_user@host/db",
+			},
+		},
+		{
 			name: "mixed $VAR and ${VAR} in one value",
 			entries: []parser.Entry{
 				{Key: "USER", Value: "admin", Quote: parser.QuoteNone},

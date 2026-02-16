@@ -144,8 +144,8 @@ func resolveEnvEntries(cmd *cobra.Command, profileOverride string, strict bool) 
 		return nil, err
 	}
 
-	// If no refs, convert directly.
-	if !env.HasRefs() {
+	// If no refs (including embedded nested refs), convert directly.
+	if !env.HasAnyRefs() {
 		return envToEntries(env), nil
 	}
 

@@ -119,6 +119,20 @@ func (e *Env) HasRefs() bool {
 	return e.refCount > 0
 }
 
+// HasAnyRefs reports whether the Env contains any ref:// references,
+// including embedded ref:// URIs within non-ref values (nested references).
+func (e *Env) HasAnyRefs() bool {
+	if e.refCount > 0 {
+		return true
+	}
+	for _, key := range e.order {
+		if ref.ContainsRef(e.entries[key].Value) {
+			return true
+		}
+	}
+	return false
+}
+
 // Load reads a .env file from disk and returns an Env with all entries.
 // Returns an error if the file cannot be opened or parsed.
 // Parse warnings (e.g., duplicate keys) are returned as the second value.

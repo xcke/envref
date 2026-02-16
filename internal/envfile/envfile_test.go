@@ -497,6 +497,42 @@ func TestHasRefs(t *testing.T) {
 	})
 }
 
+func TestHasAnyRefs(t *testing.T) {
+	t.Run("true when top-level refs present", func(t *testing.T) {
+		env := NewEnv()
+		env.Set(parser.Entry{Key: "SECRET", Value: "ref://secrets/key", IsRef: true})
+
+		if !env.HasAnyRefs() {
+			t.Error("expected HasAnyRefs() to return true for top-level ref")
+		}
+	})
+
+	t.Run("true when embedded refs present", func(t *testing.T) {
+		env := NewEnv()
+		env.Set(parser.Entry{Key: "URL", Value: "postgres://ref://secrets/user@host/db"})
+
+		if !env.HasAnyRefs() {
+			t.Error("expected HasAnyRefs() to return true for embedded ref")
+		}
+	})
+
+	t.Run("false when no refs at all", func(t *testing.T) {
+		env := NewEnv()
+		env.Set(parser.Entry{Key: "HOST", Value: "localhost"})
+
+		if env.HasAnyRefs() {
+			t.Error("expected HasAnyRefs() to return false")
+		}
+	})
+
+	t.Run("false for empty env", func(t *testing.T) {
+		env := NewEnv()
+		if env.HasAnyRefs() {
+			t.Error("expected HasAnyRefs() to return false for empty env")
+		}
+	})
+}
+
 func TestResolvedRefs(t *testing.T) {
 	t.Run("parses valid refs", func(t *testing.T) {
 		env := NewEnv()

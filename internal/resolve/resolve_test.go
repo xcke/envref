@@ -1533,6 +1533,235 @@ func TestResult_ResolvedWithEmptyResult(t *testing.T) {
 // ResolveWithProfile Tests
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Nested / Embedded Reference Tests
+// ---------------------------------------------------------------------------
+
+func TestResolve_NestedRefDirect(t *testing.T) {
+	// Direct nested ref: value contains ${ref://secrets/key} which after
+	// interpolation becomes ref://secrets/key embedded in the string.
+	env := buildEnv(
+		parser.Entry{Key: "DB_URL", Value: "postgres://ref://secrets/db_user:ref://secrets/db_pass@localhost/app"},
+	)
+	reg := buildRegistry(newMockBackend("secrets", map[string]string{
+		"proj/db_user": "admin",
+		"proj/db_pass": "s3cret",
+	}))
+
+	result, err := resolve.Resolve(env, reg, "proj")
+	require.NoError(t, err)
+
+	assert.True(t, result.Resolved())
+	assert.Len(t, result.Entries, 1)
+	assert.Equal(t, "postgres://admin:s3cret@localhost/app", result.Entries[0].Value)
+	assert.True(t, result.Entries[0].WasRef)
+}
+
+func TestResolve_NestedRefViaInterpolation(t *testing.T) {
+	// Indirect nested ref: variable holds a ref:// URI, and another
+	// variable references it via ${VAR}, resulting in an embedded ref.
+	env := buildEnv(
+		parser.Entry{Key: "SECRET_USER", Value: "ref://keychain/db_user", IsRef: true},
+		parser.Entry{Key: "SECRET_PASS", Value: "ref://keychain/db_pass", IsRef: true},
+		parser.Entry{Key: "DB_URL", Value: "postgres://ref://keychain/db_user:ref://keychain/db_pass@localhost/app"},
+	)
+	reg := buildRegistry(newMockBackend("keychain", map[string]string{
+		"proj/db_user": "admin",
+		"proj/db_pass": "s3cret",
+	}))
+
+	result, err := resolve.Resolve(env, reg, "proj")
+	require.NoError(t, err)
+
+	assert.True(t, result.Resolved())
+	assert.Len(t, result.Entries, 3)
+
+	// Top-level refs should be resolved.
+	assert.Equal(t, "admin", result.Entries[0].Value)
+	assert.True(t, result.Entries[0].WasRef)
+	assert.Equal(t, "s3cret", result.Entries[1].Value)
+	assert.True(t, result.Entries[1].WasRef)
+
+	// Nested ref in DB_URL should be resolved.
+	assert.Equal(t, "postgres://admin:s3cret@localhost/app", result.Entries[2].Value)
+	assert.True(t, result.Entries[2].WasRef)
+}
+
+func TestResolve_NestedRefSingleEmbedded(t *testing.T) {
+	// A single embedded ref in a larger value.
+	env := buildEnv(
+		parser.Entry{Key: "GREETING", Value: "Hello ref://secrets/name!"},
+	)
+	reg := buildRegistry(newMockBackend("secrets", map[string]string{
+		"proj/name": "World",
+	}))
+
+	result, err := resolve.Resolve(env, reg, "proj")
+	require.NoError(t, err)
+
+	assert.True(t, result.Resolved())
+	assert.Equal(t, "Hello World!", result.Entries[0].Value)
+	assert.True(t, result.Entries[0].WasRef)
+}
+
+func TestResolve_NestedRefMissingSecret(t *testing.T) {
+	// Embedded ref that can't be resolved.
+	env := buildEnv(
+		parser.Entry{Key: "URL", Value: "http://ref://secrets/host:8080"},
+	)
+	reg := buildRegistry(newMockBackend("secrets", map[string]string{}))
+
+	result, err := resolve.Resolve(env, reg, "proj")
+	require.NoError(t, err)
+
+	assert.False(t, result.Resolved())
+	assert.Len(t, result.Errors, 1)
+	assert.Equal(t, "URL", result.Errors[0].Key)
+	assert.Equal(t, "ref://secrets/host", result.Errors[0].Ref)
+}
+
+func TestResolve_NestedRefPartialResolution(t *testing.T) {
+	// One embedded ref resolves, another doesn't.
+	env := buildEnv(
+		parser.Entry{Key: "DSN", Value: "user=ref://secrets/user pass=ref://secrets/pass"},
+	)
+	reg := buildRegistry(newMockBackend("secrets", map[string]string{
+		"proj/user": "admin",
+		// "pass" is missing
+	}))
+
+	result, err := resolve.Resolve(env, reg, "proj")
+	require.NoError(t, err)
+
+	assert.False(t, result.Resolved())
+	assert.Len(t, result.Errors, 1)
+	assert.Equal(t, "DSN", result.Errors[0].Key)
+	// The resolved part should still be substituted.
+	assert.Equal(t, "user=admin pass=ref://secrets/pass", result.Entries[0].Value)
+}
+
+func TestResolve_NestedRefUsesCache(t *testing.T) {
+	// Same embedded ref URI appears in multiple values — should be cached.
+	cb := newCountingBackend("secrets", map[string]string{
+		"proj/token": "tok-123",
+	})
+	env := buildEnv(
+		parser.Entry{Key: "URL_A", Value: "http://ref://secrets/token@host-a"},
+		parser.Entry{Key: "URL_B", Value: "http://ref://secrets/token@host-b"},
+	)
+	reg := buildRegistry(cb)
+
+	result, err := resolve.Resolve(env, reg, "proj")
+	require.NoError(t, err)
+
+	assert.True(t, result.Resolved())
+	assert.Equal(t, "http://tok-123@host-a", result.Entries[0].Value)
+	assert.Equal(t, "http://tok-123@host-b", result.Entries[1].Value)
+
+	// Token should be resolved only once (cached from any previous lookup).
+	assert.Equal(t, 1, cb.getCounts["proj/token"])
+}
+
+func TestResolve_NestedRefSharesCacheWithTopLevel(t *testing.T) {
+	// A top-level ref and a nested ref referencing the same secret share cache.
+	cb := newCountingBackend("secrets", map[string]string{
+		"proj/api_key": "sk-123",
+	})
+	env := buildEnv(
+		parser.Entry{Key: "API_KEY", Value: "ref://secrets/api_key", IsRef: true},
+		parser.Entry{Key: "HEADER", Value: "Bearer ref://secrets/api_key"},
+	)
+	reg := buildRegistry(cb)
+
+	result, err := resolve.Resolve(env, reg, "proj")
+	require.NoError(t, err)
+
+	assert.True(t, result.Resolved())
+	assert.Equal(t, "sk-123", result.Entries[0].Value)
+	assert.Equal(t, "Bearer sk-123", result.Entries[1].Value)
+
+	// Only one backend hit despite two lookups.
+	assert.Equal(t, 1, cb.getCounts["proj/api_key"])
+}
+
+func TestResolve_NestedRefSkipsTopLevelRefs(t *testing.T) {
+	// The nested resolution pass should skip entries that were already
+	// resolved as top-level refs.
+	env := buildEnv(
+		parser.Entry{Key: "SECRET", Value: "ref://keychain/key", IsRef: true},
+		parser.Entry{Key: "PLAIN", Value: "no refs here"},
+	)
+	reg := buildRegistry(newMockBackend("keychain", map[string]string{
+		"proj/key": "resolved",
+	}))
+
+	result, err := resolve.Resolve(env, reg, "proj")
+	require.NoError(t, err)
+
+	assert.True(t, result.Resolved())
+	assert.Equal(t, "resolved", result.Entries[0].Value)
+	assert.True(t, result.Entries[0].WasRef)
+	assert.Equal(t, "no refs here", result.Entries[1].Value)
+	assert.False(t, result.Entries[1].WasRef)
+}
+
+func TestResolve_NestedRefWithProfile(t *testing.T) {
+	// Nested refs should also respect profile-scoped secrets.
+	env := buildEnv(
+		parser.Entry{Key: "URL", Value: "http://ref://secrets/host:ref://secrets/port"},
+	)
+	reg := buildRegistry(newMockBackend("secrets", map[string]string{
+		"proj/staging/host": "staging.example.com",
+		"proj/staging/port": "8443",
+		"proj/host":         "prod.example.com",
+		"proj/port":         "443",
+	}))
+
+	result, err := resolve.ResolveWithProfile(env, reg, "proj", "staging")
+	require.NoError(t, err)
+
+	assert.True(t, result.Resolved())
+	assert.Equal(t, "http://staging.example.com:8443", result.Entries[0].Value)
+}
+
+func TestResolve_NestedRefWithFallbackChain(t *testing.T) {
+	// Nested refs using generic backend name should use fallback chain.
+	env := buildEnv(
+		parser.Entry{Key: "DSN", Value: "user=ref://secrets/user host=ref://secrets/host"},
+	)
+	reg := buildRegistry(
+		newMockBackend("primary", map[string]string{}),
+		newMockBackend("secondary", map[string]string{
+			"proj/user": "admin",
+			"proj/host": "db.local",
+		}),
+	)
+
+	result, err := resolve.Resolve(env, reg, "proj")
+	require.NoError(t, err)
+
+	assert.True(t, result.Resolved())
+	assert.Equal(t, "user=admin host=db.local", result.Entries[0].Value)
+}
+
+func TestResolve_NestedRefNoEmbeddedRefs(t *testing.T) {
+	// Values without embedded refs should be unchanged after nested pass.
+	env := buildEnv(
+		parser.Entry{Key: "PLAIN", Value: "just a plain value"},
+		parser.Entry{Key: "URL", Value: "https://example.com/path"},
+	)
+	reg := buildRegistry(newMockBackend("keychain", map[string]string{}))
+
+	result, err := resolve.Resolve(env, reg, "proj")
+	require.NoError(t, err)
+
+	assert.True(t, result.Resolved())
+	assert.Equal(t, "just a plain value", result.Entries[0].Value)
+	assert.False(t, result.Entries[0].WasRef)
+	assert.Equal(t, "https://example.com/path", result.Entries[1].Value)
+	assert.False(t, result.Entries[1].WasRef)
+}
+
 func TestResolveWithProfile_EmptyProfileEqualsResolve(t *testing.T) {
 	// Empty profile should behave identically to Resolve.
 	env := buildEnv(
