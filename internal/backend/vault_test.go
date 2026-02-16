@@ -650,7 +650,10 @@ func TestVaultBackend_ReopenAfterClose(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewVaultBackend v2: %v", err)
 	}
-	defer func() { _ = v2.Close() }()
+	// Use t.Cleanup (LIFO order) so the vault is closed before t.TempDir
+	// removes the directory. On Windows, SQLite may hold the file open
+	// until Close completes.
+	t.Cleanup(func() { _ = v2.Close() })
 
 	val, err := v2.Get("k1")
 	if err != nil {
