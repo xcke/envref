@@ -1,7 +1,7 @@
 # Project Status
 
 ## Last Completed
-- ENV-024: Added automatic config validation on load with ValidationError type, enhanced checks [iter-26]
+- ENV-025: Added `envref config show` command with plain, JSON, and table output formats [iter-27]
 
 ## Current State
 - Go module `github.com/xcke/envref` initialized with Cobra + Viper + go-keyring + testify dependencies
@@ -22,16 +22,10 @@
 - `envref validate` — checks .env against .env.example schema
 - `envref status` — shows environment overview with actionable hints
 - `envref doctor` — scans .env files for common issues
-- **Config validation on load:** `Load()` now calls `Validate()` automatically, returning `*ValidationError` for semantic errors
-  - Project name: required, no whitespace padding, no path separators (/ or \)
-  - File paths: env_file and local_file must be relative, non-empty
-  - Backends: names required and unique
-  - Profiles: names non-empty, no whitespace padding
-  - Active profile must reference a defined profile (when profiles exist)
-  - `Warnings()` method for non-fatal issues (unknown backend types)
-  - `status` command shows validation problems as hints instead of failing
+- `envref config show` — prints resolved effective config (plain, JSON, table formats)
+- **Config validation on load:** `Load()` calls `Validate()` automatically, returning `*ValidationError` for semantic errors
 - **Config inheritance:** Global config at `~/.config/envref/config.yaml` merged with project `.envref.yaml`
-- **Output format support:** `--format` flag on `get`, `list`, and `resolve` commands (plain, json, shell, table)
+- **Output format support:** `--format` flag on `get`, `list`, `resolve`, and `config show` commands (plain, json, shell, table)
 - **Profile support:** 3-layer merge with `--profile` flag
 - Resolution pipeline with per-key error collection, partial resolution, direct backend matching + fallback chain
 - `.env` file parser with full quote/multiline/comment/BOM/CRLF support
