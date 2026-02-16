@@ -153,7 +153,7 @@
 - [TODO] P2 | ENV-111 | Add colorized, human-friendly terminal output (with `--no-color` flag)
 - [TODO] P2 | ENV-112 | Add `--quiet` / `--verbose` / `--debug` global flags
 - [TODO] P2 | ENV-113 | Implement fuzzy key matching in error messages ("KEY not found, did you mean API_KEY?")
-- [TODO] P2 | ENV-114 | Add `envref run -- <command>` — inject resolved env vars and exec (alternative to direnv)
+- [DONE] P2 | ENV-114 | Add `envref run -- <command>` — inject resolved env vars and exec (alternative to direnv)
 - [TODO] P2 | ENV-115 | Add `envref edit` — open `.env` in `$EDITOR` with syntax highlighting hints
 - [TODO] P3 | ENV-116 | Add `envref import <file|url>` — import env vars from another format (Docker, Vercel, Heroku)
 - [TODO] P3 | ENV-117 | Add `envref export --format <docker|github|gitlab>` — export for CI platforms

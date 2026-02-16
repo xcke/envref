@@ -2,6 +2,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
@@ -34,6 +35,7 @@ from your OS keychain or other secret backends at runtime.`,
 	rootCmd.AddCommand(newProfileCmd())
 	rootCmd.AddCommand(newValidateCmd())
 	rootCmd.AddCommand(newStatusCmd())
+	rootCmd.AddCommand(newRunCmd())
 
 	return rootCmd
 }
@@ -52,6 +54,10 @@ func newVersionCmd() *cobra.Command {
 // Execute runs the root command.
 func Execute() {
 	if err := NewRootCmd().Execute(); err != nil {
+		var exitErr *exitError
+		if errors.As(err, &exitErr) {
+			os.Exit(exitErr.code)
+		}
 		os.Exit(1)
 	}
 }

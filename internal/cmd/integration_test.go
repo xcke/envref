@@ -92,7 +92,7 @@ func TestIntegration_RootCmd_HasAllSubcommands(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	expectedCmds := []string{"version", "get", "set", "list", "init", "secret", "resolve", "profile"}
+	expectedCmds := []string{"version", "get", "set", "list", "init", "secret", "resolve", "profile", "run"}
 	for _, cmd := range expectedCmds {
 		if !strings.Contains(stdout, cmd) {
 			t.Errorf("root help should list %q command, got:\n%s", cmd, stdout)
@@ -135,6 +135,7 @@ func TestIntegration_HelpFlags_AllCommands(t *testing.T) {
 		{"secret", "delete", "--help"},
 		{"secret", "list", "--help"},
 		{"resolve", "--help"},
+		{"run", "--help"},
 		{"profile", "--help"},
 		{"profile", "list", "--help"},
 	}

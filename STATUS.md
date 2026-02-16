@@ -1,8 +1,7 @@
 # Project Status
 
 ## Last Completed
-- ENV-074: Confirmed partial resolution with per-key error collection already implemented [iter-22]
-- ENV-075: Added --strict flag to resolve command — suppresses output if any ref fails [iter-22]
+- ENV-114: Added `envref run -- <command>` to execute commands with resolved env vars injected [iter-23]
 
 ## Current State
 - Go module `github.com/xcke/envref` initialized with Cobra + Viper + go-keyring + testify dependencies
@@ -17,6 +16,11 @@
 - `envref resolve --profile <name>` — uses a named profile's env file in the merge chain
 - `envref resolve --direnv` — outputs `export KEY=VALUE` format for shell integration
 - `envref resolve --strict` — fails with no output if any reference cannot be resolved (CI-safe)
+- `envref run -- <command>` — resolves env vars and executes a subprocess with them injected (alternative to direnv)
+  - Supports `--profile` and `--strict` flags
+  - Inherits current process environment, overlays resolved vars
+  - Forwards signals (SIGINT, SIGTERM) to child process
+  - Propagates child process exit code
 - `envref profile list` — shows available profiles from config and convention-based `.env.*` files, marks active profile
 - `envref profile use <name>` — sets active profile in `.envref.yaml`, validates against config and disk, supports `--clear`
 - `envref validate` — checks .env against .env.example schema, reports missing/extra keys, supports `--example`, `--profile-file` flags
@@ -34,7 +38,7 @@
 - **GoReleaser config** for cross-platform releases (Linux/macOS/Windows × amd64/arm64, tar.gz/zip, checksums, changelog)
 - **GitHub Actions CI pipeline** with test (ubuntu/macos/windows matrix), lint (go vet + golangci-lint), and build jobs
 - Makefile with build/test/lint/install targets
-- Comprehensive test coverage: parser (100+), merge (38+), resolve (50+), integration (55+), profile, validate, status, format, strict mode tests
+- Comprehensive test coverage: parser (100+), merge (38+), resolve (50+), integration (55+), profile, validate, status, format, strict mode, run command tests
 - Directory structure: `cmd/envref/`, `internal/cmd/`, `internal/parser/`, `internal/envfile/`, `internal/config/`, `internal/ref/`, `internal/resolve/`, `internal/backend/`, `pkg/`
 - All checks pass: `go build`, `go vet`, `go test`, `golangci-lint`
 
