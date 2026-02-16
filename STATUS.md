@@ -1,7 +1,7 @@
 # Project Status
 
 ## Last Completed
-- ENV-065: Added `envref secret generate` command with configurable length and charset [iter-30]
+- ENV-066: Added `envref secret copy` command to copy secrets between projects [iter-31]
 
 ## Current State
 - Go module `github.com/xcke/envref` initialized with Cobra + Viper + go-keyring + testify dependencies
@@ -11,7 +11,7 @@
 - `envref get <KEY>` command loads `.env` + optional profile + `.env.local`, merges, interpolates, prints value
 - `envref set <KEY>=<VALUE>` command writes key-value pairs to .env files
 - `envref list` command prints all merged and interpolated key-value pairs
-- `envref secret set/get/delete/list/generate` — full secret CRUD + generation via configured backends with project namespace
+- `envref secret set/get/delete/list/generate/copy` — full secret CRUD + generation + cross-project copy via configured backends with project namespace
 - `envref resolve` — loads .env + optional profile + .env.local, merges, interpolates, resolves `ref://` references
 - `envref resolve --profile <name>` — uses a named profile's env file in the merge chain
 - `envref resolve --direnv` — outputs `export KEY=VALUE` format for shell integration

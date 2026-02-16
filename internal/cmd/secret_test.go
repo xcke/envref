@@ -1022,6 +1022,191 @@ func TestSecretGenerateCmd_InvalidBackend(t *testing.T) {
 	}
 }
 
+// --- Tests for secret copy ---
+
+func TestSecretCopyCmd_Success(t *testing.T) {
+	dir := t.TempDir()
+	writeTestConfig(t, dir, "destproject")
+
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getting cwd: %v", err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(origDir)
+	})
+
+	root := NewRootCmd()
+	buf := new(bytes.Buffer)
+	errBuf := new(bytes.Buffer)
+	root.SetOut(buf)
+	root.SetErr(errBuf)
+	root.SetArgs([]string{"secret", "copy", "API_KEY", "--from", "srcproject"})
+
+	err = root.Execute()
+	if err != nil {
+		// Expected in CI where keychain is not available.
+		errMsg := err.Error()
+		if contains(errMsg, "accepts 1 arg") || contains(errMsg, "unknown command") {
+			t.Fatalf("command structure error: %v", err)
+		}
+	} else {
+		got := buf.String()
+		want := "secret \"API_KEY\" copied from project \"srcproject\" to \"destproject\" (backend \"keychain\")\n"
+		if got != want {
+			t.Errorf("output: got %q, want %q", got, want)
+		}
+	}
+}
+
+func TestSecretCopyCmd_NoArgs(t *testing.T) {
+	root := NewRootCmd()
+	root.SetOut(new(bytes.Buffer))
+	root.SetErr(new(bytes.Buffer))
+	root.SetArgs([]string{"secret", "copy"})
+
+	err := root.Execute()
+	if err == nil {
+		t.Fatal("expected error for missing argument, got nil")
+	}
+}
+
+func TestSecretCopyCmd_MissingFromFlag(t *testing.T) {
+	root := NewRootCmd()
+	root.SetOut(new(bytes.Buffer))
+	root.SetErr(new(bytes.Buffer))
+	root.SetArgs([]string{"secret", "copy", "API_KEY"})
+
+	err := root.Execute()
+	if err == nil {
+		t.Fatal("expected error for missing --from flag, got nil")
+	}
+	if !contains(err.Error(), "from") {
+		t.Errorf("expected error about --from flag, got: %v", err)
+	}
+}
+
+func TestSecretCopyCmd_NoConfig(t *testing.T) {
+	dir := t.TempDir()
+
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getting cwd: %v", err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(origDir)
+	})
+
+	root := NewRootCmd()
+	root.SetOut(new(bytes.Buffer))
+	root.SetErr(new(bytes.Buffer))
+	root.SetArgs([]string{"secret", "copy", "API_KEY", "--from", "other"})
+
+	err = root.Execute()
+	if err == nil {
+		t.Fatal("expected error when no config found, got nil")
+	}
+	if !contains(err.Error(), "loading config") {
+		t.Errorf("expected config loading error, got: %v", err)
+	}
+}
+
+func TestSecretCopyCmd_NoBackends(t *testing.T) {
+	dir := t.TempDir()
+	content := "project: testproject\n"
+	if err := os.WriteFile(filepath.Join(dir, ".envref.yaml"), []byte(content), 0o644); err != nil {
+		t.Fatalf("writing config: %v", err)
+	}
+
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getting cwd: %v", err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(origDir)
+	})
+
+	root := NewRootCmd()
+	root.SetOut(new(bytes.Buffer))
+	root.SetErr(new(bytes.Buffer))
+	root.SetArgs([]string{"secret", "copy", "API_KEY", "--from", "other"})
+
+	err = root.Execute()
+	if err == nil {
+		t.Fatal("expected error when no backends configured, got nil")
+	}
+	if !contains(err.Error(), "no backends configured") {
+		t.Errorf("expected 'no backends configured' error, got: %v", err)
+	}
+}
+
+func TestSecretCopyCmd_InvalidBackend(t *testing.T) {
+	dir := t.TempDir()
+	writeTestConfig(t, dir, "testproject")
+
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getting cwd: %v", err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(origDir)
+	})
+
+	root := NewRootCmd()
+	root.SetOut(new(bytes.Buffer))
+	root.SetErr(new(bytes.Buffer))
+	root.SetArgs([]string{"secret", "copy", "API_KEY", "--from", "other", "--backend", "nonexistent"})
+
+	err = root.Execute()
+	if err == nil {
+		t.Fatal("expected error for nonexistent backend, got nil")
+	}
+	if !contains(err.Error(), "nonexistent") {
+		t.Errorf("expected error mentioning backend name, got: %v", err)
+	}
+}
+
+func TestSecretCopyCmd_EmptyKey(t *testing.T) {
+	dir := t.TempDir()
+	writeTestConfig(t, dir, "testproject")
+
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getting cwd: %v", err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(origDir)
+	})
+
+	root := NewRootCmd()
+	root.SetOut(new(bytes.Buffer))
+	root.SetErr(new(bytes.Buffer))
+	root.SetArgs([]string{"secret", "copy", "  ", "--from", "other"})
+
+	err = root.Execute()
+	if err == nil {
+		t.Fatal("expected error for empty key, got nil")
+	}
+	if !contains(err.Error(), "key must not be empty") {
+		t.Errorf("expected empty key error, got: %v", err)
+	}
+}
+
 // contains is a simple helper to check for substring presence.
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && searchSubstring(s, substr)

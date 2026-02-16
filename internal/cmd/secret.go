@@ -32,6 +32,7 @@ Secrets are namespaced by project name from .envref.yaml.`,
 	cmd.AddCommand(newSecretDeleteCmd())
 	cmd.AddCommand(newSecretListCmd())
 	cmd.AddCommand(newSecretGenerateCmd())
+	cmd.AddCommand(newSecretCopyCmd())
 
 	return cmd
 }
@@ -596,6 +597,109 @@ func generateBase64(length int) (string, error) {
 		return "", fmt.Errorf("base64 encoding produced fewer characters than expected")
 	}
 	return encoded[:length], nil
+}
+
+// newSecretCopyCmd creates the secret copy subcommand.
+func newSecretCopyCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "copy <KEY>",
+		Short: "Copy a secret from another project",
+		Long: `Copy a secret from another project's namespace into the current project.
+
+The --from flag specifies the source project name. The secret is read from the
+source project's namespace and stored in the current project's namespace using
+the same key name.
+
+By default, the first configured backend from .envref.yaml is used for both
+reading and writing. Use --backend to specify a different backend.
+
+Examples:
+  envref secret copy API_KEY --from other-project             # copy from another project
+  envref secret copy DB_PASS --from staging --backend keychain # specific backend`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			fromProject, _ := cmd.Flags().GetString("from")
+			backendName, _ := cmd.Flags().GetString("backend")
+			return runSecretCopy(cmd, args[0], fromProject, backendName)
+		},
+	}
+
+	cmd.Flags().String("from", "", "source project to copy the secret from (required)")
+	_ = cmd.MarkFlagRequired("from")
+	cmd.Flags().StringP("backend", "b", "", "backend to use for reading and writing (default: first configured)")
+
+	return cmd
+}
+
+// runSecretCopy copies a secret from another project's namespace into the current project.
+func runSecretCopy(cmd *cobra.Command, key, fromProject, backendName string) error {
+	// Validate key.
+	if strings.TrimSpace(key) == "" {
+		return fmt.Errorf("key must not be empty")
+	}
+
+	// Validate source project.
+	if strings.TrimSpace(fromProject) == "" {
+		return fmt.Errorf("--from project must not be empty")
+	}
+
+	// Load project config.
+	cwd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("getting working directory: %w", err)
+	}
+
+	cfg, _, err := config.Load(cwd)
+	if err != nil {
+		return fmt.Errorf("loading config: %w", err)
+	}
+
+	if len(cfg.Backends) == 0 {
+		return fmt.Errorf("no backends configured in %s", config.FullFileName)
+	}
+
+	// Determine target backend.
+	if backendName == "" {
+		backendName = cfg.Backends[0].Name
+	}
+
+	// Build registry with backends.
+	registry, err := buildRegistry(cfg)
+	if err != nil {
+		return fmt.Errorf("initializing backends: %w", err)
+	}
+
+	// Get the raw backend.
+	targetBackend := registry.Backend(backendName)
+	if targetBackend == nil {
+		return fmt.Errorf("backend %q is not registered", backendName)
+	}
+
+	// Create namespaced backend for the source project.
+	srcBackend, err := backend.NewNamespacedBackend(targetBackend, fromProject)
+	if err != nil {
+		return fmt.Errorf("creating source namespace: %w", err)
+	}
+
+	// Create namespaced backend for the current (destination) project.
+	dstBackend, err := backend.NewNamespacedBackend(targetBackend, cfg.Project)
+	if err != nil {
+		return fmt.Errorf("creating destination namespace: %w", err)
+	}
+
+	// Read from source.
+	value, err := srcBackend.Get(key)
+	if err != nil {
+		return fmt.Errorf("reading secret from project %q: %w", fromProject, err)
+	}
+
+	// Write to destination.
+	if err := dstBackend.Set(key, value); err != nil {
+		return fmt.Errorf("storing secret: %w", err)
+	}
+
+	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "secret %q copied from project %q to %q (backend %q)\n", key, fromProject, cfg.Project, backendName)
+	return nil
 }
 
 // buildRegistry creates a backend registry from the config, instantiating

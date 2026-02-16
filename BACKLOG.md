@@ -86,7 +86,7 @@
 - [DONE] P1 | ENV-063 | Add `envref secret list` — list stored secret keys (no values) for current project
 - [DONE] P2 | ENV-064 | Add `envref secret set <key> --value <val>` — non-interactive mode for scripting
 - [DONE] P2 | ENV-065 | Add `envref secret generate <key>` — generate random secret (configurable length, charset)
-- [TODO] P2 | ENV-066 | Add `envref secret copy <key> --from <project>` — copy secret between projects
+- [DONE] P2 | ENV-066 | Add `envref secret copy <key> --from <project>` — copy secret between projects
 - [TODO] P3 | ENV-067 | Add `envref secret rotate <key>` — generate new value, store old in history
 
 ---
