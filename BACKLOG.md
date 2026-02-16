@@ -53,7 +53,7 @@
 
 - [DONE] P1 | ENV-030 | Define `SecretBackend` interface (`Get(key) → value`, `Set(key, value)`, `Delete(key)`, `List()`)
 - [DONE] P1 | ENV-031 | Implement backend registry with ordered fallback chain (try backend 1 → 2 → 3)
-- [TODO] P1 | ENV-032 | Namespace secrets per project (`<project>/<key>`) to avoid collisions
+- [DONE] P1 | ENV-032 | Namespace secrets per project (`<project>/<key>`) to avoid collisions
 
 ### 3b — OS Keychain Backend
 
