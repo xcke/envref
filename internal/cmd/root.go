@@ -38,6 +38,7 @@ from your OS keychain or other secret backends at runtime.`,
 	rootCmd.AddCommand(newRunCmd())
 	rootCmd.AddCommand(newDoctorCmd())
 	rootCmd.AddCommand(newConfigCmd())
+	rootCmd.AddCommand(newCompletionCmd())
 
 	return rootCmd
 }

@@ -1,7 +1,7 @@
 # Project Status
 
 ## Last Completed
-- ENV-036: Added graceful keychain error handling with classified errors and actionable hints [iter-28]
+- ENV-110: Added shell completion command supporting bash, zsh, fish, powershell [iter-29]
 
 ## Current State
 - Go module `github.com/xcke/envref` initialized with Cobra + Viper + go-keyring + testify dependencies
@@ -23,6 +23,7 @@
 - `envref status` — shows environment overview with actionable hints
 - `envref doctor` — scans .env files for common issues
 - `envref config show` — prints resolved effective config (plain, JSON, table formats)
+- `envref completion <shell>` — generates shell completion scripts (bash, zsh, fish, powershell)
 - **Config validation on load:** `Load()` calls `Validate()` automatically, returning `*ValidationError` for semantic errors
 - **Config inheritance:** Global config at `~/.config/envref/config.yaml` merged with project `.envref.yaml`
 - **Output format support:** `--format` flag on `get`, `list`, `resolve`, and `config show` commands (plain, json, shell, table)

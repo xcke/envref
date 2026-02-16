@@ -149,7 +149,7 @@
 
 ## Phase 9 — Developer Experience Polish
 
-- [TODO] P2 | ENV-110 | Add shell completions (`envref completion bash|zsh|fish`)
+- [DONE] P2 | ENV-110 | Add shell completions (`envref completion bash|zsh|fish`)
 - [TODO] P2 | ENV-111 | Add colorized, human-friendly terminal output (with `--no-color` flag)
 - [TODO] P2 | ENV-112 | Add `--quiet` / `--verbose` / `--debug` global flags
 - [TODO] P2 | ENV-113 | Implement fuzzy key matching in error messages ("KEY not found, did you mean API_KEY?")
