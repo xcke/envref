@@ -110,7 +110,7 @@
 - [DONE] P1 | ENV-081 | Ensure `envref resolve --direnv` output is compatible with direnv `eval`
 - [DONE] P2 | ENV-082 | Handle direnv trust/allow flow — prompt user to run `direnv allow` after init
 - [DONE] P2 | ENV-083 | Add `envref resolve --watch` — output on file changes (for direnv reload triggers)
-- [TODO] P2 | ENV-084 | Ensure fast startup (<50ms) for resolve command — benchmark and optimize
+- [DONE] P2 | ENV-084 | Ensure fast startup (<50ms) for resolve command — benchmark and optimize
 - [TODO] P3 | ENV-085 | Add documentation: direnv integration guide with examples
 
 ---
@@ -155,9 +155,9 @@
 - [DONE] P2 | ENV-113 | Implement fuzzy key matching in error messages ("KEY not found, did you mean API_KEY?")
 - [DONE] P2 | ENV-114 | Add `envref run -- <command>` — inject resolved env vars and exec (alternative to direnv)
 - [DONE] P2 | ENV-115 | Add `envref edit` — open `.env` in `$EDITOR`
-- [TODO] P3 | ENV-116 | Add `envref import <file|url>` — import env vars from another format (Docker, Vercel, Heroku)
-- [TODO] P3 | ENV-117 | Add `envref export --format <docker|github|gitlab>` — export for CI platforms
-- [TODO] P3 | ENV-118 | Add interactive TUI mode for browsing/editing (Bubble Tea)
+- [DEFER] P3 | ENV-116 | Add `envref import <file|url>` — import env vars from another format (Docker, Vercel, Heroku)
+- [DEFER] P3 | ENV-117 | Add `envref export --format <docker|github|gitlab>` — export for CI platforms
+- [DEFER] P3 | ENV-118 | Add interactive TUI mode for browsing/editing (Bubble Tea)
 
 ---
 
@@ -180,7 +180,7 @@
 - [TODO] P3 | ENV-134 | Add AUR package
 - [TODO] P3 | ENV-135 | Add Scoop manifest (Windows)
 - [TODO] P3 | ENV-136 | Add Nix flake
-- [TODO] P3 | ENV-137 | Create project website / landing page
+- [TODO] P3 | ENV-137 | Create project website / landing page Shell inspired Github Page landing page for the tool, with excelent documentation
 - [TODO] P3 | ENV-138 | Record demo GIF / asciinema for README
 
 ---
@@ -197,7 +197,6 @@
 - [TODO] P2 | ENV-147 | Set up code coverage reporting
 - [TODO] P3 | ENV-148 | Fuzz testing for `.env` parser
 - [TODO] P3 | ENV-149 | Security audit of secret handling (memory zeroing, no secrets in logs/errors)
-- [TODO] P3 | ENV-150 | Shell inspired Github Page landing page for the tool, with excelent documentation
 ---
 
 ## Milestone Summary

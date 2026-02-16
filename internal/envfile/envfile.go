@@ -18,6 +18,8 @@ type Env struct {
 	entries map[string]parser.Entry
 	// order preserves the insertion order of keys.
 	order []string
+	// refCount tracks the number of ref:// entries for O(1) HasRefs.
+	refCount int
 }
 
 // NewEnv creates an empty Env.
@@ -27,11 +29,29 @@ func NewEnv() *Env {
 	}
 }
 
+// newEnvSized creates an Env pre-sized for the expected number of entries.
+func newEnvSized(n int) *Env {
+	return &Env{
+		entries: make(map[string]parser.Entry, n),
+		order:   make([]string, 0, n),
+	}
+}
+
 // Set adds or replaces an entry. If the key already exists, it is updated
 // in place (preserving order). New keys are appended.
 func (e *Env) Set(entry parser.Entry) {
-	if _, exists := e.entries[entry.Key]; !exists {
+	if existing, exists := e.entries[entry.Key]; exists {
+		// Update ref count if IsRef status changed.
+		if existing.IsRef && !entry.IsRef {
+			e.refCount--
+		} else if !existing.IsRef && entry.IsRef {
+			e.refCount++
+		}
+	} else {
 		e.order = append(e.order, entry.Key)
+		if entry.IsRef {
+			e.refCount++
+		}
 	}
 	e.entries[entry.Key] = entry
 }
@@ -96,12 +116,7 @@ func (e *Env) ResolvedRefs() map[string]ref.Reference {
 
 // HasRefs reports whether the Env contains any ref:// references.
 func (e *Env) HasRefs() bool {
-	for _, key := range e.order {
-		if e.entries[key].IsRef {
-			return true
-		}
-	}
-	return false
+	return e.refCount > 0
 }
 
 // Load reads a .env file from disk and returns an Env with all entries.
@@ -122,7 +137,7 @@ func Load(path string) (*Env, []parser.Warning, error) {
 		return nil, warnings, fmt.Errorf("closing %s: %w", path, closeErr)
 	}
 
-	env := NewEnv()
+	env := newEnvSized(len(entries))
 	for _, entry := range entries {
 		env.Set(entry)
 	}
@@ -144,7 +159,12 @@ func LoadOptional(path string) (*Env, []parser.Warning, error) {
 // applied in order — later overlays win on key conflicts. The base Env
 // is not modified; a new Env is returned.
 func Merge(base *Env, overlays ...*Env) *Env {
-	result := NewEnv()
+	// Estimate capacity: base entries plus overlay entries (some may overlap).
+	capacity := base.Len()
+	for _, overlay := range overlays {
+		capacity += overlay.Len()
+	}
+	result := newEnvSized(capacity)
 
 	// Copy base entries.
 	for _, key := range base.order {

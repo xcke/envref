@@ -1,7 +1,7 @@
 # Project Status
 
 ## Last Completed
-- ENV-083: Added resolve --watch flag to re-resolve on .env file changes [iter-47]
+- ENV-084: Added benchmark tests and optimized resolve pipeline for <50ms startup [iter-48]
 
 ## Current State
 - Go module `github.com/xcke/envref` initialized with Cobra + Viper + go-keyring + age + sqlite + testify + x/term dependencies
@@ -36,6 +36,7 @@
 - **Vault setup flow:** `vault init` stores encrypted verification token; subsequent access verifies passphrase against token; wrong passphrase returns clear error
 - **Interactive passphrase prompt:** secret/resolve/run/status commands prompt for vault passphrase at terminal when not configured via env var or config
 - **Global verbosity flags, colorized output, fuzzy key matching, resolution cache**
+- **Performance benchmarks:** parser, envfile, resolve, config packages all benchmarked; optimizations reduce allocations 20-37% across pipeline
 - **README.md** with project overview, install instructions, quickstart, and command reference
 - `.env` file parser with full quote/multiline/comment/BOM/CRLF support
 - `ref://` URI parser, `Backend` interface, `Registry`, `NamespacedBackend`

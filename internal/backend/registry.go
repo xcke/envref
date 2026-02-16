@@ -52,6 +52,12 @@ func (r *Registry) Backends() []Backend {
 	return out
 }
 
+// BackendsIter returns the internal backend slice for read-only iteration.
+// The caller must not modify the returned slice.
+func (r *Registry) BackendsIter() []Backend {
+	return r.backends
+}
+
 // Get retrieves a secret by trying each backend in registration order.
 // Returns the value from the first backend that has the key.
 // If no backend has the key, returns ErrNotFound.

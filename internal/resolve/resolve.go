@@ -85,8 +85,9 @@ func ResolveWithProfile(env *envfile.Env, registry *backend.Registry, project, p
 	}
 
 	// Build project-scoped namespaced wrappers for each backend.
-	nsBackends := make(map[string]*backend.NamespacedBackend)
-	for _, b := range registry.Backends() {
+	backends := registry.BackendsIter()
+	nsBackends := make(map[string]*backend.NamespacedBackend, len(backends))
+	for _, b := range backends {
 		ns, err := backend.NewNamespacedBackend(b, project)
 		if err != nil {
 			return nil, fmt.Errorf("wrapping backend %q: %w", b.Name(), err)
@@ -106,8 +107,8 @@ func ResolveWithProfile(env *envfile.Env, registry *backend.Registry, project, p
 	var profileBackends map[string]*backend.NamespacedBackend
 	var profileRegistry *backend.Registry
 	if profile != "" {
-		profileBackends = make(map[string]*backend.NamespacedBackend)
-		for _, b := range registry.Backends() {
+		profileBackends = make(map[string]*backend.NamespacedBackend, len(backends))
+		for _, b := range backends {
 			ns, err := backend.NewProfileNamespacedBackend(b, project, profile)
 			if err != nil {
 				return nil, fmt.Errorf("wrapping backend %q for profile %q: %w", b.Name(), profile, err)
@@ -131,8 +132,11 @@ func ResolveWithProfile(env *envfile.Env, registry *backend.Registry, project, p
 	}
 	cache := make(map[string]cachedResult)
 
-	result := &Result{}
-	for _, envEntry := range env.All() {
+	allEntries := env.All()
+	result := &Result{
+		Entries: make([]Entry, 0, len(allEntries)),
+	}
+	for _, envEntry := range allEntries {
 		if !envEntry.IsRef {
 			result.Entries = append(result.Entries, Entry{
 				Key:    envEntry.Key,
