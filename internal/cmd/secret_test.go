@@ -273,6 +273,226 @@ func TestSecretSetCmd_EmptyStdin(t *testing.T) {
 	}
 }
 
+func TestSecretDeleteCmd_WithForceFlag(t *testing.T) {
+	dir := t.TempDir()
+	writeTestConfig(t, dir, "testproject")
+
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getting cwd: %v", err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(origDir)
+	})
+
+	root := NewRootCmd()
+	buf := new(bytes.Buffer)
+	errBuf := new(bytes.Buffer)
+	root.SetOut(buf)
+	root.SetErr(errBuf)
+	root.SetArgs([]string{"secret", "delete", "API_KEY", "--force"})
+
+	err = root.Execute()
+	if err != nil {
+		// Expected in CI where keychain is not available.
+		// Verify it's a backend error, not a command structure error.
+		errMsg := err.Error()
+		if contains(errMsg, "accepts 1 arg") || contains(errMsg, "unknown command") {
+			t.Fatalf("command structure error: %v", err)
+		}
+	} else {
+		got := buf.String()
+		if got != "secret \"API_KEY\" deleted from backend \"keychain\"\n" {
+			t.Errorf("output: got %q, want %q", got, "secret \"API_KEY\" deleted from backend \"keychain\"\n")
+		}
+	}
+}
+
+func TestSecretDeleteCmd_ConfirmYes(t *testing.T) {
+	dir := t.TempDir()
+	writeTestConfig(t, dir, "testproject")
+
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getting cwd: %v", err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(origDir)
+	})
+
+	root := NewRootCmd()
+	buf := new(bytes.Buffer)
+	errBuf := new(bytes.Buffer)
+	root.SetOut(buf)
+	root.SetErr(errBuf)
+	root.SetIn(bytes.NewBufferString("y\n"))
+	root.SetArgs([]string{"secret", "delete", "API_KEY"})
+
+	err = root.Execute()
+	if err != nil {
+		errMsg := err.Error()
+		if contains(errMsg, "accepts 1 arg") || contains(errMsg, "unknown command") {
+			t.Fatalf("command structure error: %v", err)
+		}
+	} else {
+		got := buf.String()
+		if got != "secret \"API_KEY\" deleted from backend \"keychain\"\n" {
+			t.Errorf("output: got %q, want %q", got, "secret \"API_KEY\" deleted from backend \"keychain\"\n")
+		}
+	}
+
+	// Verify prompt was written to stderr.
+	if !contains(errBuf.String(), "Delete secret") {
+		t.Errorf("expected confirmation prompt in stderr, got %q", errBuf.String())
+	}
+}
+
+func TestSecretDeleteCmd_ConfirmNo(t *testing.T) {
+	dir := t.TempDir()
+	writeTestConfig(t, dir, "testproject")
+
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getting cwd: %v", err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(origDir)
+	})
+
+	root := NewRootCmd()
+	buf := new(bytes.Buffer)
+	errBuf := new(bytes.Buffer)
+	root.SetOut(buf)
+	root.SetErr(errBuf)
+	root.SetIn(bytes.NewBufferString("n\n"))
+	root.SetArgs([]string{"secret", "delete", "API_KEY"})
+
+	err = root.Execute()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Should not have deleted — no output on stdout.
+	if buf.String() != "" {
+		t.Errorf("expected no stdout output for cancelled deletion, got %q", buf.String())
+	}
+
+	// Stderr should contain cancellation message.
+	if !contains(errBuf.String(), "deletion cancelled") {
+		t.Errorf("expected cancellation message in stderr, got %q", errBuf.String())
+	}
+}
+
+func TestSecretDeleteCmd_NoArgs(t *testing.T) {
+	root := NewRootCmd()
+	root.SetOut(new(bytes.Buffer))
+	root.SetErr(new(bytes.Buffer))
+	root.SetArgs([]string{"secret", "delete"})
+
+	err := root.Execute()
+	if err == nil {
+		t.Fatal("expected error for missing argument, got nil")
+	}
+}
+
+func TestSecretDeleteCmd_NoConfig(t *testing.T) {
+	dir := t.TempDir()
+
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getting cwd: %v", err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(origDir)
+	})
+
+	root := NewRootCmd()
+	root.SetOut(new(bytes.Buffer))
+	root.SetErr(new(bytes.Buffer))
+	root.SetArgs([]string{"secret", "delete", "API_KEY", "--force"})
+
+	err = root.Execute()
+	if err == nil {
+		t.Fatal("expected error when no config found, got nil")
+	}
+	if !contains(err.Error(), "loading config") {
+		t.Errorf("expected config loading error, got: %v", err)
+	}
+}
+
+func TestSecretDeleteCmd_NoBackends(t *testing.T) {
+	dir := t.TempDir()
+	content := "project: testproject\n"
+	if err := os.WriteFile(filepath.Join(dir, ".envref.yaml"), []byte(content), 0o644); err != nil {
+		t.Fatalf("writing config: %v", err)
+	}
+
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getting cwd: %v", err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(origDir)
+	})
+
+	root := NewRootCmd()
+	root.SetOut(new(bytes.Buffer))
+	root.SetErr(new(bytes.Buffer))
+	root.SetArgs([]string{"secret", "delete", "API_KEY", "--force"})
+
+	err = root.Execute()
+	if err == nil {
+		t.Fatal("expected error when no backends configured, got nil")
+	}
+	if !contains(err.Error(), "no backends configured") {
+		t.Errorf("expected 'no backends configured' error, got: %v", err)
+	}
+}
+
+func TestSecretDeleteCmd_InvalidBackend(t *testing.T) {
+	dir := t.TempDir()
+	writeTestConfig(t, dir, "testproject")
+
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getting cwd: %v", err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(origDir)
+	})
+
+	root := NewRootCmd()
+	root.SetOut(new(bytes.Buffer))
+	root.SetErr(new(bytes.Buffer))
+	root.SetArgs([]string{"secret", "delete", "API_KEY", "--force", "--backend", "nonexistent"})
+
+	err = root.Execute()
+	if err == nil {
+		t.Fatal("expected error for nonexistent backend, got nil")
+	}
+	if !contains(err.Error(), "nonexistent") {
+		t.Errorf("expected error mentioning backend name, got: %v", err)
+	}
+}
+
 // contains is a simple helper to check for substring presence.
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && searchSubstring(s, substr)

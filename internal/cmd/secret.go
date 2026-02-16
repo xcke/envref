@@ -25,6 +25,7 @@ Secrets are namespaced by project name from .envref.yaml.`,
 
 	cmd.AddCommand(newSecretSetCmd())
 	cmd.AddCommand(newSecretGetCmd())
+	cmd.AddCommand(newSecretDeleteCmd())
 
 	return cmd
 }
@@ -105,6 +106,104 @@ func runSecretGet(cmd *cobra.Command, key, backendName string) error {
 	}
 
 	_, _ = fmt.Fprintln(cmd.OutOrStdout(), value)
+	return nil
+}
+
+// newSecretDeleteCmd creates the secret delete subcommand.
+func newSecretDeleteCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "delete <KEY>",
+		Short: "Delete a secret from a backend",
+		Long: `Delete a secret from the configured backend for the current project.
+
+By default, you will be prompted to confirm the deletion. Use --force to skip
+the confirmation prompt.
+
+The first backend from .envref.yaml is used by default.
+Use --backend to specify a different backend.
+
+Examples:
+  envref secret delete API_KEY                    # delete with confirmation
+  envref secret delete API_KEY --force            # delete without confirmation
+  envref secret delete DB_PASS --backend keychain # delete from specific backend`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			backendName, _ := cmd.Flags().GetString("backend")
+			force, _ := cmd.Flags().GetBool("force")
+			return runSecretDelete(cmd, args[0], backendName, force)
+		},
+	}
+
+	cmd.Flags().StringP("backend", "b", "", "backend to delete the secret from (default: first configured)")
+	cmd.Flags().BoolP("force", "f", false, "skip confirmation prompt")
+
+	return cmd
+}
+
+// runSecretDelete removes a secret from the configured backend.
+func runSecretDelete(cmd *cobra.Command, key, backendName string, force bool) error {
+	// Validate key.
+	if strings.TrimSpace(key) == "" {
+		return fmt.Errorf("key must not be empty")
+	}
+
+	// Load project config.
+	cwd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("getting working directory: %w", err)
+	}
+
+	cfg, _, err := config.Load(cwd)
+	if err != nil {
+		return fmt.Errorf("loading config: %w", err)
+	}
+
+	if len(cfg.Backends) == 0 {
+		return fmt.Errorf("no backends configured in %s", config.FullFileName)
+	}
+
+	// Determine target backend.
+	if backendName == "" {
+		backendName = cfg.Backends[0].Name
+	}
+
+	// Build registry with backends.
+	registry, err := buildRegistry(cfg)
+	if err != nil {
+		return fmt.Errorf("initializing backends: %w", err)
+	}
+
+	// Wrap the target backend with project namespace.
+	targetBackend := registry.Backend(backendName)
+	if targetBackend == nil {
+		return fmt.Errorf("backend %q is not registered", backendName)
+	}
+
+	nsBackend, err := backend.NewNamespacedBackend(targetBackend, cfg.Project)
+	if err != nil {
+		return fmt.Errorf("creating namespaced backend: %w", err)
+	}
+
+	// Confirm deletion unless --force is set.
+	if !force {
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Delete secret %q from backend %q? [y/N] ", key, backendName)
+		answer, err := readLine(cmd.InOrStdin())
+		if err != nil {
+			return fmt.Errorf("reading confirmation: %w", err)
+		}
+		answer = strings.TrimSpace(strings.ToLower(answer))
+		if answer != "y" && answer != "yes" {
+			_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "deletion cancelled")
+			return nil
+		}
+	}
+
+	// Delete the secret.
+	if err := nsBackend.Delete(key); err != nil {
+		return fmt.Errorf("deleting secret: %w", err)
+	}
+
+	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "secret %q deleted from backend %q\n", key, backendName)
 	return nil
 }
 
