@@ -1,7 +1,7 @@
 # Project Status
 
 ## Last Completed
-- ENV-043: Added vault export/import commands for backup and migration [iter-54]
+- ENV-105: Added envref audit command with entropy analysis and pattern matching for plaintext secrets [iter-55]
 
 ## Current State
 - Go module `github.com/xcke/envref` initialized with Cobra + Viper + go-keyring + age + sqlite + testify + x/term dependencies
@@ -24,6 +24,7 @@
 - `envref validate` — checks .env against .env.example schema with `--ci` and `--schema` modes
 - `envref status` — shows environment overview with actionable hints
 - `envref doctor` — scans .env files for common issues
+- `envref audit` — warns about plaintext secrets via pattern matching (15 known formats), key name heuristics, and Shannon entropy analysis; `--min-entropy` flag for tuning; CI-safe exit codes
 - `envref config show` — prints resolved effective config (plain, JSON, table formats)
 - `envref completion <shell>` — generates shell completion scripts (bash, zsh, fish, powershell)
 - `envref edit` — opens .env files in `$VISUAL`/`$EDITOR`
