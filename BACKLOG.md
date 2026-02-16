@@ -188,7 +188,7 @@
 - [DONE] P1 | ENV-140 | Unit tests for `.env` parser (edge cases, multiline, quotes, comments)
 - [DONE] P1 | ENV-141 | Unit tests for merge logic (override precedence, ref detection)
 - [DONE] P1 | ENV-142 | Unit tests for resolution pipeline (mock backends)
-- [TODO] P1 | ENV-143 | Integration tests for CLI commands (cobra test helpers)
+- [DONE] P1 | ENV-143 | Integration tests for CLI commands (cobra test helpers)
 - [TODO] P2 | ENV-144 | Integration tests for keychain backend (platform-specific CI matrix)
 - [TODO] P2 | ENV-145 | Integration tests for direnv integration (end-to-end shell test)
 - [TODO] P2 | ENV-146 | Benchmark `envref resolve` — target <50ms for 100 vars

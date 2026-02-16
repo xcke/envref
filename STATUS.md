@@ -1,7 +1,7 @@
 # Project Status
 
 ## Last Completed
-- ENV-142: Added comprehensive unit tests for resolution pipeline — 50+ test cases covering input validation, direct backend match, fallback chain (first wins, three backends, not found), missing secrets, invalid ref URIs, mixed resolution (partial success), project namespace separation, nested paths, backend connection errors, order preservation, special characters, large envs (500 entries), duplicate ref paths, cross-backend resolution, error isolation, WasRef flag semantics, error message formatting, repeated calls, and table-driven scenarios [iter-12]
+- ENV-143: Added comprehensive integration tests for CLI commands — 40+ test cases covering end-to-end workflows (init→set→get→list→resolve chains), command wiring and help output for all commands/subcommands, argument validation, init with --force/--direnv flags, set→get roundtrips, local override precedence, variable interpolation across merged files, ref:// masking in list output, secret command validation paths (no config, no backends, invalid backend, stdin prompts, deletion cancellation), resolve with plain/direnv output, config discovery from subdirectories, key order preservation, special characters, and quoted values [iter-13]
 
 ## Current State
 - Go module `github.com/xcke/envref` initialized with Cobra + Viper + go-keyring + testify dependencies
@@ -30,6 +30,7 @@
 - **Parser test coverage: 100+ test cases** covering all quote styles, edge cases, multiline, escapes, BOM, CRLF, duplicates, unicode, large inputs, and real-world mixed files
 - **Merge test coverage: 38+ test cases** covering override precedence, ref detection, immutability, order preservation, edge cases, three-way profile merges, merge+interpolate interaction, file-loaded merges, and ResolvedRefs verification
 - **Resolve test coverage: 50+ test cases** covering input validation, direct/fallback resolution, error handling, namespace isolation, special characters, large envs, and all error paths
+- **Integration test coverage: 40+ test cases** covering end-to-end CLI workflows, multi-command chains, error paths, and cross-command state verification
 - Directory structure: `cmd/envref/`, `internal/cmd/`, `internal/parser/`, `internal/envfile/`, `internal/config/`, `internal/ref/`, `internal/resolve/`, `internal/backend/`, `pkg/`
 - All checks pass: `go build`, `go vet`, `go test`, `golangci-lint`
 
