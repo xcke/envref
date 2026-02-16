@@ -843,7 +843,31 @@ func createBackend(bc config.BackendConfig) (backend.Backend, error) {
 	switch bc.EffectiveType() {
 	case "keychain":
 		return backend.NewKeychainBackend(), nil
+	case "vault":
+		return createVaultBackend(bc)
 	default:
 		return nil, fmt.Errorf("unknown backend type %q", bc.EffectiveType())
 	}
+}
+
+// createVaultBackend creates a VaultBackend from the backend config.
+// The passphrase is resolved in order: ENVREF_VAULT_PASSPHRASE env var,
+// then config.passphrase from .envref.yaml. Returns an error if no
+// passphrase is available.
+func createVaultBackend(bc config.BackendConfig) (*backend.VaultBackend, error) {
+	// Resolve passphrase: env var takes precedence over config.
+	passphrase := os.Getenv("ENVREF_VAULT_PASSPHRASE")
+	if passphrase == "" {
+		passphrase = bc.Config["passphrase"]
+	}
+	if passphrase == "" {
+		return nil, fmt.Errorf("vault passphrase required: set ENVREF_VAULT_PASSPHRASE or config.passphrase in .envref.yaml")
+	}
+
+	var opts []backend.VaultOption
+	if path := bc.Config["path"]; path != "" {
+		opts = append(opts, backend.WithVaultPath(path))
+	}
+
+	return backend.NewVaultBackend(passphrase, opts...)
 }

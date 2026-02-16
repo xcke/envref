@@ -1,10 +1,10 @@
 # Project Status
 
 ## Last Completed
-- ENV-007: Added README.md with project overview, install instructions, and quickstart [iter-43]
+- ENV-040: Implemented local encrypted vault backend with SQLite + age encryption [iter-44]
 
 ## Current State
-- Go module `github.com/xcke/envref` initialized with Cobra + Viper + go-keyring + testify dependencies
+- Go module `github.com/xcke/envref` initialized with Cobra + Viper + go-keyring + age + sqlite + testify dependencies
 - Root command with help text describing envref's purpose
 - `envref version` subcommand prints version (set via `-ldflags` at build time)
 - `envref init` command scaffolds new envref projects (`.envref.yaml`, `.env`, `.env.local`, optional `.envrc`)
@@ -26,10 +26,12 @@
 - `envref config show` — prints resolved effective config (plain, JSON, table formats)
 - `envref completion <shell>` — generates shell completion scripts (bash, zsh, fish, powershell)
 - `envref edit` — opens .env files in `$VISUAL`/`$EDITOR`
+- **Two secret backends:** `KeychainBackend` (OS keychain via go-keyring) and `VaultBackend` (local SQLite + age encryption)
+- **VaultBackend:** per-value age scrypt encryption, passphrase via `ENVREF_VAULT_PASSPHRASE` env var or `config.passphrase`, configurable DB path, lazy connection, WAL mode
 - **Global verbosity flags, colorized output, fuzzy key matching, resolution cache**
 - **README.md** with project overview, install instructions, quickstart, and command reference
 - `.env` file parser with full quote/multiline/comment/BOM/CRLF support
-- `ref://` URI parser, `Backend` interface, `Registry`, `NamespacedBackend`, `KeychainBackend`
+- `ref://` URI parser, `Backend` interface, `Registry`, `NamespacedBackend`
 - GoReleaser config, GitHub Actions CI pipeline, Makefile
 - Comprehensive test coverage across all packages
 - All checks pass: `go build`, `go vet`, `go test`, `golangci-lint`
