@@ -75,7 +75,7 @@
 - [DONE] P3 | ENV-052 | Implement AWS SSM Parameter Store backend and Oracle OCI Vault store backend
 - [DONE] P3 | ENV-053 | Implement HashiCorp Vault backend
 - [DONE] P3 | ENV-054 | Define plugin interface for community-contributed backends
-- [TODO] P1 | ENV-115 | Document the backends uses with examples
+- [DONE] P1 | ENV-115 | Document the backends uses with examples
 ---
 
 ## Phase 4 — Secret Management Commands

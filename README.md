@@ -174,12 +174,19 @@ Lookup order (with --profile staging):
   2. my-app/api_key           <- project-scoped (fallback)
 ```
 
-Two backends are built in:
+Seven backend types are supported (two built-in, four via CLI wrappers, plus a plugin system):
 
-| Backend | Storage | Encryption | Use case |
-|---------|---------|-----------|----------|
-| `keychain` | OS keychain (macOS Keychain, Linux Secret Service, Windows Credential Manager) | OS-managed | Default — zero setup |
-| `vault` | Local SQLite at `~/.config/envref/vault.db` | age scrypt per-value | Fallback when keychain unavailable |
+| Backend | Type | Storage | Use case |
+|---------|------|---------|----------|
+| OS Keychain | `keychain` | macOS Keychain / Linux Secret Service / Windows Credential Manager | Default — zero setup |
+| Local Vault | `vault` | SQLite + age encryption | Headless servers, containers, CI |
+| 1Password | `1password` | 1Password vault via `op` CLI | Teams using 1Password |
+| AWS SSM | `aws-ssm` | AWS Systems Manager Parameter Store | AWS infrastructure |
+| HashiCorp Vault | `hashicorp-vault` | Vault KV v2 secrets engine | Enterprise secret management |
+| OCI Vault | `oci-vault` | Oracle Cloud Infrastructure Vault | Oracle Cloud workloads |
+| Plugin | `plugin` | Custom external executable | Any secret store via JSON protocol |
+
+See [docs/secret-backends.md](docs/secret-backends.md) for detailed configuration and examples.
 
 ### Project structure
 
@@ -191,7 +198,7 @@ internal/
   envfile/               Env container, merge, interpolation
   ref/                   ref:// URI parser
   resolve/               Reference resolution pipeline
-  backend/               Backend interface + keychain/vault implementations
+  backend/               Backend interface + 7 backend implementations
   config/                .envref.yaml loader (Viper)
   schema/                .env.schema.json validator
   suggest/               Fuzzy key matching (Levenshtein)

@@ -1,7 +1,7 @@
 # Project Status
 
 ## Last Completed
-- ENV-124: Added audit log for tracking secret operations (set, delete, generate, rotate, copy, import) [iter-71]
+- ENV-115: Documented all seven backend types with configuration, examples, and troubleshooting [iter-72]
 
 ## Current State
 - Go module `github.com/xcke/envref` initialized with Cobra + Viper + go-keyring + age + sqlite + testify + x/term dependencies
@@ -37,6 +37,7 @@
 - **`envref team list/add/remove`** — manage team members and their age public keys in `.envref.yaml`
 - **`envref onboard`** — interactive setup for new team members; identifies missing/unresolved secrets, prompts for values, stores in backend; supports `--dry-run`, `--profile`, `--backend` flags; also checks `.env.example` for missing keys
 - **Seven backend types:** `KeychainBackend` (OS keychain via go-keyring), `VaultBackend` (local SQLite + age encryption), `OnePasswordBackend` (1Password via `op` CLI), `AWSSSMBackend` (AWS SSM Parameter Store via `aws` CLI), `OCIVaultBackend` (Oracle OCI Vault via `oci` CLI), `HashiVaultBackend` (HashiCorp Vault via `vault` CLI), and `PluginBackend` (external executables via JSON protocol)
+- **Backend documentation:** Comprehensive docs for all 7 backend types with configuration tables, prerequisites, usage examples, multi-backend patterns, plugin protocol spec, and troubleshooting
 - **Audit log:** All secret mutations (set, delete, generate, rotate, copy, import) are logged to `.envref.audit.log` with timestamp, user, operation, key, backend, project, and profile; `AuditBackend` wrapper available for programmatic use
 - **Team config:** `.envref.yaml` supports a `team` section with member names and age public keys; validated on load (unique names/keys, age1... format)
 - **Nested references:** `${ref://secrets/key}` in values and embedded `ref://` URIs after interpolation are resolved via a second pass in the resolution pipeline
