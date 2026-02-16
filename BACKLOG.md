@@ -117,10 +117,12 @@
 
 ## Phase 7 — Profiles (Environment Switching)
 
-- [TODO] P1 | ENV-090 | Define profile structure (`.env.development`, `.env.staging`, `.env.production`)
+- [DONE] P1 | ENV-090 | Define profile structure (`.env.development`, `.env.staging`, `.env.production`)
+  Plan: Added ActiveProfile field to Config, ProfileEnvFile/HasProfile/EffectiveProfile methods,
+  --profile flag on resolve, --profile-file on get/list, updated loadAndMergeEnv for 3-layer merge.
 - [TODO] P1 | ENV-091 | Add `envref profile list` — show available profiles
 - [TODO] P1 | ENV-092 | Add `envref profile use <name>` — set active profile (stored in `.envref.yaml` or `.envref.local`)
-- [TODO] P1 | ENV-093 | Update resolve pipeline to load base `.env` ← profile `.env.<name>` ← `.env.local`
+- [DONE] P1 | ENV-093 | Update resolve pipeline to load base `.env` ← profile `.env.<name>` ← `.env.local`
 - [TODO] P2 | ENV-094 | Add `envref profile create <name>` — scaffold new profile file
 - [TODO] P2 | ENV-095 | Add `envref profile diff <a> <b>` — show key/value differences between profiles
 - [TODO] P2 | ENV-096 | Support profile-scoped secrets (`<project>/<profile>/<key>`)
@@ -195,7 +197,7 @@
 - [TODO] P2 | ENV-147 | Set up code coverage reporting
 - [TODO] P3 | ENV-148 | Fuzz testing for `.env` parser
 - [TODO] P3 | ENV-149 | Security audit of secret handling (memory zeroing, no secrets in logs/errors)
-
+- [TODO] P3 | ENV-150 | Shell inspired Github Page landing page for the tool, with excelent documentation
 ---
 
 ## Milestone Summary

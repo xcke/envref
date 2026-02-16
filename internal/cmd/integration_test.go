@@ -1146,3 +1146,265 @@ func TestIntegration_InitThenResolve_ConfigLoads(t *testing.T) {
 		t.Errorf("resolve should output init defaults, got:\n%s", stdout)
 	}
 }
+
+// --- Profile Support ---------------------------------------------------------
+
+func TestIntegration_GetWithProfileFile(t *testing.T) {
+	dir := t.TempDir()
+	writeTestFile(t, dir, ".env", "HOST=prod.example.com\nPORT=443\n")
+	writeTestFile(t, dir, ".env.staging", "HOST=staging.example.com\nPORT=8443\n")
+
+	envPath := filepath.Join(dir, ".env")
+	profilePath := filepath.Join(dir, ".env.staging")
+	localPath := filepath.Join(dir, ".env.local")
+
+	// Get HOST should return the profile value (profile overrides base).
+	stdout, _, err := execCmd(t, "get", "HOST",
+		"--file", envPath,
+		"--profile-file", profilePath,
+		"--local-file", localPath)
+	if err != nil {
+		t.Fatalf("get HOST with profile: %v", err)
+	}
+	if strings.TrimSpace(stdout) != "staging.example.com" {
+		t.Errorf("expected staging.example.com, got %q", strings.TrimSpace(stdout))
+	}
+}
+
+func TestIntegration_GetWithProfileFile_LocalWins(t *testing.T) {
+	dir := t.TempDir()
+	writeTestFile(t, dir, ".env", "HOST=prod.example.com\n")
+	writeTestFile(t, dir, ".env.staging", "HOST=staging.example.com\n")
+	writeTestFile(t, dir, ".env.local", "HOST=localhost\n")
+
+	envPath := filepath.Join(dir, ".env")
+	profilePath := filepath.Join(dir, ".env.staging")
+	localPath := filepath.Join(dir, ".env.local")
+
+	// Local should win over profile.
+	stdout, _, err := execCmd(t, "get", "HOST",
+		"--file", envPath,
+		"--profile-file", profilePath,
+		"--local-file", localPath)
+	if err != nil {
+		t.Fatalf("get HOST: %v", err)
+	}
+	if strings.TrimSpace(stdout) != "localhost" {
+		t.Errorf("expected localhost (local wins), got %q", strings.TrimSpace(stdout))
+	}
+}
+
+func TestIntegration_ListWithProfileFile(t *testing.T) {
+	dir := t.TempDir()
+	writeTestFile(t, dir, ".env", "HOST=prod\nPORT=443\n")
+	writeTestFile(t, dir, ".env.staging", "HOST=staging\nDB_HOST=staging-db\n")
+
+	envPath := filepath.Join(dir, ".env")
+	profilePath := filepath.Join(dir, ".env.staging")
+	localPath := filepath.Join(dir, ".env.local")
+
+	stdout, _, err := execCmd(t, "list",
+		"--file", envPath,
+		"--profile-file", profilePath,
+		"--local-file", localPath)
+	if err != nil {
+		t.Fatalf("list with profile: %v", err)
+	}
+
+	// HOST should be overridden by profile.
+	if !strings.Contains(stdout, "HOST=staging") {
+		t.Errorf("expected HOST=staging, got:\n%s", stdout)
+	}
+	// PORT should remain from base.
+	if !strings.Contains(stdout, "PORT=443") {
+		t.Errorf("expected PORT=443, got:\n%s", stdout)
+	}
+	// DB_HOST added by profile.
+	if !strings.Contains(stdout, "DB_HOST=staging-db") {
+		t.Errorf("expected DB_HOST=staging-db, got:\n%s", stdout)
+	}
+}
+
+func TestIntegration_ResolveWithProfile(t *testing.T) {
+	dir := t.TempDir()
+
+	// Config with active_profile.
+	cfgContent := `project: testproject
+active_profile: staging
+profiles:
+  staging:
+    env_file: .env.staging
+  production:
+    env_file: .env.production
+`
+	writeTestFile(t, dir, config.FullFileName, cfgContent)
+	writeTestFile(t, dir, ".env", "HOST=prod\nPORT=443\n")
+	writeTestFile(t, dir, ".env.staging", "HOST=staging.example.com\nSTAGING_ONLY=true\n")
+	chdir(t, dir)
+
+	stdout, _, err := execCmd(t, "resolve")
+	if err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+
+	if !strings.Contains(stdout, "HOST=staging.example.com") {
+		t.Errorf("resolve should use staging profile, got:\n%s", stdout)
+	}
+	if !strings.Contains(stdout, "PORT=443") {
+		t.Errorf("resolve should keep base PORT, got:\n%s", stdout)
+	}
+	if !strings.Contains(stdout, "STAGING_ONLY=true") {
+		t.Errorf("resolve should include staging-only var, got:\n%s", stdout)
+	}
+}
+
+func TestIntegration_ResolveWithProfileFlag_OverridesConfig(t *testing.T) {
+	dir := t.TempDir()
+
+	// Config with active_profile=staging, but we'll override with --profile=production.
+	cfgContent := `project: testproject
+active_profile: staging
+profiles:
+  staging:
+    env_file: .env.staging
+  production:
+    env_file: .env.production
+`
+	writeTestFile(t, dir, config.FullFileName, cfgContent)
+	writeTestFile(t, dir, ".env", "HOST=default\n")
+	writeTestFile(t, dir, ".env.staging", "HOST=staging\n")
+	writeTestFile(t, dir, ".env.production", "HOST=production\n")
+	chdir(t, dir)
+
+	stdout, _, err := execCmd(t, "resolve", "--profile", "production")
+	if err != nil {
+		t.Fatalf("resolve --profile production: %v", err)
+	}
+
+	if !strings.Contains(stdout, "HOST=production") {
+		t.Errorf("--profile flag should override config active_profile, got:\n%s", stdout)
+	}
+}
+
+func TestIntegration_ResolveWithProfile_LocalWins(t *testing.T) {
+	dir := t.TempDir()
+
+	cfgContent := `project: testproject
+active_profile: staging
+profiles:
+  staging:
+    env_file: .env.staging
+`
+	writeTestFile(t, dir, config.FullFileName, cfgContent)
+	writeTestFile(t, dir, ".env", "HOST=prod\nPORT=443\n")
+	writeTestFile(t, dir, ".env.staging", "HOST=staging\nPORT=8443\n")
+	writeTestFile(t, dir, ".env.local", "HOST=localhost\n")
+	chdir(t, dir)
+
+	stdout, _, err := execCmd(t, "resolve")
+	if err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+
+	// Local should win: .env ← .env.staging ← .env.local.
+	if !strings.Contains(stdout, "HOST=localhost") {
+		t.Errorf("local should override profile, got:\n%s", stdout)
+	}
+	// PORT from staging (not overridden by local).
+	if !strings.Contains(stdout, "PORT=8443") {
+		t.Errorf("PORT should come from staging profile, got:\n%s", stdout)
+	}
+}
+
+func TestIntegration_ResolveWithProfile_MissingProfileFile(t *testing.T) {
+	dir := t.TempDir()
+
+	// Profile file doesn't exist — should work (profile is optional like .env.local).
+	cfgContent := `project: testproject
+profiles:
+  staging:
+    env_file: .env.staging
+`
+	writeTestFile(t, dir, config.FullFileName, cfgContent)
+	writeTestFile(t, dir, ".env", "HOST=prod\nPORT=443\n")
+	chdir(t, dir)
+
+	stdout, _, err := execCmd(t, "resolve", "--profile", "staging")
+	if err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+
+	// Should fall through to base values since profile file is missing.
+	if !strings.Contains(stdout, "HOST=prod") {
+		t.Errorf("should use base value when profile file missing, got:\n%s", stdout)
+	}
+}
+
+func TestIntegration_ResolveWithProfile_ConventionNaming(t *testing.T) {
+	dir := t.TempDir()
+
+	// Profile not defined in profiles map; should still use .env.<name> convention.
+	cfgContent := `project: testproject
+`
+	writeTestFile(t, dir, config.FullFileName, cfgContent)
+	writeTestFile(t, dir, ".env", "HOST=default\n")
+	writeTestFile(t, dir, ".env.staging", "HOST=staging\n")
+	chdir(t, dir)
+
+	stdout, _, err := execCmd(t, "resolve", "--profile", "staging")
+	if err != nil {
+		t.Fatalf("resolve --profile staging: %v", err)
+	}
+
+	if !strings.Contains(stdout, "HOST=staging") {
+		t.Errorf("convention-named profile should work, got:\n%s", stdout)
+	}
+}
+
+func TestIntegration_ResolveWithProfile_DirenvOutput(t *testing.T) {
+	dir := t.TempDir()
+
+	cfgContent := `project: testproject
+active_profile: staging
+profiles:
+  staging:
+    env_file: .env.staging
+`
+	writeTestFile(t, dir, config.FullFileName, cfgContent)
+	writeTestFile(t, dir, ".env", "HOST=prod\n")
+	writeTestFile(t, dir, ".env.staging", "HOST=staging host\n")
+	chdir(t, dir)
+
+	stdout, _, err := execCmd(t, "resolve", "--direnv")
+	if err != nil {
+		t.Fatalf("resolve --direnv: %v", err)
+	}
+
+	if !strings.Contains(stdout, "export HOST='staging host'") {
+		t.Errorf("direnv output should quote profile values, got:\n%s", stdout)
+	}
+}
+
+func TestIntegration_ResolveWithProfile_InterpolationAcrossLayers(t *testing.T) {
+	dir := t.TempDir()
+
+	cfgContent := `project: testproject
+profiles:
+  staging:
+    env_file: .env.staging
+`
+	writeTestFile(t, dir, config.FullFileName, cfgContent)
+	writeTestFile(t, dir, ".env", "DB_HOST=default-db\nDB_PORT=5432\nDB_URL=postgres://${DB_HOST}:${DB_PORT}/app\n")
+	writeTestFile(t, dir, ".env.staging", "DB_HOST=staging-db\n")
+	chdir(t, dir)
+
+	stdout, _, err := execCmd(t, "resolve", "--profile", "staging")
+	if err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+
+	// DB_URL should interpolate using the staging DB_HOST.
+	if !strings.Contains(stdout, "DB_URL=postgres://staging-db:5432/app") {
+		t.Errorf("interpolation should use profile overrides, got:\n%s", stdout)
+	}
+}

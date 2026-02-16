@@ -37,6 +37,11 @@ type Config struct {
 	// LocalFile is the path to the local override file (default ".env.local").
 	LocalFile string `mapstructure:"local_file" yaml:"local_file"`
 
+	// ActiveProfile is the name of the currently active profile (e.g., "staging").
+	// When set, the resolve pipeline loads .env ← .env.<profile> ← .env.local.
+	// Can be overridden at runtime with the --profile flag.
+	ActiveProfile string `mapstructure:"active_profile" yaml:"active_profile"`
+
 	// Backends defines the ordered list of secret backends to try when
 	// resolving ref:// references. Backends are tried in order; the first
 	// one that returns a value wins.
@@ -82,6 +87,37 @@ func (b BackendConfig) EffectiveType() string {
 	return b.Name
 }
 
+// ProfileEnvFile returns the env file path for the given profile name.
+// If the profile is defined in the Profiles map and has a custom EnvFile,
+// that value is returned. Otherwise, the default convention ".env.<name>"
+// is used (e.g., ".env.staging", ".env.production").
+func (c *Config) ProfileEnvFile(profile string) string {
+	if p, ok := c.Profiles[profile]; ok && p.EnvFile != "" {
+		return p.EnvFile
+	}
+	return ".env." + profile
+}
+
+// HasProfile reports whether the given profile name is defined in the
+// Profiles map. An empty profile name always returns false.
+func (c *Config) HasProfile(profile string) bool {
+	if profile == "" {
+		return false
+	}
+	_, ok := c.Profiles[profile]
+	return ok
+}
+
+// EffectiveProfile returns the profile to use, preferring the override
+// (e.g., from --profile flag) over the config's ActiveProfile.
+// Returns empty string if no profile is active.
+func (c *Config) EffectiveProfile(override string) string {
+	if override != "" {
+		return override
+	}
+	return c.ActiveProfile
+}
+
 // Validate checks that the config is well-formed and returns an error
 // describing any problems found.
 func (c *Config) Validate() error {
@@ -113,13 +149,16 @@ func (c *Config) Validate() error {
 	}
 
 	// Validate profiles.
-	for name, p := range c.Profiles {
+	for name := range c.Profiles {
 		if name == "" {
 			errs = append(errs, "profiles: empty profile name is not allowed")
 		}
-		if p.EnvFile != "" && !strings.HasSuffix(p.EnvFile, ".env."+name) && !strings.Contains(p.EnvFile, name) {
-			// This is a warning-level concern, not an error. We allow arbitrary paths.
-			_ = p
+	}
+
+	// Validate active_profile references an existing profile (if set and profiles are defined).
+	if c.ActiveProfile != "" && len(c.Profiles) > 0 {
+		if _, ok := c.Profiles[c.ActiveProfile]; !ok {
+			errs = append(errs, fmt.Sprintf("active_profile %q is not defined in profiles", c.ActiveProfile))
 		}
 	}
 

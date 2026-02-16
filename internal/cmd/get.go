@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"github.com/xcke/envref/internal/envfile"
 	"github.com/xcke/envref/internal/parser"
 )
 
@@ -16,40 +15,35 @@ func newGetCmd() *cobra.Command {
 		Long: `Look up a single key from the merged .env and .env.local files and print
 its value to stdout.
 
+When a profile file is specified with --profile-file, it is loaded between
+.env and .env.local: .env ← profile ← .env.local.
+
 If the value is an unresolved ref:// reference, it is printed as-is.
 Use --file to specify a custom .env file path.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			envFile, _ := cmd.Flags().GetString("file")
 			localFile, _ := cmd.Flags().GetString("local-file")
-			return runGet(cmd, args[0], envFile, localFile)
+			profileFile, _ := cmd.Flags().GetString("profile-file")
+			return runGet(cmd, args[0], envFile, profileFile, localFile)
 		},
 	}
 
 	cmd.Flags().StringP("file", "f", ".env", "path to the .env file")
 	cmd.Flags().String("local-file", ".env.local", "path to the .env.local override file")
+	cmd.Flags().String("profile-file", "", "path to a profile-specific .env file (e.g., .env.staging)")
 
 	return cmd
 }
 
 // runGet loads env files, merges them, and prints the value for the given key.
-func runGet(cmd *cobra.Command, key, envPath, localPath string) error {
-	base, warnings, err := envfile.Load(envPath)
+func runGet(cmd *cobra.Command, key, envPath, profilePath, localPath string) error {
+	env, err := loadAndMergeEnv(cmd, envPath, profilePath, localPath)
 	if err != nil {
-		return fmt.Errorf("loading %s: %w", envPath, err)
+		return err
 	}
-	printWarnings(cmd, envPath, warnings)
 
-	local, localWarnings, err := envfile.LoadOptional(localPath)
-	if err != nil {
-		return fmt.Errorf("loading %s: %w", localPath, err)
-	}
-	printWarnings(cmd, localPath, localWarnings)
-
-	merged := envfile.Merge(base, local)
-	envfile.Interpolate(merged)
-
-	entry, found := merged.Get(key)
+	entry, found := env.Get(key)
 	if !found {
 		return fmt.Errorf("key %q not found", key)
 	}

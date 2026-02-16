@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"github.com/xcke/envref/internal/envfile"
 	"github.com/xcke/envref/internal/parser"
 )
 
@@ -15,40 +14,36 @@ func newListCmd() *cobra.Command {
 		Short: "List all environment variables",
 		Long: `Print all key-value pairs from the merged .env and .env.local files.
 
+When a profile file is specified with --profile-file, it is loaded between
+.env and .env.local: .env ← profile ← .env.local.
+
 By default, values that are ref:// secret references are masked. Use
 --show-secrets to reveal the full ref:// URIs.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			envFile, _ := cmd.Flags().GetString("file")
 			localFile, _ := cmd.Flags().GetString("local-file")
+			profileFile, _ := cmd.Flags().GetString("profile-file")
 			showSecrets, _ := cmd.Flags().GetBool("show-secrets")
-			return runList(cmd, envFile, localFile, showSecrets)
+			return runList(cmd, envFile, profileFile, localFile, showSecrets)
 		},
 	}
 
 	cmd.Flags().StringP("file", "f", ".env", "path to the .env file")
 	cmd.Flags().String("local-file", ".env.local", "path to the .env.local override file")
+	cmd.Flags().String("profile-file", "", "path to a profile-specific .env file (e.g., .env.staging)")
 	cmd.Flags().Bool("show-secrets", false, "show ref:// values instead of masking them")
 
 	return cmd
 }
 
 // runList loads env files, merges them, and prints all key-value pairs.
-func runList(cmd *cobra.Command, envPath, localPath string, showSecrets bool) error {
-	base, warnings, err := envfile.Load(envPath)
+func runList(cmd *cobra.Command, envPath, profilePath, localPath string, showSecrets bool) error {
+	merged, err := loadAndMergeEnv(cmd, envPath, profilePath, localPath)
 	if err != nil {
-		return fmt.Errorf("loading %s: %w", envPath, err)
+		return err
 	}
-	printWarnings(cmd, envPath, warnings)
 
-	local, localWarnings, err := envfile.LoadOptional(localPath)
-	if err != nil {
-		return fmt.Errorf("loading %s: %w", localPath, err)
-	}
-	printWarnings(cmd, localPath, localWarnings)
-
-	merged := envfile.Merge(base, local)
-	envfile.Interpolate(merged)
 	out := cmd.OutOrStdout()
 
 	for _, entry := range merged.All() {

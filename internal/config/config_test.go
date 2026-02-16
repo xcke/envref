@@ -450,6 +450,221 @@ func TestLoad_ClosestConfigWins(t *testing.T) {
 	}
 }
 
+func TestConfig_ProfileEnvFile(t *testing.T) {
+	tests := []struct {
+		name     string
+		config   Config
+		profile  string
+		expected string
+	}{
+		{
+			name: "profile with custom env_file",
+			config: Config{
+				Profiles: map[string]ProfileConfig{
+					"staging": {EnvFile: "config/.env.stg"},
+				},
+			},
+			profile:  "staging",
+			expected: "config/.env.stg",
+		},
+		{
+			name: "profile with empty env_file uses convention",
+			config: Config{
+				Profiles: map[string]ProfileConfig{
+					"staging": {},
+				},
+			},
+			profile:  "staging",
+			expected: ".env.staging",
+		},
+		{
+			name:     "undefined profile uses convention",
+			config:   Config{},
+			profile:  "production",
+			expected: ".env.production",
+		},
+		{
+			name: "profile defined but no custom path",
+			config: Config{
+				Profiles: map[string]ProfileConfig{
+					"development": {EnvFile: ""},
+				},
+			},
+			profile:  "development",
+			expected: ".env.development",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.config.ProfileEnvFile(tt.profile)
+			if got != tt.expected {
+				t.Errorf("ProfileEnvFile(%q) = %q, want %q", tt.profile, got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestConfig_HasProfile(t *testing.T) {
+	cfg := Config{
+		Profiles: map[string]ProfileConfig{
+			"staging":    {EnvFile: ".env.staging"},
+			"production": {},
+		},
+	}
+
+	tests := []struct {
+		name     string
+		profile  string
+		expected bool
+	}{
+		{"defined profile", "staging", true},
+		{"another defined profile", "production", true},
+		{"undefined profile", "development", false},
+		{"empty string", "", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := cfg.HasProfile(tt.profile)
+			if got != tt.expected {
+				t.Errorf("HasProfile(%q) = %v, want %v", tt.profile, got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestConfig_HasProfile_NilMap(t *testing.T) {
+	cfg := Config{}
+	if cfg.HasProfile("staging") {
+		t.Error("HasProfile should return false for nil profiles map")
+	}
+}
+
+func TestConfig_EffectiveProfile(t *testing.T) {
+	tests := []struct {
+		name          string
+		activeProfile string
+		override      string
+		expected      string
+	}{
+		{"override wins over config", "staging", "production", "production"},
+		{"config used when no override", "staging", "", "staging"},
+		{"empty when both empty", "", "", ""},
+		{"override with empty config", "", "production", "production"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := Config{ActiveProfile: tt.activeProfile}
+			got := cfg.EffectiveProfile(tt.override)
+			if got != tt.expected {
+				t.Errorf("EffectiveProfile(%q) = %q, want %q", tt.override, got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestConfig_Validate_ActiveProfile(t *testing.T) {
+	tests := []struct {
+		name    string
+		config  Config
+		wantErr bool
+		errMsg  string
+	}{
+		{
+			name: "valid active_profile references defined profile",
+			config: Config{
+				Project:       "myapp",
+				EnvFile:       ".env",
+				LocalFile:     ".env.local",
+				ActiveProfile: "staging",
+				Profiles: map[string]ProfileConfig{
+					"staging": {EnvFile: ".env.staging"},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "active_profile references undefined profile",
+			config: Config{
+				Project:       "myapp",
+				EnvFile:       ".env",
+				LocalFile:     ".env.local",
+				ActiveProfile: "staging",
+				Profiles: map[string]ProfileConfig{
+					"production": {EnvFile: ".env.production"},
+				},
+			},
+			wantErr: true,
+			errMsg:  "active_profile \"staging\" is not defined in profiles",
+		},
+		{
+			name: "active_profile without any profiles defined is allowed",
+			config: Config{
+				Project:       "myapp",
+				EnvFile:       ".env",
+				LocalFile:     ".env.local",
+				ActiveProfile: "staging",
+			},
+			wantErr: false,
+		},
+		{
+			name: "no active_profile is always valid",
+			config: Config{
+				Project:   "myapp",
+				EnvFile:   ".env",
+				LocalFile: ".env.local",
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.config.Validate()
+			if tt.wantErr && err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if !tt.wantErr && err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if tt.wantErr && tt.errMsg != "" {
+				if got := err.Error(); !contains(got, tt.errMsg) {
+					t.Errorf("error = %q, want to contain %q", got, tt.errMsg)
+				}
+			}
+		})
+	}
+}
+
+func TestLoadFile_WithActiveProfile(t *testing.T) {
+	dir := t.TempDir()
+	content := `project: myapp
+active_profile: staging
+profiles:
+  staging:
+    env_file: .env.staging
+  production:
+    env_file: .env.production
+`
+	path := writeFile(t, dir, FullFileName, content)
+
+	cfg, err := LoadFile(path)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.ActiveProfile != "staging" {
+		t.Errorf("ActiveProfile = %q, want %q", cfg.ActiveProfile, "staging")
+	}
+	if cfg.ProfileEnvFile("staging") != ".env.staging" {
+		t.Errorf("ProfileEnvFile(staging) = %q, want %q", cfg.ProfileEnvFile("staging"), ".env.staging")
+	}
+	if cfg.ProfileEnvFile("production") != ".env.production" {
+		t.Errorf("ProfileEnvFile(production) = %q, want %q", cfg.ProfileEnvFile("production"), ".env.production")
+	}
+}
+
 // contains reports whether s contains substr.
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && containsAt(s, substr)

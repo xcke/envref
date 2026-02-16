@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/xcke/envref/internal/config"
 	"github.com/xcke/envref/internal/envfile"
+	"github.com/xcke/envref/internal/parser"
 	"github.com/xcke/envref/internal/resolve"
 )
 
@@ -20,27 +21,34 @@ func newResolveCmd() *cobra.Command {
 resolve all ref:// secret references via configured backends, and output
 fully resolved KEY=VALUE pairs to stdout.
 
+When a profile is active (via --profile flag or active_profile in config),
+a profile-specific env file is loaded between .env and .env.local:
+  .env ← .env.<profile> ← .env.local
+
 By default, output is in KEY=VALUE format (one per line). Use --direnv
 to output in direnv-compatible format (export KEY=VALUE).
 
 Examples:
-  envref resolve                # output KEY=VALUE pairs
-  envref resolve --direnv       # output export KEY=VALUE for direnv
-  eval "$(envref resolve --direnv)"  # inject into current shell`,
+  envref resolve                         # output KEY=VALUE pairs
+  envref resolve --profile staging       # use staging profile
+  envref resolve --direnv                # output export KEY=VALUE for direnv
+  eval "$(envref resolve --direnv)"      # inject into current shell`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			direnv, _ := cmd.Flags().GetBool("direnv")
-			return runResolve(cmd, direnv)
+			profile, _ := cmd.Flags().GetString("profile")
+			return runResolve(cmd, direnv, profile)
 		},
 	}
 
 	cmd.Flags().Bool("direnv", false, "output in direnv-compatible format (export KEY=VALUE)")
+	cmd.Flags().StringP("profile", "P", "", "environment profile to use (e.g., staging, production)")
 
 	return cmd
 }
 
 // runResolve implements the resolve command logic.
-func runResolve(cmd *cobra.Command, direnv bool) error {
+func runResolve(cmd *cobra.Command, direnv bool, profileOverride string) error {
 	// Load project config to get project name, backend config, and file paths.
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -56,8 +64,15 @@ func runResolve(cmd *cobra.Command, direnv bool) error {
 	envPath := resolveFilePath(projectDir, cfg.EnvFile)
 	localPath := resolveFilePath(projectDir, cfg.LocalFile)
 
+	// Determine the active profile and resolve its env file path.
+	var profilePath string
+	profile := cfg.EffectiveProfile(profileOverride)
+	if profile != "" {
+		profilePath = resolveFilePath(projectDir, cfg.ProfileEnvFile(profile))
+	}
+
 	// Load and merge env files.
-	env, err := loadAndMergeEnv(cmd, envPath, localPath)
+	env, err := loadAndMergeEnv(cmd, envPath, profilePath, localPath)
 	if err != nil {
 		return err
 	}
@@ -108,20 +123,42 @@ func resolveFilePath(projectDir, filePath string) string {
 	return projectDir + "/" + filePath
 }
 
-// loadAndMergeEnv loads the base and local env files, merges them, and
-// interpolates variables.
-func loadAndMergeEnv(cmd *cobra.Command, envPath, localPath string) (*envfile.Env, error) {
+// loadAndMergeEnv loads the base env file, an optional profile-specific env
+// file, and the local override file, merges them in order (base ← profile ←
+// local), and interpolates variables.
+//
+// The profilePath parameter is optional — pass an empty string to skip the
+// profile layer (backwards-compatible with the two-layer merge).
+func loadAndMergeEnv(cmd *cobra.Command, envPath, profilePath, localPath string) (*envfile.Env, error) {
 	base, warnings, err := envfile.Load(envPath)
 	if err != nil {
 		return nil, fmt.Errorf("loading %s: %w", envPath, err)
 	}
 	printWarnings(cmd, envPath, warnings)
 
+	// Optional profile layer: .env.<profile> (e.g., .env.staging).
+	var profile *envfile.Env
+	if profilePath != "" {
+		var profileWarnings []parser.Warning
+		profile, profileWarnings, err = envfile.LoadOptional(profilePath)
+		if err != nil {
+			return nil, fmt.Errorf("loading %s: %w", profilePath, err)
+		}
+		printWarnings(cmd, profilePath, profileWarnings)
+	}
+
 	local, localWarnings, err := envfile.LoadOptional(localPath)
 	if err != nil {
 		return nil, fmt.Errorf("loading %s: %w", localPath, err)
 	}
 	printWarnings(cmd, localPath, localWarnings)
+
+	// Merge: base ← profile ← local (later layers win on conflicts).
+	if profile != nil && profile.Len() > 0 {
+		merged := envfile.Merge(base, profile, local)
+		envfile.Interpolate(merged)
+		return merged, nil
+	}
 
 	merged := envfile.Merge(base, local)
 	envfile.Interpolate(merged)
