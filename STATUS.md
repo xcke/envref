@@ -1,7 +1,7 @@
 # Project Status
 
 ## Last Completed
-- ENV-144: Added integration tests for keychain backend with platform-specific CI job [iter-60]
+- ENV-145: Added integration tests for direnv integration with end-to-end shell tests and CI job [iter-61]
 
 ## Current State
 - Go module `github.com/xcke/envref` initialized with Cobra + Viper + go-keyring + age + sqlite + testify + x/term dependencies
@@ -41,8 +41,9 @@
 - GoReleaser config, GitHub Actions CI + release pipelines, Makefile with coverage targets
 - Comprehensive test coverage across all packages
 - Fuzz tests for .env parser, ref:// URI parser, and variable interpolation
-- **Integration tests** for keychain backend (12 tests) with `//go:build integration` tag covering CRUD, namespacing, profile isolation, concurrency, registry fallback, bulk operations, and special character values
-- **CI integration-test job** runs keychain integration tests on macOS (real Keychain)
+- **Integration tests** for keychain backend (12 tests) with `//go:build integration` tag
+- **Direnv integration tests** (22 tests) with `//go:build integration` tag covering end-to-end shell eval, init --direnv, profile switching, shell quoting safety, strict mode, multiline values, special characters, .envrc sourcing, and real direnv binary tests
+- **CI jobs** for keychain integration tests (macOS) and direnv integration tests (ubuntu + macOS with direnv installed)
 - All checks pass: `go build`, `go vet`, `go test`, `golangci-lint`
 
 ## Known Issues

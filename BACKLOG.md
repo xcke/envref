@@ -192,7 +192,7 @@
 - [DONE] P1 | ENV-142 | Unit tests for resolution pipeline (mock backends)
 - [DONE] P1 | ENV-143 | Integration tests for CLI commands (cobra test helpers)
 - [DONE] P2 | ENV-144 | Integration tests for keychain backend (platform-specific CI matrix)
-- [TODO] P2 | ENV-145 | Integration tests for direnv integration (end-to-end shell test)
+- [DONE] P2 | ENV-145 | Integration tests for direnv integration (end-to-end shell test)
 - [DONE] P2 | ENV-146 | Benchmark `envref resolve` — target <50ms for 100 vars
 - [DONE] P2 | ENV-147 | Set up code coverage reporting
 - [DONE] P3 | ENV-148 | Fuzz testing for `.env` parser
