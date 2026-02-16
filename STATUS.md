@@ -1,7 +1,7 @@
 # Project Status
 
 ## Last Completed
-- ENV-023: Added config inheritance — global `~/.config/envref/config.yaml` merged with project `.envref.yaml` [iter-25]
+- ENV-024: Added automatic config validation on load with ValidationError type, enhanced checks [iter-26]
 
 ## Current State
 - Go module `github.com/xcke/envref` initialized with Cobra + Viper + go-keyring + testify dependencies
@@ -16,34 +16,30 @@
 - `envref resolve --profile <name>` — uses a named profile's env file in the merge chain
 - `envref resolve --direnv` — outputs `export KEY=VALUE` format for shell integration
 - `envref resolve --strict` — fails with no output if any reference cannot be resolved (CI-safe)
-- `envref run -- <command>` — resolves env vars and executes a subprocess with them injected (alternative to direnv)
-  - Supports `--profile` and `--strict` flags
-  - Inherits current process environment, overlays resolved vars
-  - Forwards signals (SIGINT, SIGTERM) to child process
-  - Propagates child process exit code
-- `envref profile list` — shows available profiles from config and convention-based `.env.*` files, marks active profile
-- `envref profile use <name>` — sets active profile in `.envref.yaml`, validates against config and disk, supports `--clear`
-- `envref validate` — checks .env against .env.example schema, reports missing/extra keys, supports `--example`, `--profile-file` flags
-- `envref status` — shows environment overview: project info, file existence, key counts, backend resolution status, validation, actionable hints
-- `envref doctor` — scans .env files for common issues with non-zero exit code on failure
-  - Duplicate keys, trailing whitespace, unquoted values with spaces, empty values without explicit intent
-  - .env not in .gitignore check, .envrc direnv trust check
-  - Supports `--file` and `--local-file` flags
-- **Config inheritance:** Global config at `~/.config/envref/config.yaml` provides defaults (backends, profiles, etc.) that project-level `.envref.yaml` overrides. Supports `ENVREF_CONFIG_DIR` and `XDG_CONFIG_HOME` env vars for custom paths.
+- `envref run -- <command>` — resolves env vars and executes a subprocess with them injected
+- `envref profile list` — shows available profiles from config and convention-based `.env.*` files
+- `envref profile use <name>` — sets active profile in `.envref.yaml`
+- `envref validate` — checks .env against .env.example schema
+- `envref status` — shows environment overview with actionable hints
+- `envref doctor` — scans .env files for common issues
+- **Config validation on load:** `Load()` now calls `Validate()` automatically, returning `*ValidationError` for semantic errors
+  - Project name: required, no whitespace padding, no path separators (/ or \)
+  - File paths: env_file and local_file must be relative, non-empty
+  - Backends: names required and unique
+  - Profiles: names non-empty, no whitespace padding
+  - Active profile must reference a defined profile (when profiles exist)
+  - `Warnings()` method for non-fatal issues (unknown backend types)
+  - `status` command shows validation problems as hints instead of failing
+- **Config inheritance:** Global config at `~/.config/envref/config.yaml` merged with project `.envref.yaml`
 - **Output format support:** `--format` flag on `get`, `list`, and `resolve` commands (plain, json, shell, table)
-- **Profile support:** `.envref.yaml` `active_profile` field, `profiles` map, convention-based naming, `--profile` flag, 3-layer merge
-- **Config write support:** `SetActiveProfile()` function for targeted YAML field updates
-- Resolution pipeline: `internal/resolve` package with `Resolve()` function, per-key error collection, partial resolution, direct backend matching + fallback chain
-- Shell-safe quoting for direnv export output
-- Variable interpolation (`${VAR}` and `$VAR` syntax)
-- `.envref.yaml` config schema with Viper-based loader and project root discovery
+- **Profile support:** 3-layer merge with `--profile` flag
+- Resolution pipeline with per-key error collection, partial resolution, direct backend matching + fallback chain
 - `.env` file parser with full quote/multiline/comment/BOM/CRLF support
-- `.env` file loader, merger, writer, and interpolator with ref:// handling
-- `ref://` URI parser, `Backend` interface, `Registry` with fallback chain, `NamespacedBackend`, `KeychainBackend`
-- **GoReleaser config** for cross-platform releases (Linux/macOS/Windows × amd64/arm64, tar.gz/zip, checksums, changelog)
-- **GitHub Actions CI pipeline** with test (ubuntu/macos/windows matrix), lint (go vet + golangci-lint), and build jobs
+- `ref://` URI parser, `Backend` interface, `Registry`, `NamespacedBackend`, `KeychainBackend`
+- **GoReleaser config** for cross-platform releases
+- **GitHub Actions CI pipeline** with test, lint, build jobs
 - Makefile with build/test/lint/install targets
-- Comprehensive test coverage: parser (100+), merge (38+), resolve (50+), integration (55+), profile, validate, status, format, strict mode, run command, doctor, config inheritance tests
+- Comprehensive test coverage across all packages
 - Directory structure: `cmd/envref/`, `internal/cmd/`, `internal/parser/`, `internal/envfile/`, `internal/config/`, `internal/ref/`, `internal/resolve/`, `internal/backend/`, `pkg/`
 - All checks pass: `go build`, `go vet`, `go test`, `golangci-lint`
 

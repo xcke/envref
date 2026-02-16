@@ -42,7 +42,7 @@
 - [DONE] P1 | ENV-021 | Implement config loader using Viper (project root discovery via `.envref.yaml`)
 - [DONE] P1 | ENV-022 | Add `envref init` command — scaffold `.envref.yaml`, `.env`, `.envrc`, `.gitignore` entries
 - [DONE] P2 | ENV-023 | Support config inheritance / defaults (global `~/.config/envref/config.yaml` + project-level)
-- [TODO] P2 | ENV-024 | Validate config on load — clear errors for missing/malformed fields
+- [DONE] P2 | ENV-024 | Validate config on load — clear errors for missing/malformed fields
 - [TODO] P3 | ENV-025 | Add `envref config show` command — print resolved effective config
 
 ---

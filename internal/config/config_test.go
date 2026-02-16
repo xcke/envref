@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -165,6 +166,88 @@ func TestConfig_Validate(t *testing.T) {
 			},
 			wantErr: true,
 			errMsg:  "project name is required",
+		},
+		{
+			name: "project name with leading whitespace",
+			config: Config{
+				Project:   " myapp",
+				EnvFile:   ".env",
+				LocalFile: ".env.local",
+			},
+			wantErr: true,
+			errMsg:  "project name must not have leading or trailing whitespace",
+		},
+		{
+			name: "project name with trailing whitespace",
+			config: Config{
+				Project:   "myapp ",
+				EnvFile:   ".env",
+				LocalFile: ".env.local",
+			},
+			wantErr: true,
+			errMsg:  "project name must not have leading or trailing whitespace",
+		},
+		{
+			name: "project name with forward slash",
+			config: Config{
+				Project:   "my/app",
+				EnvFile:   ".env",
+				LocalFile: ".env.local",
+			},
+			wantErr: true,
+			errMsg:  "project name must not contain path separators",
+		},
+		{
+			name: "project name with backslash",
+			config: Config{
+				Project:   "my\\app",
+				EnvFile:   ".env",
+				LocalFile: ".env.local",
+			},
+			wantErr: true,
+			errMsg:  "project name must not contain path separators",
+		},
+		{
+			name: "absolute env_file path",
+			config: Config{
+				Project:   "myapp",
+				EnvFile:   "/etc/.env",
+				LocalFile: ".env.local",
+			},
+			wantErr: true,
+			errMsg:  "env_file must be a relative path",
+		},
+		{
+			name: "absolute local_file path",
+			config: Config{
+				Project:   "myapp",
+				EnvFile:   ".env",
+				LocalFile: "/etc/.env.local",
+			},
+			wantErr: true,
+			errMsg:  "local_file must be a relative path",
+		},
+		{
+			name: "profile name with whitespace",
+			config: Config{
+				Project:   "myapp",
+				EnvFile:   ".env",
+				LocalFile: ".env.local",
+				Profiles: map[string]ProfileConfig{
+					" staging ": {EnvFile: ".env.staging"},
+				},
+			},
+			wantErr: true,
+			errMsg:  "must not have leading or trailing whitespace",
+		},
+		{
+			name: "relative subdirectory env_file is valid",
+			config: Config{
+				Project:   "myapp",
+				EnvFile:   "config/.env",
+				LocalFile: "config/.env.local",
+			},
+			wantErr: false,
 		},
 	}
 
@@ -1195,6 +1278,213 @@ func TestLoad_InvalidGlobalConfig(t *testing.T) {
 	}
 	if !contains(err.Error(), "global config") {
 		t.Errorf("error = %q, want to contain 'global config'", err.Error())
+	}
+}
+
+func TestValidationError_Type(t *testing.T) {
+	cfg := Config{
+		EnvFile:   ".env",
+		LocalFile: ".env.local",
+	}
+	err := cfg.Validate()
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	// Should be extractable as *ValidationError.
+	var valErr *ValidationError
+	if !errors.As(err, &valErr) {
+		t.Fatalf("error should be *ValidationError, got %T", err)
+	}
+	if len(valErr.Problems) == 0 {
+		t.Error("ValidationError.Problems should not be empty")
+	}
+	if !contains(valErr.Error(), "project name is required") {
+		t.Errorf("error message = %q, want to contain 'project name is required'", valErr.Error())
+	}
+}
+
+func TestValidationError_MultipleProblems(t *testing.T) {
+	cfg := Config{
+		Project:   " bad/name ",
+		EnvFile:   "",
+		LocalFile: "",
+	}
+	err := cfg.Validate()
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	var valErr *ValidationError
+	if !errors.As(err, &valErr) {
+		t.Fatalf("error should be *ValidationError, got %T", err)
+	}
+	// Should report multiple problems.
+	if len(valErr.Problems) < 2 {
+		t.Errorf("expected at least 2 problems, got %d: %v", len(valErr.Problems), valErr.Problems)
+	}
+}
+
+func TestConfig_Warnings(t *testing.T) {
+	tests := []struct {
+		name      string
+		config    Config
+		wantCount int
+		wantMsg   string
+	}{
+		{
+			name: "no warnings for known backend type",
+			config: Config{
+				Backends: []BackendConfig{
+					{Name: "keychain", Type: "keychain"},
+				},
+			},
+			wantCount: 0,
+		},
+		{
+			name: "warning for unknown backend type",
+			config: Config{
+				Backends: []BackendConfig{
+					{Name: "vault", Type: "encrypted-vault"},
+				},
+			},
+			wantCount: 1,
+			wantMsg:   "unknown backend type",
+		},
+		{
+			name: "multiple warnings for multiple unknown types",
+			config: Config{
+				Backends: []BackendConfig{
+					{Name: "vault", Type: "encrypted-vault"},
+					{Name: "op", Type: "1password"},
+				},
+			},
+			wantCount: 2,
+		},
+		{
+			name: "no warnings for empty backends",
+			config: Config{
+				Backends: nil,
+			},
+			wantCount: 0,
+		},
+		{
+			name: "backend with name fallback to known type",
+			config: Config{
+				Backends: []BackendConfig{
+					{Name: "keychain"},
+				},
+			},
+			wantCount: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			warnings := tt.config.Warnings()
+			if len(warnings) != tt.wantCount {
+				t.Errorf("len(Warnings()) = %d, want %d: %v", len(warnings), tt.wantCount, warnings)
+			}
+			if tt.wantMsg != "" && tt.wantCount > 0 {
+				if !contains(warnings[0], tt.wantMsg) {
+					t.Errorf("warning = %q, want to contain %q", warnings[0], tt.wantMsg)
+				}
+			}
+		})
+	}
+}
+
+func TestLoad_ValidatesOnLoad(t *testing.T) {
+	// Point to a non-existent global config directory.
+	t.Setenv("ENVREF_CONFIG_DIR", t.TempDir())
+
+	// Create a project config with no project name — should fail validation.
+	projectDir := t.TempDir()
+	writeFile(t, projectDir, FullFileName, `env_file: .env
+local_file: .env.local
+`)
+
+	_, _, err := Load(projectDir)
+	if err == nil {
+		t.Fatal("expected validation error, got nil")
+	}
+
+	var valErr *ValidationError
+	if !errors.As(err, &valErr) {
+		t.Fatalf("error should be *ValidationError, got %T: %v", err, err)
+	}
+	if !contains(valErr.Error(), "project name is required") {
+		t.Errorf("error = %q, want to contain 'project name is required'", valErr.Error())
+	}
+}
+
+func TestLoad_ValidatesAbsolutePaths(t *testing.T) {
+	t.Setenv("ENVREF_CONFIG_DIR", t.TempDir())
+
+	projectDir := t.TempDir()
+	writeFile(t, projectDir, FullFileName, `project: myapp
+env_file: /etc/.env
+`)
+
+	_, _, err := Load(projectDir)
+	if err == nil {
+		t.Fatal("expected validation error, got nil")
+	}
+
+	var valErr *ValidationError
+	if !errors.As(err, &valErr) {
+		t.Fatalf("error should be *ValidationError, got %T: %v", err, err)
+	}
+	if !contains(valErr.Error(), "env_file must be a relative path") {
+		t.Errorf("error = %q, want to contain 'env_file must be a relative path'", valErr.Error())
+	}
+}
+
+func TestLoad_ValidatesProjectNameFormat(t *testing.T) {
+	t.Setenv("ENVREF_CONFIG_DIR", t.TempDir())
+
+	projectDir := t.TempDir()
+	writeFile(t, projectDir, FullFileName, `project: "my/bad/project"
+`)
+
+	_, _, err := Load(projectDir)
+	if err == nil {
+		t.Fatal("expected validation error, got nil")
+	}
+
+	var valErr *ValidationError
+	if !errors.As(err, &valErr) {
+		t.Fatalf("error should be *ValidationError, got %T: %v", err, err)
+	}
+	if !contains(valErr.Error(), "path separators") {
+		t.Errorf("error = %q, want to contain 'path separators'", valErr.Error())
+	}
+}
+
+func TestLoad_ValidConfigPassesValidation(t *testing.T) {
+	t.Setenv("ENVREF_CONFIG_DIR", t.TempDir())
+
+	projectDir := t.TempDir()
+	writeFile(t, projectDir, FullFileName, `project: myapp
+env_file: .env
+local_file: .env.local
+backends:
+  - name: keychain
+    type: keychain
+profiles:
+  staging:
+    env_file: .env.staging
+`)
+
+	cfg, root, err := Load(projectDir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.Project != "myapp" {
+		t.Errorf("Project = %q, want %q", cfg.Project, "myapp")
+	}
+	if root != projectDir {
+		t.Errorf("root = %q, want %q", root, projectDir)
 	}
 }
 

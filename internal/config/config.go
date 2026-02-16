@@ -18,6 +18,27 @@ import (
 	"github.com/spf13/viper"
 )
 
+// KnownBackendTypes lists the backend types that envref recognizes. This is
+// used for validation warnings — unknown types are flagged but not rejected,
+// since future backends may be added via plugins.
+var KnownBackendTypes = []string{
+	"keychain",
+}
+
+// ValidationError is returned when the config is syntactically valid YAML but
+// contains semantic errors (missing required fields, invalid values, etc.).
+// Callers can use errors.As to distinguish validation failures from I/O errors
+// or missing config files.
+type ValidationError struct {
+	// Problems lists the individual validation issues found.
+	Problems []string
+}
+
+// Error returns a human-readable summary of all validation problems.
+func (e *ValidationError) Error() string {
+	return "invalid config: " + strings.Join(e.Problems, "; ")
+}
+
 // FileName is the name of the project-level configuration file (without extension).
 const FileName = ".envref"
 
@@ -226,21 +247,31 @@ func (c *Config) EffectiveProfile(override string) string {
 	return c.ActiveProfile
 }
 
-// Validate checks that the config is well-formed and returns an error
-// describing any problems found.
+// Validate checks that the config is well-formed and returns a
+// *ValidationError describing any problems found. Returns nil if valid.
 func (c *Config) Validate() error {
 	var errs []string
 
+	// Project name checks.
 	if c.Project == "" {
 		errs = append(errs, "project name is required")
+	} else if strings.TrimSpace(c.Project) != c.Project {
+		errs = append(errs, "project name must not have leading or trailing whitespace")
+	} else if strings.ContainsAny(c.Project, "/\\") {
+		errs = append(errs, "project name must not contain path separators (/ or \\)")
 	}
 
+	// File path checks.
 	if c.EnvFile == "" {
 		errs = append(errs, "env_file must not be empty")
+	} else if filepath.IsAbs(c.EnvFile) {
+		errs = append(errs, "env_file must be a relative path, got absolute path")
 	}
 
 	if c.LocalFile == "" {
 		errs = append(errs, "local_file must not be empty")
+	} else if filepath.IsAbs(c.LocalFile) {
+		errs = append(errs, "local_file must be a relative path, got absolute path")
 	}
 
 	// Validate backends.
@@ -260,6 +291,8 @@ func (c *Config) Validate() error {
 	for name := range c.Profiles {
 		if name == "" {
 			errs = append(errs, "profiles: empty profile name is not allowed")
+		} else if strings.TrimSpace(name) != name {
+			errs = append(errs, fmt.Sprintf("profiles: profile name %q must not have leading or trailing whitespace", name))
 		}
 	}
 
@@ -273,7 +306,32 @@ func (c *Config) Validate() error {
 	if len(errs) == 0 {
 		return nil
 	}
-	return fmt.Errorf("invalid config: %s", strings.Join(errs, "; "))
+	return &ValidationError{Problems: errs}
+}
+
+// Warnings returns non-fatal issues with the config, such as unknown backend
+// types. Unlike Validate, these do not prevent the config from being used.
+func (c *Config) Warnings() []string {
+	var warnings []string
+	for i, b := range c.Backends {
+		btype := b.EffectiveType()
+		if btype != "" && !isKnownBackendType(btype) {
+			warnings = append(warnings, fmt.Sprintf("backends[%d]: unknown backend type %q (known types: %s)",
+				i, btype, strings.Join(KnownBackendTypes, ", ")))
+		}
+	}
+	return warnings
+}
+
+// isKnownBackendType reports whether the given type string is in the
+// KnownBackendTypes list.
+func isKnownBackendType(t string) bool {
+	for _, kt := range KnownBackendTypes {
+		if kt == t {
+			return true
+		}
+	}
+	return false
 }
 
 // Load reads the .envref.yaml file starting from the given directory and
@@ -302,6 +360,11 @@ func Load(startDir string) (*Config, string, error) {
 	}
 
 	cfg := mergeConfigs(globalCfg, projectCfg)
+
+	if err := cfg.Validate(); err != nil {
+		return nil, "", err
+	}
+
 	return cfg, configDir, nil
 }
 

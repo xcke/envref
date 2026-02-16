@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -108,6 +109,15 @@ func buildStatusReport(cmd *cobra.Command, profileOverride string) (*statusRepor
 
 	cfg, projectDir, cfgErr := config.Load(cwd)
 	if cfgErr != nil {
+		var valErr *config.ValidationError
+		if errors.As(cfgErr, &valErr) {
+			// Config exists but has validation problems — report them as hints.
+			report.configExists = true
+			for _, p := range valErr.Problems {
+				report.hints = append(report.hints, fmt.Sprintf("Config issue: %s", p))
+			}
+			return report, nil
+		}
 		// No config found — report minimal status.
 		report.configExists = false
 		report.hints = append(report.hints, "No .envref.yaml found. Run \"envref init\" to set up your project.")
