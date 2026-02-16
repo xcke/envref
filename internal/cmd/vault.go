@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -10,6 +11,8 @@ import (
 	"github.com/xcke/envref/internal/output"
 	"golang.org/x/term"
 )
+
+const defaultVaultExportFile = "envref-vault-export.json"
 
 // newVaultCmd creates the vault command group for managing the encrypted vault.
 func newVaultCmd() *cobra.Command {
@@ -25,6 +28,8 @@ Use 'vault init' to set up the vault with a master passphrase on first use.`,
 	cmd.AddCommand(newVaultInitCmd())
 	cmd.AddCommand(newVaultLockCmd())
 	cmd.AddCommand(newVaultUnlockCmd())
+	cmd.AddCommand(newVaultExportCmd())
+	cmd.AddCommand(newVaultImportCmd())
 
 	return cmd
 }
@@ -197,6 +202,150 @@ func runVaultUnlock(cmd *cobra.Command) error {
 
 	out.Info("vault unlocked at %s\n", v.DBPath())
 	return nil
+}
+
+// newVaultExportCmd creates the vault export subcommand.
+func newVaultExportCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "export",
+		Short: "Export vault secrets to a JSON file",
+		Long: `Export all secrets from the local encrypted vault to a JSON file.
+
+The exported file contains decrypted secret key-value pairs in plaintext JSON.
+Keep this file secure — it contains all your vault secrets in the clear.
+
+By default, exports to envref-vault-export.json in the current directory. Use
+--file to specify a different path, or --stdout to write to standard output.
+
+Examples:
+  envref vault export                                  # export to envref-vault-export.json
+  envref vault export --file backup.json               # export to custom file
+  envref vault export --stdout                         # export to stdout (for piping)
+  envref vault export --stdout | age -r <recipient>    # export and encrypt with age`,
+		Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runVaultExport(cmd)
+		},
+	}
+
+	cmd.Flags().StringP("file", "f", "", "output file path (default: "+defaultVaultExportFile+")")
+	cmd.Flags().Bool("stdout", false, "write export to stdout instead of a file")
+
+	return cmd
+}
+
+// runVaultExport exports all vault secrets to JSON.
+func runVaultExport(cmd *cobra.Command) error {
+	out := output.NewWriter(cmd)
+
+	v, err := createVaultForCommand(cmd)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = v.Close() }()
+
+	data, err := v.ExportJSON()
+	if err != nil {
+		return fmt.Errorf("exporting vault: %w", err)
+	}
+
+	toStdout, _ := cmd.Flags().GetBool("stdout")
+	if toStdout {
+		_, err := fmt.Fprintln(out.Stdout(), string(data))
+		return err
+	}
+
+	filePath, _ := cmd.Flags().GetString("file")
+	if filePath == "" {
+		filePath = defaultVaultExportFile
+	}
+
+	if err := os.WriteFile(filePath, append(data, '\n'), 0o600); err != nil {
+		return fmt.Errorf("writing export file: %w", err)
+	}
+
+	export, _ := v.Export()
+	out.Info("exported %d secrets to %s\n", len(export.Secrets), filePath)
+	out.Warn("this file contains plaintext secrets — keep it secure and delete after use\n")
+	return nil
+}
+
+// newVaultImportCmd creates the vault import subcommand.
+func newVaultImportCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "import",
+		Short: "Import secrets into the vault from a JSON file",
+		Long: `Import secrets from a JSON export file into the local encrypted vault.
+
+The file must be in the format produced by 'envref vault export'. Each secret
+is re-encrypted with the current vault passphrase on import.
+
+Existing keys in the vault are overwritten by imported values.
+
+By default, reads from envref-vault-export.json in the current directory. Use
+--file to specify a different path, or --stdin to read from standard input.
+
+Examples:
+  envref vault import                                  # import from envref-vault-export.json
+  envref vault import --file backup.json               # import from custom file
+  cat backup.json | envref vault import --stdin         # import from stdin`,
+		Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runVaultImport(cmd)
+		},
+	}
+
+	cmd.Flags().StringP("file", "f", "", "input file path (default: "+defaultVaultExportFile+")")
+	cmd.Flags().Bool("stdin", false, "read import data from stdin instead of a file")
+
+	return cmd
+}
+
+// runVaultImport imports secrets from a JSON file into the vault.
+func runVaultImport(cmd *cobra.Command) error {
+	out := output.NewWriter(cmd)
+
+	var data []byte
+	var err error
+	var source string
+
+	fromStdin, _ := cmd.Flags().GetBool("stdin")
+	if fromStdin {
+		data, err = readAll(cmd)
+		if err != nil {
+			return fmt.Errorf("reading from stdin: %w", err)
+		}
+		source = "stdin"
+	} else {
+		filePath, _ := cmd.Flags().GetString("file")
+		if filePath == "" {
+			filePath = defaultVaultExportFile
+		}
+		data, err = os.ReadFile(filePath)
+		if err != nil {
+			return fmt.Errorf("reading import file: %w", err)
+		}
+		source = filePath
+	}
+
+	v, err := createVaultForCommand(cmd)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = v.Close() }()
+
+	count, err := v.ImportJSON(data)
+	if err != nil {
+		return fmt.Errorf("importing vault: %w", err)
+	}
+
+	out.Info("imported %d secrets from %s\n", count, source)
+	return nil
+}
+
+// readAll reads all data from the command's stdin.
+func readAll(cmd *cobra.Command) ([]byte, error) {
+	return io.ReadAll(cmd.InOrStdin())
 }
 
 // createVaultForCommand creates a VaultBackend for vault management commands

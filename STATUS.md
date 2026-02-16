@@ -1,7 +1,7 @@
 # Project Status
 
 ## Last Completed
-- ENV-008: Added MIT LICENSE file [iter-53]
+- ENV-043: Added vault export/import commands for backup and migration [iter-54]
 
 ## Current State
 - Go module `github.com/xcke/envref` initialized with Cobra + Viper + go-keyring + age + sqlite + testify + x/term dependencies
@@ -30,6 +30,8 @@
 - `envref vault init` — initialize vault with master passphrase (interactive prompt with confirmation, or via env var)
 - `envref vault lock` — lock vault to prevent all secret access; persists across CLI invocations
 - `envref vault unlock` — unlock vault after verifying passphrase to restore secret access
+- `envref vault export` — export all vault secrets to JSON file or stdout for backup/migration
+- `envref vault import` — import secrets from JSON file or stdin into the vault
 - **Two secret backends:** `KeychainBackend` (OS keychain via go-keyring) and `VaultBackend` (local SQLite + age encryption)
 - **Comprehensive README** with architecture diagram, resolution pipeline, backend chain, project structure, vault docs, and benchmarks
 - **docs/ directory** with four usage guides: getting-started, direnv-integration, profiles, secret-backends

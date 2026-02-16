@@ -1,6 +1,7 @@
 package backend
 
 import (
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -648,5 +649,357 @@ func TestVaultBackend_ReopenAfterClose(t *testing.T) {
 	}
 	if val != "v2" {
 		t.Fatalf("Get after reopen: got %q, want %q", val, "v2")
+	}
+}
+
+func TestVaultBackend_Export(t *testing.T) {
+	v := testVault(t)
+	if err := v.Initialize(); err != nil {
+		t.Fatalf("Initialize: %v", err)
+	}
+
+	// Export empty vault.
+	export, err := v.Export()
+	if err != nil {
+		t.Fatalf("Export empty: %v", err)
+	}
+	if len(export.Secrets) != 0 {
+		t.Fatalf("Export empty: got %d secrets, want 0", len(export.Secrets))
+	}
+	if export.Version != exportVersion {
+		t.Fatalf("Export version: got %d, want %d", export.Version, exportVersion)
+	}
+	if export.ExportedAt == "" {
+		t.Fatal("Export ExportedAt should not be empty")
+	}
+
+	// Add secrets and export.
+	secrets := map[string]string{
+		"api_key":    "sk-secret-123",
+		"db_pass":    "p@ssw0rd!",
+		"unicode_val": "こんにちは",
+	}
+	for k, val := range secrets {
+		if err := v.Set(k, val); err != nil {
+			t.Fatalf("Set(%s): %v", k, err)
+		}
+	}
+
+	export, err = v.Export()
+	if err != nil {
+		t.Fatalf("Export: %v", err)
+	}
+	if len(export.Secrets) != len(secrets) {
+		t.Fatalf("Export: got %d secrets, want %d", len(export.Secrets), len(secrets))
+	}
+	for k, want := range secrets {
+		got, ok := export.Secrets[k]
+		if !ok {
+			t.Fatalf("Export missing key %q", k)
+		}
+		if got != want {
+			t.Fatalf("Export[%q]: got %q, want %q", k, got, want)
+		}
+	}
+}
+
+func TestVaultBackend_ExportJSON(t *testing.T) {
+	v := testVault(t)
+	if err := v.Initialize(); err != nil {
+		t.Fatalf("Initialize: %v", err)
+	}
+
+	if err := v.Set("key1", "value1"); err != nil {
+		t.Fatalf("Set: %v", err)
+	}
+
+	data, err := v.ExportJSON()
+	if err != nil {
+		t.Fatalf("ExportJSON: %v", err)
+	}
+
+	// Verify it's valid JSON.
+	var export VaultExport
+	if err := json.Unmarshal(data, &export); err != nil {
+		t.Fatalf("unmarshal exported JSON: %v", err)
+	}
+	if export.Version != exportVersion {
+		t.Fatalf("version: got %d, want %d", export.Version, exportVersion)
+	}
+	if val, ok := export.Secrets["key1"]; !ok || val != "value1" {
+		t.Fatalf("secrets[key1]: got %q, want %q", val, "value1")
+	}
+}
+
+func TestVaultBackend_Import(t *testing.T) {
+	v := testVault(t)
+	if err := v.Initialize(); err != nil {
+		t.Fatalf("Initialize: %v", err)
+	}
+
+	export := &VaultExport{
+		Version:    exportVersion,
+		ExportedAt: "2025-01-01T00:00:00Z",
+		Secrets: map[string]string{
+			"key1": "value1",
+			"key2": "value2",
+			"key3": "value3",
+		},
+	}
+
+	count, err := v.Import(export)
+	if err != nil {
+		t.Fatalf("Import: %v", err)
+	}
+	if count != 3 {
+		t.Fatalf("Import count: got %d, want 3", count)
+	}
+
+	// Verify all keys were imported.
+	for k, want := range export.Secrets {
+		got, err := v.Get(k)
+		if err != nil {
+			t.Fatalf("Get(%s): %v", k, err)
+		}
+		if got != want {
+			t.Fatalf("Get(%s): got %q, want %q", k, got, want)
+		}
+	}
+}
+
+func TestVaultBackend_ImportOverwrites(t *testing.T) {
+	v := testVault(t)
+	if err := v.Initialize(); err != nil {
+		t.Fatalf("Initialize: %v", err)
+	}
+
+	// Pre-set a key.
+	if err := v.Set("key1", "original"); err != nil {
+		t.Fatalf("Set: %v", err)
+	}
+
+	// Import with the same key but different value.
+	export := &VaultExport{
+		Version:    exportVersion,
+		ExportedAt: "2025-01-01T00:00:00Z",
+		Secrets:    map[string]string{"key1": "imported"},
+	}
+
+	count, err := v.Import(export)
+	if err != nil {
+		t.Fatalf("Import: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("Import count: got %d, want 1", count)
+	}
+
+	got, err := v.Get("key1")
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if got != "imported" {
+		t.Fatalf("Get after import: got %q, want %q", got, "imported")
+	}
+}
+
+func TestVaultBackend_ImportJSON(t *testing.T) {
+	v := testVault(t)
+	if err := v.Initialize(); err != nil {
+		t.Fatalf("Initialize: %v", err)
+	}
+
+	jsonData := []byte(`{
+		"version": 1,
+		"exported_at": "2025-01-01T00:00:00Z",
+		"secrets": {
+			"api_key": "sk-123",
+			"db_pass": "secret"
+		}
+	}`)
+
+	count, err := v.ImportJSON(jsonData)
+	if err != nil {
+		t.Fatalf("ImportJSON: %v", err)
+	}
+	if count != 2 {
+		t.Fatalf("ImportJSON count: got %d, want 2", count)
+	}
+
+	got, err := v.Get("api_key")
+	if err != nil {
+		t.Fatalf("Get(api_key): %v", err)
+	}
+	if got != "sk-123" {
+		t.Fatalf("Get(api_key): got %q, want %q", got, "sk-123")
+	}
+}
+
+func TestVaultBackend_ExportImportRoundtrip(t *testing.T) {
+	dir := t.TempDir()
+
+	// Create vault 1 with secrets.
+	dbPath1 := filepath.Join(dir, "vault1.db")
+	v1, err := NewVaultBackend("pass1", WithVaultPath(dbPath1))
+	if err != nil {
+		t.Fatalf("NewVaultBackend v1: %v", err)
+	}
+	if err := v1.Initialize(); err != nil {
+		t.Fatalf("Initialize v1: %v", err)
+	}
+
+	secrets := map[string]string{
+		"key1":    "value1",
+		"key2":    "multi\nline\nvalue",
+		"key3":    `{"json": "value"}`,
+		"unicode": "日本語テスト",
+	}
+	for k, val := range secrets {
+		if err := v1.Set(k, val); err != nil {
+			t.Fatalf("Set(%s): %v", k, err)
+		}
+	}
+
+	// Export from v1 as JSON.
+	data, err := v1.ExportJSON()
+	if err != nil {
+		t.Fatalf("ExportJSON: %v", err)
+	}
+	_ = v1.Close()
+
+	// Create vault 2 with different passphrase and import.
+	dbPath2 := filepath.Join(dir, "vault2.db")
+	v2, err := NewVaultBackend("different-pass", WithVaultPath(dbPath2))
+	if err != nil {
+		t.Fatalf("NewVaultBackend v2: %v", err)
+	}
+	defer func() { _ = v2.Close() }()
+	if err := v2.Initialize(); err != nil {
+		t.Fatalf("Initialize v2: %v", err)
+	}
+
+	count, err := v2.ImportJSON(data)
+	if err != nil {
+		t.Fatalf("ImportJSON: %v", err)
+	}
+	if count != len(secrets) {
+		t.Fatalf("ImportJSON count: got %d, want %d", count, len(secrets))
+	}
+
+	// Verify all secrets match.
+	for k, want := range secrets {
+		got, err := v2.Get(k)
+		if err != nil {
+			t.Fatalf("Get(%s) from v2: %v", k, err)
+		}
+		if got != want {
+			t.Fatalf("Get(%s) from v2: got %q, want %q", k, got, want)
+		}
+	}
+}
+
+func TestVaultBackend_ExportLocked(t *testing.T) {
+	v := testVault(t)
+	if err := v.Initialize(); err != nil {
+		t.Fatalf("Initialize: %v", err)
+	}
+	if err := v.Lock(); err != nil {
+		t.Fatalf("Lock: %v", err)
+	}
+
+	_, err := v.Export()
+	if !errors.Is(err, ErrVaultLocked) {
+		t.Fatalf("Export on locked vault: got %v, want ErrVaultLocked", err)
+	}
+}
+
+func TestVaultBackend_ImportLocked(t *testing.T) {
+	v := testVault(t)
+	if err := v.Initialize(); err != nil {
+		t.Fatalf("Initialize: %v", err)
+	}
+	if err := v.Lock(); err != nil {
+		t.Fatalf("Lock: %v", err)
+	}
+
+	export := &VaultExport{
+		Version:    exportVersion,
+		ExportedAt: "2025-01-01T00:00:00Z",
+		Secrets:    map[string]string{"k": "v"},
+	}
+	_, err := v.Import(export)
+	if !errors.Is(err, ErrVaultLocked) {
+		t.Fatalf("Import on locked vault: got %v, want ErrVaultLocked", err)
+	}
+}
+
+func TestVaultBackend_ImportNil(t *testing.T) {
+	v := testVault(t)
+	if err := v.Initialize(); err != nil {
+		t.Fatalf("Initialize: %v", err)
+	}
+
+	_, err := v.Import(nil)
+	if err == nil {
+		t.Fatal("Import nil should fail")
+	}
+}
+
+func TestVaultBackend_ImportBadVersion(t *testing.T) {
+	v := testVault(t)
+	if err := v.Initialize(); err != nil {
+		t.Fatalf("Initialize: %v", err)
+	}
+
+	export := &VaultExport{
+		Version:    999,
+		ExportedAt: "2025-01-01T00:00:00Z",
+		Secrets:    map[string]string{"k": "v"},
+	}
+	_, err := v.Import(export)
+	if err == nil {
+		t.Fatal("Import with bad version should fail")
+	}
+}
+
+func TestVaultBackend_ImportJSON_InvalidJSON(t *testing.T) {
+	v := testVault(t)
+	if err := v.Initialize(); err != nil {
+		t.Fatalf("Initialize: %v", err)
+	}
+
+	_, err := v.ImportJSON([]byte("not json"))
+	if err == nil {
+		t.Fatal("ImportJSON with invalid JSON should fail")
+	}
+}
+
+func TestVaultBackend_ExportNotInitialized(t *testing.T) {
+	v := testVault(t)
+
+	// Export on uninitialized vault should fail (passphrase verification fails).
+	_, err := v.Export()
+	if err == nil {
+		t.Fatal("Export on uninitialized vault should fail")
+	}
+}
+
+func TestVaultBackend_ImportEmptySecrets(t *testing.T) {
+	v := testVault(t)
+	if err := v.Initialize(); err != nil {
+		t.Fatalf("Initialize: %v", err)
+	}
+
+	export := &VaultExport{
+		Version:    exportVersion,
+		ExportedAt: "2025-01-01T00:00:00Z",
+		Secrets:    map[string]string{},
+	}
+
+	count, err := v.Import(export)
+	if err != nil {
+		t.Fatalf("Import empty: %v", err)
+	}
+	if count != 0 {
+		t.Fatalf("Import empty count: got %d, want 0", count)
 	}
 }

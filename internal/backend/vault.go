@@ -13,6 +13,7 @@ package backend
 import (
 	"bytes"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -21,6 +22,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"filippo.io/age"
 	"filippo.io/age/armor"
@@ -595,4 +597,141 @@ func (v *VaultBackend) decrypt(armored string) (string, error) {
 // DBPath returns the path to the vault database file.
 func (v *VaultBackend) DBPath() string {
 	return v.dbPath
+}
+
+// VaultExport represents the JSON structure used for vault export/import.
+// It contains all secret key-value pairs in plaintext along with metadata
+// about the export.
+type VaultExport struct {
+	// Version is the export format version for forward compatibility.
+	Version int `json:"version"`
+	// ExportedAt is the RFC 3339 timestamp when the export was created.
+	ExportedAt string `json:"exported_at"`
+	// Secrets contains the decrypted key-value pairs.
+	Secrets map[string]string `json:"secrets"`
+}
+
+// exportVersion is the current export format version.
+const exportVersion = 1
+
+// Export decrypts all secrets and returns them as a VaultExport struct.
+// Returns ErrVaultLocked if the vault is locked.
+func (v *VaultBackend) Export() (*VaultExport, error) {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+
+	db, err := v.open()
+	if err != nil {
+		return nil, fmt.Errorf("vault export: %w", err)
+	}
+
+	if err := v.checkLocked(db); err != nil {
+		return nil, fmt.Errorf("vault export: %w", err)
+	}
+
+	if err := v.verifyPassphraseUnlocked(db); err != nil {
+		return nil, fmt.Errorf("vault export: %w", err)
+	}
+
+	rows, err := db.Query("SELECT key, value FROM secrets ORDER BY key")
+	if err != nil {
+		return nil, fmt.Errorf("vault export: querying secrets: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	secrets := make(map[string]string)
+	for rows.Next() {
+		var key, encrypted string
+		if err := rows.Scan(&key, &encrypted); err != nil {
+			return nil, fmt.Errorf("vault export: scanning row: %w", err)
+		}
+		plaintext, err := v.decrypt(encrypted)
+		if err != nil {
+			return nil, fmt.Errorf("vault export: decrypting %q: %w", key, err)
+		}
+		secrets[key] = plaintext
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("vault export: iterating rows: %w", err)
+	}
+
+	return &VaultExport{
+		Version:    exportVersion,
+		ExportedAt: time.Now().UTC().Format(time.RFC3339),
+		Secrets:    secrets,
+	}, nil
+}
+
+// Import reads a VaultExport and stores all secrets in the vault, encrypting
+// each value. Existing keys are overwritten. Returns ErrVaultLocked if the
+// vault is locked.
+func (v *VaultBackend) Import(export *VaultExport) (int, error) {
+	if export == nil {
+		return 0, fmt.Errorf("vault import: export data is nil")
+	}
+	if export.Version != exportVersion {
+		return 0, fmt.Errorf("vault import: unsupported export version %d (expected %d)", export.Version, exportVersion)
+	}
+
+	v.mu.Lock()
+	defer v.mu.Unlock()
+
+	db, err := v.open()
+	if err != nil {
+		return 0, fmt.Errorf("vault import: %w", err)
+	}
+
+	if err := v.checkLocked(db); err != nil {
+		return 0, fmt.Errorf("vault import: %w", err)
+	}
+
+	if err := v.verifyPassphraseUnlocked(db); err != nil {
+		return 0, fmt.Errorf("vault import: %w", err)
+	}
+
+	count := 0
+	for key, value := range export.Secrets {
+		encrypted, err := v.encrypt(value)
+		if err != nil {
+			return count, fmt.Errorf("vault import: encrypting %q: %w", key, err)
+		}
+
+		_, err = db.Exec(
+			"INSERT INTO secrets (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+			key, encrypted,
+		)
+		if err != nil {
+			return count, fmt.Errorf("vault import: storing %q: %w", key, err)
+		}
+		count++
+	}
+
+	return count, nil
+}
+
+// ExportJSON is a convenience method that exports the vault and marshals
+// it to indented JSON bytes.
+func (v *VaultBackend) ExportJSON() ([]byte, error) {
+	export, err := v.Export()
+	if err != nil {
+		return nil, err
+	}
+
+	data, err := json.MarshalIndent(export, "", "  ")
+	if err != nil {
+		return nil, fmt.Errorf("vault export: marshaling JSON: %w", err)
+	}
+
+	return data, nil
+}
+
+// ImportJSON is a convenience method that reads JSON bytes and imports
+// the secrets into the vault. Returns the number of secrets imported.
+func (v *VaultBackend) ImportJSON(data []byte) (int, error) {
+	var export VaultExport
+	if err := json.Unmarshal(data, &export); err != nil {
+		return 0, fmt.Errorf("vault import: parsing JSON: %w", err)
+	}
+
+	return v.Import(&export)
 }

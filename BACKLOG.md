@@ -67,7 +67,7 @@
 - [DONE] P2 | ENV-040 | Implement local vault backend (SQLite + age encryption at `~/.config/envref/vault.db`)
 - [DONE] P2 | ENV-041 | Add master password or age key setup flow on first use
 - [DONE] P2 | ENV-042 | Add vault `lock` / `unlock` commands
-- [TODO] P3 | ENV-043 | Add vault export/import for backup/migration
+- [DONE] P3 | ENV-043 | Add vault export/import for backup/migration
 
 ### 3d — External Backends (plugins)
 
@@ -187,7 +187,7 @@
 
 ## Phase 12 — Testing & Quality
 
-- [DONE] P1 | ENV-140 | Unit tests for `.env` parser (edge cases, multiline, quotes, comments)
+- [DONE] P1 | ENV-140 | Unit tests for `.env` parser (edge cases,**** multiline, quotes, comments)
 - [DONE] P1 | ENV-141 | Unit tests for merge logic (override precedence, ref detection)
 - [DONE] P1 | ENV-142 | Unit tests for resolution pipeline (mock backends)
 - [DONE] P1 | ENV-143 | Integration tests for CLI commands (cobra test helpers)
