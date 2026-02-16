@@ -8,6 +8,7 @@ package resolve
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/xcke/envref/internal/backend"
 	"github.com/xcke/envref/internal/envfile"
@@ -62,6 +63,17 @@ func (r *Result) Resolved() bool {
 // Non-ref entries are passed through unchanged. Resolution errors are collected
 // per-key rather than failing the entire operation.
 func Resolve(env *envfile.Env, registry *backend.Registry, project string) (*Result, error) {
+	return ResolveWithProfile(env, registry, project, "")
+}
+
+// ResolveWithProfile works like Resolve but supports profile-scoped secrets.
+// When profile is non-empty, each ref:// lookup first tries the profile-scoped
+// namespace (<project>/<profile>/<key>), then falls back to the project-scoped
+// namespace (<project>/<key>). This allows profile-specific secret overrides
+// while maintaining project-wide defaults.
+//
+// When profile is empty, behavior is identical to Resolve.
+func ResolveWithProfile(env *envfile.Env, registry *backend.Registry, project, profile string) (*Result, error) {
 	if env == nil {
 		return nil, fmt.Errorf("env must not be nil")
 	}
@@ -72,7 +84,7 @@ func Resolve(env *envfile.Env, registry *backend.Registry, project string) (*Res
 		return nil, fmt.Errorf("project name must not be empty")
 	}
 
-	// Build namespaced wrappers for each backend.
+	// Build project-scoped namespaced wrappers for each backend.
 	nsBackends := make(map[string]*backend.NamespacedBackend)
 	for _, b := range registry.Backends() {
 		ns, err := backend.NewNamespacedBackend(b, project)
@@ -82,11 +94,32 @@ func Resolve(env *envfile.Env, registry *backend.Registry, project string) (*Res
 		nsBackends[b.Name()] = ns
 	}
 
-	// Build a namespaced registry for fallback resolution.
+	// Build a project-scoped namespaced registry for fallback resolution.
 	nsRegistry := backend.NewRegistry()
 	for _, name := range registry.Names() {
 		if err := nsRegistry.Register(nsBackends[name]); err != nil {
 			return nil, fmt.Errorf("registering namespaced backend %q: %w", name, err)
+		}
+	}
+
+	// Build profile-scoped namespaced wrappers if a profile is active.
+	var profileBackends map[string]*backend.NamespacedBackend
+	var profileRegistry *backend.Registry
+	if profile != "" {
+		profileBackends = make(map[string]*backend.NamespacedBackend)
+		for _, b := range registry.Backends() {
+			ns, err := backend.NewProfileNamespacedBackend(b, project, profile)
+			if err != nil {
+				return nil, fmt.Errorf("wrapping backend %q for profile %q: %w", b.Name(), profile, err)
+			}
+			profileBackends[b.Name()] = ns
+		}
+
+		profileRegistry = backend.NewRegistry()
+		for _, name := range registry.Names() {
+			if err := profileRegistry.Register(profileBackends[name]); err != nil {
+				return nil, fmt.Errorf("registering profile backend %q: %w", name, err)
+			}
 		}
 	}
 
@@ -128,7 +161,19 @@ func Resolve(env *envfile.Env, registry *backend.Registry, project string) (*Res
 		// Check the cache before hitting backends.
 		cached, ok := cache[envEntry.Value]
 		if !ok {
-			value, resolveErr := resolveRef(parsed, nsBackends, nsRegistry)
+			var value string
+			var resolveErr error
+
+			// If a profile is active, try profile-scoped first.
+			if profileBackends != nil {
+				value, resolveErr = resolveRef(parsed, profileBackends, profileRegistry)
+			}
+
+			// Fall back to project-scoped if no profile or profile lookup failed with not-found.
+			if profileBackends == nil || isNotFoundError(resolveErr) {
+				value, resolveErr = resolveRef(parsed, nsBackends, nsRegistry)
+			}
+
 			cached = cachedResult{value: value, err: resolveErr}
 			cache[envEntry.Value] = cached
 		}
@@ -156,6 +201,15 @@ func Resolve(env *envfile.Env, registry *backend.Registry, project string) (*Res
 	}
 
 	return result, nil
+}
+
+// isNotFoundError returns true if the error indicates a secret was not found.
+func isNotFoundError(err error) bool {
+	if err == nil {
+		return false
+	}
+	return errors.Is(err, backend.ErrNotFound) ||
+		strings.Contains(err.Error(), "not found")
 }
 
 // resolveRef looks up a parsed reference in the backends. If the ref specifies

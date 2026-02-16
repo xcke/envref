@@ -1,7 +1,7 @@
 # Project Status
 
 ## Last Completed
-- ENV-095: Added `envref profile diff <a> <b>` command to compare profiles [iter-38]
+- ENV-096: Added profile-scoped secrets with `--profile` flag on all secret commands [iter-39]
 
 ## Current State
 - Go module `github.com/xcke/envref` initialized with Cobra + Viper + go-keyring + testify dependencies
@@ -12,32 +12,32 @@
 - `envref set <KEY>=<VALUE>` command writes key-value pairs to .env files
 - `envref list` command prints all merged and interpolated key-value pairs
 - `envref secret set/get/delete/list/generate/copy` — full secret CRUD + generation + cross-project copy via configured backends with project namespace
+- **Profile-scoped secrets:** `--profile` flag on all secret subcommands stores/retrieves secrets as `<project>/<profile>/<key>`; `secret get` falls back from profile to project scope; resolve pipeline tries profile-scoped first then project-scoped
 - `envref resolve` — loads .env + optional profile + .env.local, merges, interpolates, resolves `ref://` references
-- `envref resolve --profile <name>` — uses a named profile's env file in the merge chain
+- `envref resolve --profile <name>` — uses a named profile's env file in the merge chain and resolves profile-scoped secrets
 - `envref resolve --direnv` — outputs `export KEY=VALUE` format for shell integration
 - `envref resolve --strict` — fails with no output if any reference cannot be resolved (CI-safe)
 - `envref run -- <command>` — resolves env vars and executes a subprocess with them injected
 - `envref profile list` — shows available profiles from config and convention-based `.env.*` files
 - `envref profile use <name>` — sets active profile in `.envref.yaml`
 - `envref profile create <name>` — scaffolds `.env.<name>` file with optional `--from`, `--register`, `--env-file`, `--force` flags
-- `envref profile diff <a> <b>` — compares effective environments between two profiles, showing only-in-A, only-in-B, and changed keys with colorized output; supports `--format plain|json|table`
+- `envref profile diff <a> <b>` — compares effective environments between two profiles
 - `envref validate` — checks .env against .env.example schema
-- `envref validate --ci` — CI mode: extra keys are errors, compact output, silent on success, exit code 1 on any failure
+- `envref validate --ci` — CI mode with exit code 1 on failure
 - `envref status` — shows environment overview with actionable hints
 - `envref doctor` — scans .env files for common issues
 - `envref config show` — prints resolved effective config (plain, JSON, table formats)
 - `envref completion <shell>` — generates shell completion scripts (bash, zsh, fish, powershell)
-- **Global verbosity flags:** `--quiet`/`-q` suppresses info output, `--verbose` shows file loading detail, `--debug` shows internal trace; mutually exclusive via Cobra
-- **Colorized output:** Errors (red), warnings (yellow), debug labels (cyan), success (green), section headers (bold); auto-detected via TTY; disabled with `--no-color` flag or `NO_COLOR` env var
-- **`internal/output` package:** `Writer` type with `Info`/`Verbose`/`Debug`/`Warn`/`Error`/`Success` methods + color helpers (`Red`/`Green`/`Yellow`/`Cyan`/`Bold`)
-- **Fuzzy key matching:** `internal/suggest` package with Levenshtein distance based "did you mean?" suggestions in `get` command errors; case-insensitive matching, up to 3 suggestions within edit distance 3
-- **Resolution cache:** Duplicate `ref://` URIs within a single resolve call are resolved once, avoiding redundant backend queries
-- **Config validation on load:** `Load()` calls `Validate()` automatically, returning `*ValidationError` for semantic errors
+- **Global verbosity flags:** `--quiet`/`-q`, `--verbose`, `--debug`; mutually exclusive
+- **Colorized output:** auto-detected via TTY; disabled with `--no-color` flag or `NO_COLOR` env var
+- **`internal/output` package:** `Writer` type with verbosity and color support
+- **Fuzzy key matching:** `internal/suggest` package with "did you mean?" suggestions
+- **Resolution cache:** Duplicate `ref://` URIs resolved once per resolve call
+- **Config validation on load:** `Load()` calls `Validate()` automatically
 - **Config inheritance:** Global config at `~/.config/envref/config.yaml` merged with project `.envref.yaml`
-- **Output format support:** `--format` flag on `get`, `list`, `resolve`, and `config show` commands (plain, json, shell, table)
+- **Output format support:** `--format` flag on `get`, `list`, `resolve`, and `config show` commands
 - **Profile support:** 3-layer merge with `--profile` flag
-- **Config profile management:** `AddProfile()` function for programmatic config file updates
-- **Keychain error handling:** `KeychainError` type classifies raw go-keyring errors into categories with platform-specific actionable hints
+- **Keychain error handling:** `KeychainError` type with platform-specific hints
 - Resolution pipeline with per-key error collection, partial resolution, direct backend matching + fallback chain
 - `.env` file parser with full quote/multiline/comment/BOM/CRLF support
 - `ref://` URI parser, `Backend` interface, `Registry`, `NamespacedBackend`, `KeychainBackend`

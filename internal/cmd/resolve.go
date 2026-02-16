@@ -121,8 +121,8 @@ func runResolve(cmd *cobra.Command, direnv bool, profileOverride, formatStr stri
 
 	w.Debug("registered %d backend(s)\n", len(cfg.Backends))
 
-	// Resolve references.
-	result, err := resolve.Resolve(env, registry, cfg.Project)
+	// Resolve references (with profile-scoped fallback if profile is active).
+	result, err := resolve.ResolveWithProfile(env, registry, cfg.Project, profile)
 	if err != nil {
 		return fmt.Errorf("resolving references: %w", err)
 	}

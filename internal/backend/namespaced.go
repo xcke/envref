@@ -18,6 +18,7 @@ import (
 type NamespacedBackend struct {
 	inner   Backend
 	project string
+	profile string
 	prefix  string
 }
 
@@ -64,6 +65,12 @@ func (n *NamespacedBackend) Delete(key string) error {
 	return n.inner.Delete(n.prefix + key)
 }
 
+// Profile returns the profile scope, if any. Returns empty string for
+// project-scoped backends.
+func (n *NamespacedBackend) Profile() string {
+	return n.profile
+}
+
 // List returns all secret keys in this project's namespace, with the
 // project prefix stripped. Keys from other projects are excluded.
 func (n *NamespacedBackend) List() ([]string, error) {
@@ -79,4 +86,27 @@ func (n *NamespacedBackend) List() ([]string, error) {
 		}
 	}
 	return keys, nil
+}
+
+// NewProfileNamespacedBackend creates a NamespacedBackend that scopes all
+// operations to a specific project and profile. Keys are stored as
+// "<project>/<profile>/<key>" in the underlying backend.
+//
+// Both project and profile must be non-empty.
+func NewProfileNamespacedBackend(inner Backend, project, profile string) (*NamespacedBackend, error) {
+	if project == "" {
+		return nil, fmt.Errorf("project name must not be empty")
+	}
+	if profile == "" {
+		return nil, fmt.Errorf("profile name must not be empty")
+	}
+	if inner == nil {
+		return nil, fmt.Errorf("inner backend must not be nil")
+	}
+	return &NamespacedBackend{
+		inner:   inner,
+		project: project,
+		profile: profile,
+		prefix:  project + "/" + profile + "/",
+	}, nil
 }

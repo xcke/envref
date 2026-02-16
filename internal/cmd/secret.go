@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"math/big"
@@ -48,23 +49,29 @@ func newSecretGetCmd() *cobra.Command {
 By default, the first configured backend from .envref.yaml is used.
 Use --backend to specify a different backend.
 
+Use --profile to retrieve a profile-scoped secret (stored under <project>/<profile>/<key>).
+If no profile-scoped secret exists, falls back to the project-scoped secret.
+
 Examples:
-  envref secret get API_KEY                    # get from default backend
-  envref secret get DB_PASS --backend keychain # get from specific backend`,
+  envref secret get API_KEY                              # get from default backend
+  envref secret get DB_PASS --backend keychain           # get from specific backend
+  envref secret get API_KEY --profile staging            # get profile-scoped secret`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			backendName, _ := cmd.Flags().GetString("backend")
-			return runSecretGet(cmd, args[0], backendName)
+			profile, _ := cmd.Flags().GetString("profile")
+			return runSecretGet(cmd, args[0], backendName, profile)
 		},
 	}
 
 	cmd.Flags().StringP("backend", "b", "", "backend to retrieve the secret from (default: first configured)")
+	cmd.Flags().StringP("profile", "P", "", "profile scope for the secret (e.g., staging, production)")
 
 	return cmd
 }
 
 // runSecretGet retrieves a secret from the configured backend.
-func runSecretGet(cmd *cobra.Command, key, backendName string) error {
+func runSecretGet(cmd *cobra.Command, key, backendName, profile string) error {
 	// Validate key.
 	if strings.TrimSpace(key) == "" {
 		return fmt.Errorf("key must not be empty")
@@ -102,12 +109,32 @@ func runSecretGet(cmd *cobra.Command, key, backendName string) error {
 		return fmt.Errorf("backend %q is not registered", backendName)
 	}
 
+	// Resolve effective profile from flag or config.
+	effectiveProfile := cfg.EffectiveProfile(profile)
+
+	// If profile is active, try profile-scoped first, then fall back.
+	if effectiveProfile != "" {
+		profileBackend, pErr := backend.NewProfileNamespacedBackend(targetBackend, cfg.Project, effectiveProfile)
+		if pErr != nil {
+			return fmt.Errorf("creating profile backend: %w", pErr)
+		}
+		value, pGetErr := profileBackend.Get(key)
+		if pGetErr == nil {
+			_, _ = fmt.Fprintln(cmd.OutOrStdout(), value)
+			return nil
+		}
+		// Only fall back on not-found; other errors are real failures.
+		if !errors.Is(pGetErr, backend.ErrNotFound) {
+			return fmt.Errorf("retrieving secret: %w", pGetErr)
+		}
+	}
+
 	nsBackend, err := backend.NewNamespacedBackend(targetBackend, cfg.Project)
 	if err != nil {
 		return fmt.Errorf("creating namespaced backend: %w", err)
 	}
 
-	// Retrieve the secret.
+	// Retrieve the secret from project scope.
 	value, err := nsBackend.Get(key)
 	if err != nil {
 		return fmt.Errorf("retrieving secret: %w", err)
@@ -129,23 +156,28 @@ Only key names are shown — secret values are never printed.
 By default, the first configured backend from .envref.yaml is used.
 Use --backend to specify a different backend.
 
+Use --profile to list only profile-scoped secrets for the given profile.
+
 Examples:
-  envref secret list                    # list from default backend
-  envref secret list --backend keychain # list from specific backend`,
+  envref secret list                              # list from default backend
+  envref secret list --backend keychain           # list from specific backend
+  envref secret list --profile staging            # list profile-scoped secrets`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			backendName, _ := cmd.Flags().GetString("backend")
-			return runSecretList(cmd, backendName)
+			profile, _ := cmd.Flags().GetString("profile")
+			return runSecretList(cmd, backendName, profile)
 		},
 	}
 
 	cmd.Flags().StringP("backend", "b", "", "backend to list secrets from (default: first configured)")
+	cmd.Flags().StringP("profile", "P", "", "profile scope to list secrets for (e.g., staging, production)")
 
 	return cmd
 }
 
 // runSecretList lists all secret keys for the current project from the configured backend.
-func runSecretList(cmd *cobra.Command, backendName string) error {
+func runSecretList(cmd *cobra.Command, backendName, profile string) error {
 	// Load project config.
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -178,7 +210,14 @@ func runSecretList(cmd *cobra.Command, backendName string) error {
 		return fmt.Errorf("backend %q is not registered", backendName)
 	}
 
-	nsBackend, err := backend.NewNamespacedBackend(targetBackend, cfg.Project)
+	// Build the appropriate namespaced backend.
+	effectiveProfile := cfg.EffectiveProfile(profile)
+	var nsBackend *backend.NamespacedBackend
+	if effectiveProfile != "" {
+		nsBackend, err = backend.NewProfileNamespacedBackend(targetBackend, cfg.Project, effectiveProfile)
+	} else {
+		nsBackend, err = backend.NewNamespacedBackend(targetBackend, cfg.Project)
+	}
 	if err != nil {
 		return fmt.Errorf("creating namespaced backend: %w", err)
 	}
@@ -190,7 +229,11 @@ func runSecretList(cmd *cobra.Command, backendName string) error {
 	}
 
 	if len(keys) == 0 {
-		output.NewWriter(cmd).Info("no secrets found\n")
+		if effectiveProfile != "" {
+			output.NewWriter(cmd).Info("no secrets found for profile %q\n", effectiveProfile)
+		} else {
+			output.NewWriter(cmd).Info("no secrets found\n")
+		}
 		return nil
 	}
 
@@ -213,26 +256,31 @@ the confirmation prompt.
 The first backend from .envref.yaml is used by default.
 Use --backend to specify a different backend.
 
+Use --profile to delete a profile-scoped secret.
+
 Examples:
-  envref secret delete API_KEY                    # delete with confirmation
-  envref secret delete API_KEY --force            # delete without confirmation
-  envref secret delete DB_PASS --backend keychain # delete from specific backend`,
+  envref secret delete API_KEY                              # delete with confirmation
+  envref secret delete API_KEY --force                      # delete without confirmation
+  envref secret delete DB_PASS --backend keychain           # delete from specific backend
+  envref secret delete API_KEY --profile staging --force    # delete profile-scoped secret`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			backendName, _ := cmd.Flags().GetString("backend")
 			force, _ := cmd.Flags().GetBool("force")
-			return runSecretDelete(cmd, args[0], backendName, force)
+			profile, _ := cmd.Flags().GetString("profile")
+			return runSecretDelete(cmd, args[0], backendName, force, profile)
 		},
 	}
 
 	cmd.Flags().StringP("backend", "b", "", "backend to delete the secret from (default: first configured)")
 	cmd.Flags().BoolP("force", "f", false, "skip confirmation prompt")
+	cmd.Flags().StringP("profile", "P", "", "profile scope for the secret (e.g., staging, production)")
 
 	return cmd
 }
 
 // runSecretDelete removes a secret from the configured backend.
-func runSecretDelete(cmd *cobra.Command, key, backendName string, force bool) error {
+func runSecretDelete(cmd *cobra.Command, key, backendName string, force bool, profile string) error {
 	// Validate key.
 	if strings.TrimSpace(key) == "" {
 		return fmt.Errorf("key must not be empty")
@@ -270,14 +318,25 @@ func runSecretDelete(cmd *cobra.Command, key, backendName string, force bool) er
 		return fmt.Errorf("backend %q is not registered", backendName)
 	}
 
-	nsBackend, err := backend.NewNamespacedBackend(targetBackend, cfg.Project)
+	// Build the appropriate namespaced backend.
+	effectiveProfile := cfg.EffectiveProfile(profile)
+	var nsBackend *backend.NamespacedBackend
+	if effectiveProfile != "" {
+		nsBackend, err = backend.NewProfileNamespacedBackend(targetBackend, cfg.Project, effectiveProfile)
+	} else {
+		nsBackend, err = backend.NewNamespacedBackend(targetBackend, cfg.Project)
+	}
 	if err != nil {
 		return fmt.Errorf("creating namespaced backend: %w", err)
 	}
 
 	// Confirm deletion unless --force is set.
+	scopeLabel := fmt.Sprintf("backend %q", backendName)
+	if effectiveProfile != "" {
+		scopeLabel = fmt.Sprintf("backend %q (profile %q)", backendName, effectiveProfile)
+	}
 	if !force {
-		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Delete secret %q from backend %q? [y/N] ", key, backendName)
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Delete secret %q from %s? [y/N] ", key, scopeLabel)
 		answer, err := readLine(cmd.InOrStdin())
 		if err != nil {
 			return fmt.Errorf("reading confirmation: %w", err)
@@ -294,7 +353,7 @@ func runSecretDelete(cmd *cobra.Command, key, backendName string, force bool) er
 		return fmt.Errorf("deleting secret: %w", err)
 	}
 
-	output.NewWriter(cmd).Info("secret %q deleted from backend %q\n", key, backendName)
+	output.NewWriter(cmd).Info("secret %q deleted from %s\n", key, scopeLabel)
 	return nil
 }
 
@@ -311,26 +370,32 @@ If --value is not provided, you will be prompted to enter the value from stdin
 The secret is stored in the first backend from .envref.yaml by default.
 Use --backend to specify a different backend.
 
+Use --profile to store the secret in a profile-scoped namespace
+(<project>/<profile>/<key>), allowing different values per environment.
+
 Examples:
-  envref secret set API_KEY                    # prompt for value
-  envref secret set API_KEY --value sk-123     # non-interactive
-  envref secret set DB_PASS --backend keychain # specific backend`,
+  envref secret set API_KEY                              # prompt for value
+  envref secret set API_KEY --value sk-123               # non-interactive
+  envref secret set DB_PASS --backend keychain           # specific backend
+  envref secret set API_KEY --value sk-stg --profile staging  # profile-scoped`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			value, _ := cmd.Flags().GetString("value")
 			backendName, _ := cmd.Flags().GetString("backend")
-			return runSecretSet(cmd, args[0], value, backendName)
+			profile, _ := cmd.Flags().GetString("profile")
+			return runSecretSet(cmd, args[0], value, backendName, profile)
 		},
 	}
 
 	cmd.Flags().StringP("value", "v", "", "secret value (if omitted, prompts for input)")
 	cmd.Flags().StringP("backend", "b", "", "backend to store the secret in (default: first configured)")
+	cmd.Flags().StringP("profile", "P", "", "profile scope for the secret (e.g., staging, production)")
 
 	return cmd
 }
 
 // runSecretSet stores a secret in the configured backend.
-func runSecretSet(cmd *cobra.Command, key, value, backendName string) error {
+func runSecretSet(cmd *cobra.Command, key, value, backendName, profile string) error {
 	// Validate key.
 	if strings.TrimSpace(key) == "" {
 		return fmt.Errorf("key must not be empty")
@@ -368,7 +433,14 @@ func runSecretSet(cmd *cobra.Command, key, value, backendName string) error {
 		return fmt.Errorf("backend %q is not registered", backendName)
 	}
 
-	nsBackend, err := backend.NewNamespacedBackend(targetBackend, cfg.Project)
+	// Build the appropriate namespaced backend.
+	effectiveProfile := cfg.EffectiveProfile(profile)
+	var nsBackend *backend.NamespacedBackend
+	if effectiveProfile != "" {
+		nsBackend, err = backend.NewProfileNamespacedBackend(targetBackend, cfg.Project, effectiveProfile)
+	} else {
+		nsBackend, err = backend.NewNamespacedBackend(targetBackend, cfg.Project)
+	}
 	if err != nil {
 		return fmt.Errorf("creating namespaced backend: %w", err)
 	}
@@ -387,7 +459,11 @@ func runSecretSet(cmd *cobra.Command, key, value, backendName string) error {
 		return fmt.Errorf("storing secret: %w", err)
 	}
 
-	output.NewWriter(cmd).Info("secret %q stored in backend %q\n", key, backendName)
+	scopeLabel := fmt.Sprintf("backend %q", backendName)
+	if effectiveProfile != "" {
+		scopeLabel = fmt.Sprintf("backend %q (profile %q)", backendName, effectiveProfile)
+	}
+	output.NewWriter(cmd).Info("secret %q stored in %s\n", key, scopeLabel)
 	return nil
 }
 
@@ -443,22 +519,23 @@ Available charsets:
   base64        standard base64 encoding
 
 Use --print to display the generated secret value on stdout.
+Use --profile to store in a profile-scoped namespace.
 
 Examples:
-  envref secret generate API_KEY                          # 32 char alphanumeric
-  envref secret generate API_KEY --length 64              # 64 char alphanumeric
-  envref secret generate API_KEY --charset hex            # hex string
-  envref secret generate API_KEY --charset base64         # base64 encoded
-  envref secret generate API_KEY --charset ascii          # include symbols
-  envref secret generate API_KEY --print                  # print the generated value
-  envref secret generate API_KEY --backend keychain       # specific backend`,
+  envref secret generate API_KEY                                    # 32 char alphanumeric
+  envref secret generate API_KEY --length 64                        # 64 char alphanumeric
+  envref secret generate API_KEY --charset hex                      # hex string
+  envref secret generate API_KEY --print                            # print the generated value
+  envref secret generate API_KEY --profile staging                  # profile-scoped
+  envref secret generate API_KEY --backend keychain                 # specific backend`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			length, _ := cmd.Flags().GetInt("length")
 			charset, _ := cmd.Flags().GetString("charset")
 			backendName, _ := cmd.Flags().GetString("backend")
 			printVal, _ := cmd.Flags().GetBool("print")
-			return runSecretGenerate(cmd, args[0], length, charset, backendName, printVal)
+			profile, _ := cmd.Flags().GetString("profile")
+			return runSecretGenerate(cmd, args[0], length, charset, backendName, printVal, profile)
 		},
 	}
 
@@ -466,12 +543,13 @@ Examples:
 	cmd.Flags().StringP("charset", "c", "alphanumeric", "character set: alphanumeric, ascii, hex, base64")
 	cmd.Flags().StringP("backend", "b", "", "backend to store the secret in (default: first configured)")
 	cmd.Flags().BoolP("print", "p", false, "print the generated secret value to stdout")
+	cmd.Flags().StringP("profile", "P", "", "profile scope for the secret (e.g., staging, production)")
 
 	return cmd
 }
 
 // runSecretGenerate generates a random secret and stores it in the configured backend.
-func runSecretGenerate(cmd *cobra.Command, key string, length int, charset, backendName string, printVal bool) error {
+func runSecretGenerate(cmd *cobra.Command, key string, length int, charset, backendName string, printVal bool, profile string) error {
 	// Validate key.
 	if strings.TrimSpace(key) == "" {
 		return fmt.Errorf("key must not be empty")
@@ -523,7 +601,14 @@ func runSecretGenerate(cmd *cobra.Command, key string, length int, charset, back
 		return fmt.Errorf("backend %q is not registered", backendName)
 	}
 
-	nsBackend, err := backend.NewNamespacedBackend(targetBackend, cfg.Project)
+	// Build the appropriate namespaced backend.
+	effectiveProfile := cfg.EffectiveProfile(profile)
+	var nsBackend *backend.NamespacedBackend
+	if effectiveProfile != "" {
+		nsBackend, err = backend.NewProfileNamespacedBackend(targetBackend, cfg.Project, effectiveProfile)
+	} else {
+		nsBackend, err = backend.NewNamespacedBackend(targetBackend, cfg.Project)
+	}
 	if err != nil {
 		return fmt.Errorf("creating namespaced backend: %w", err)
 	}
@@ -537,7 +622,11 @@ func runSecretGenerate(cmd *cobra.Command, key string, length int, charset, back
 		_, _ = fmt.Fprintln(cmd.OutOrStdout(), value)
 	}
 
-	output.NewWriter(cmd).Info("secret %q generated and stored in backend %q (%d chars, %s)\n", key, backendName, length, charset)
+	scopeLabel := fmt.Sprintf("backend %q", backendName)
+	if effectiveProfile != "" {
+		scopeLabel = fmt.Sprintf("backend %q (profile %q)", backendName, effectiveProfile)
+	}
+	output.NewWriter(cmd).Info("secret %q generated and stored in %s (%d chars, %s)\n", key, scopeLabel, length, charset)
 	return nil
 }
 
@@ -604,36 +693,45 @@ func generateBase64(length int) (string, error) {
 func newSecretCopyCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "copy <KEY>",
-		Short: "Copy a secret from another project",
+		Short: "Copy a secret from another project or profile",
 		Long: `Copy a secret from another project's namespace into the current project.
 
 The --from flag specifies the source project name. The secret is read from the
 source project's namespace and stored in the current project's namespace using
 the same key name.
 
+Use --profile to store the copied secret in a profile-scoped namespace.
+Use --from-profile to read from a profile-scoped namespace in the source project.
+
 By default, the first configured backend from .envref.yaml is used for both
 reading and writing. Use --backend to specify a different backend.
 
 Examples:
-  envref secret copy API_KEY --from other-project             # copy from another project
-  envref secret copy DB_PASS --from staging --backend keychain # specific backend`,
+  envref secret copy API_KEY --from other-project                          # copy from project
+  envref secret copy API_KEY --from other-project --profile staging        # copy into profile scope
+  envref secret copy API_KEY --from other-project --from-profile prod      # copy from profile scope
+  envref secret copy DB_PASS --from staging --backend keychain             # specific backend`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			fromProject, _ := cmd.Flags().GetString("from")
 			backendName, _ := cmd.Flags().GetString("backend")
-			return runSecretCopy(cmd, args[0], fromProject, backendName)
+			profile, _ := cmd.Flags().GetString("profile")
+			fromProfile, _ := cmd.Flags().GetString("from-profile")
+			return runSecretCopy(cmd, args[0], fromProject, backendName, profile, fromProfile)
 		},
 	}
 
 	cmd.Flags().String("from", "", "source project to copy the secret from (required)")
 	_ = cmd.MarkFlagRequired("from")
 	cmd.Flags().StringP("backend", "b", "", "backend to use for reading and writing (default: first configured)")
+	cmd.Flags().StringP("profile", "P", "", "destination profile scope (e.g., staging, production)")
+	cmd.Flags().String("from-profile", "", "source profile scope to copy from")
 
 	return cmd
 }
 
 // runSecretCopy copies a secret from another project's namespace into the current project.
-func runSecretCopy(cmd *cobra.Command, key, fromProject, backendName string) error {
+func runSecretCopy(cmd *cobra.Command, key, fromProject, backendName, profile, fromProfile string) error {
 	// Validate key.
 	if strings.TrimSpace(key) == "" {
 		return fmt.Errorf("key must not be empty")
@@ -676,22 +774,37 @@ func runSecretCopy(cmd *cobra.Command, key, fromProject, backendName string) err
 		return fmt.Errorf("backend %q is not registered", backendName)
 	}
 
-	// Create namespaced backend for the source project.
-	srcBackend, err := backend.NewNamespacedBackend(targetBackend, fromProject)
+	// Create namespaced backend for the source project (optionally profile-scoped).
+	var srcBackend *backend.NamespacedBackend
+	if fromProfile != "" {
+		srcBackend, err = backend.NewProfileNamespacedBackend(targetBackend, fromProject, fromProfile)
+	} else {
+		srcBackend, err = backend.NewNamespacedBackend(targetBackend, fromProject)
+	}
 	if err != nil {
 		return fmt.Errorf("creating source namespace: %w", err)
 	}
 
 	// Create namespaced backend for the current (destination) project.
-	dstBackend, err := backend.NewNamespacedBackend(targetBackend, cfg.Project)
+	effectiveProfile := cfg.EffectiveProfile(profile)
+	var dstBackend *backend.NamespacedBackend
+	if effectiveProfile != "" {
+		dstBackend, err = backend.NewProfileNamespacedBackend(targetBackend, cfg.Project, effectiveProfile)
+	} else {
+		dstBackend, err = backend.NewNamespacedBackend(targetBackend, cfg.Project)
+	}
 	if err != nil {
 		return fmt.Errorf("creating destination namespace: %w", err)
 	}
 
 	// Read from source.
+	srcLabel := fmt.Sprintf("project %q", fromProject)
+	if fromProfile != "" {
+		srcLabel = fmt.Sprintf("project %q (profile %q)", fromProject, fromProfile)
+	}
 	value, err := srcBackend.Get(key)
 	if err != nil {
-		return fmt.Errorf("reading secret from project %q: %w", fromProject, err)
+		return fmt.Errorf("reading secret from %s: %w", srcLabel, err)
 	}
 
 	// Write to destination.
@@ -699,7 +812,11 @@ func runSecretCopy(cmd *cobra.Command, key, fromProject, backendName string) err
 		return fmt.Errorf("storing secret: %w", err)
 	}
 
-	output.NewWriter(cmd).Info("secret %q copied from project %q to %q (backend %q)\n", key, fromProject, cfg.Project, backendName)
+	dstLabel := fmt.Sprintf("%q", cfg.Project)
+	if effectiveProfile != "" {
+		dstLabel = fmt.Sprintf("%q (profile %q)", cfg.Project, effectiveProfile)
+	}
+	output.NewWriter(cmd).Info("secret %q copied from %s to %s (backend %q)\n", key, srcLabel, dstLabel, backendName)
 	return nil
 }
 

@@ -1528,3 +1528,190 @@ func TestResult_ResolvedWithEmptyResult(t *testing.T) {
 	assert.Nil(t, r.Entries)
 	assert.Nil(t, r.Errors)
 }
+
+// ---------------------------------------------------------------------------
+// ResolveWithProfile Tests
+// ---------------------------------------------------------------------------
+
+func TestResolveWithProfile_EmptyProfileEqualsResolve(t *testing.T) {
+	// Empty profile should behave identically to Resolve.
+	env := buildEnv(
+		parser.Entry{Key: "SECRET", Value: "ref://keychain/key", IsRef: true},
+	)
+	reg := buildRegistry(newMockBackend("keychain", map[string]string{
+		"proj/key": "project-value",
+	}))
+
+	result, err := resolve.ResolveWithProfile(env, reg, "proj", "")
+	require.NoError(t, err)
+
+	assert.True(t, result.Resolved())
+	assert.Equal(t, "project-value", result.Entries[0].Value)
+}
+
+func TestResolveWithProfile_ProfileScopedSecretFound(t *testing.T) {
+	// When a profile-scoped secret exists, it should be returned.
+	env := buildEnv(
+		parser.Entry{Key: "API_KEY", Value: "ref://keychain/api_key", IsRef: true},
+	)
+	reg := buildRegistry(newMockBackend("keychain", map[string]string{
+		"proj/api_key":         "project-key",
+		"proj/staging/api_key": "staging-key",
+	}))
+
+	result, err := resolve.ResolveWithProfile(env, reg, "proj", "staging")
+	require.NoError(t, err)
+
+	assert.True(t, result.Resolved())
+	assert.Equal(t, "staging-key", result.Entries[0].Value)
+	assert.True(t, result.Entries[0].WasRef)
+}
+
+func TestResolveWithProfile_FallbackToProjectScope(t *testing.T) {
+	// When profile-scoped secret doesn't exist, fall back to project scope.
+	env := buildEnv(
+		parser.Entry{Key: "DB_PASS", Value: "ref://keychain/db_pass", IsRef: true},
+	)
+	reg := buildRegistry(newMockBackend("keychain", map[string]string{
+		"proj/db_pass": "project-db-pass",
+		// No proj/staging/db_pass — should fall back.
+	}))
+
+	result, err := resolve.ResolveWithProfile(env, reg, "proj", "staging")
+	require.NoError(t, err)
+
+	assert.True(t, result.Resolved())
+	assert.Equal(t, "project-db-pass", result.Entries[0].Value)
+}
+
+func TestResolveWithProfile_MixedProfileAndProject(t *testing.T) {
+	// Some secrets have profile overrides, others use project defaults.
+	env := buildEnv(
+		parser.Entry{Key: "HOST", Value: "localhost"},
+		parser.Entry{Key: "API_KEY", Value: "ref://keychain/api_key", IsRef: true},
+		parser.Entry{Key: "DB_PASS", Value: "ref://keychain/db_pass", IsRef: true},
+	)
+	reg := buildRegistry(newMockBackend("keychain", map[string]string{
+		"proj/api_key":         "project-api",
+		"proj/staging/api_key": "staging-api",
+		"proj/db_pass":         "project-db",
+		// db_pass has no staging override.
+	}))
+
+	result, err := resolve.ResolveWithProfile(env, reg, "proj", "staging")
+	require.NoError(t, err)
+
+	assert.True(t, result.Resolved())
+	assert.Len(t, result.Entries, 3)
+
+	assert.Equal(t, "localhost", result.Entries[0].Value)
+	assert.False(t, result.Entries[0].WasRef)
+
+	assert.Equal(t, "staging-api", result.Entries[1].Value) // profile override
+	assert.True(t, result.Entries[1].WasRef)
+
+	assert.Equal(t, "project-db", result.Entries[2].Value) // project fallback
+	assert.True(t, result.Entries[2].WasRef)
+}
+
+func TestResolveWithProfile_NeitherScopeHasSecret(t *testing.T) {
+	// Neither profile nor project has the secret — should error.
+	env := buildEnv(
+		parser.Entry{Key: "MISSING", Value: "ref://keychain/missing", IsRef: true},
+	)
+	reg := buildRegistry(newMockBackend("keychain", map[string]string{}))
+
+	result, err := resolve.ResolveWithProfile(env, reg, "proj", "staging")
+	require.NoError(t, err)
+
+	assert.False(t, result.Resolved())
+	assert.Len(t, result.Errors, 1)
+	assert.Equal(t, "MISSING", result.Errors[0].Key)
+}
+
+func TestResolveWithProfile_CacheWorksWithProfile(t *testing.T) {
+	// Duplicate refs with profile should be cached.
+	cb := newCountingBackend("keychain", map[string]string{
+		"proj/staging/shared": "staging-value",
+	})
+	env := buildEnv(
+		parser.Entry{Key: "A", Value: "ref://keychain/shared", IsRef: true},
+		parser.Entry{Key: "B", Value: "ref://keychain/shared", IsRef: true},
+	)
+	reg := buildRegistry(cb)
+
+	result, err := resolve.ResolveWithProfile(env, reg, "proj", "staging")
+	require.NoError(t, err)
+
+	assert.True(t, result.Resolved())
+	assert.Len(t, result.Entries, 2)
+	assert.Equal(t, "staging-value", result.Entries[0].Value)
+	assert.Equal(t, "staging-value", result.Entries[1].Value)
+
+	// Profile backend hit once, project backend should not be hit at all.
+	assert.Equal(t, 1, cb.getCounts["proj/staging/shared"])
+}
+
+func TestResolveWithProfile_FallbackChainWithProfile(t *testing.T) {
+	// When using fallback chain (generic backend name like "secrets"),
+	// profile scope should still be tried first.
+	env := buildEnv(
+		parser.Entry{Key: "TOKEN", Value: "ref://secrets/token", IsRef: true},
+	)
+	reg := buildRegistry(newMockBackend("keychain", map[string]string{
+		"proj/prod/token": "prod-token",
+		"proj/token":      "project-token",
+	}))
+
+	result, err := resolve.ResolveWithProfile(env, reg, "proj", "prod")
+	require.NoError(t, err)
+
+	assert.True(t, result.Resolved())
+	assert.Equal(t, "prod-token", result.Entries[0].Value)
+}
+
+func TestResolveWithProfile_FallbackChainProjectScope(t *testing.T) {
+	// Generic backend ref, profile scope empty, project scope has it.
+	env := buildEnv(
+		parser.Entry{Key: "TOKEN", Value: "ref://secrets/token", IsRef: true},
+	)
+	reg := buildRegistry(newMockBackend("keychain", map[string]string{
+		"proj/token": "project-token",
+	}))
+
+	result, err := resolve.ResolveWithProfile(env, reg, "proj", "prod")
+	require.NoError(t, err)
+
+	assert.True(t, result.Resolved())
+	assert.Equal(t, "project-token", result.Entries[0].Value)
+}
+
+func TestResolveWithProfile_MultipleProfiles(t *testing.T) {
+	// Different profiles resolve different values.
+	env := buildEnv(
+		parser.Entry{Key: "API_KEY", Value: "ref://keychain/api_key", IsRef: true},
+	)
+
+	mock := newMockBackend("keychain", map[string]string{
+		"proj/api_key":         "default-key",
+		"proj/staging/api_key": "staging-key",
+		"proj/prod/api_key":    "prod-key",
+	})
+
+	// Resolve with staging profile.
+	regStaging := buildRegistry(mock)
+	resultStaging, err := resolve.ResolveWithProfile(env, regStaging, "proj", "staging")
+	require.NoError(t, err)
+	assert.Equal(t, "staging-key", resultStaging.Entries[0].Value)
+
+	// Resolve with prod profile (need fresh registries since NamespacedBackend wraps differ).
+	mock2 := newMockBackend("keychain", map[string]string{
+		"proj/api_key":         "default-key",
+		"proj/staging/api_key": "staging-key",
+		"proj/prod/api_key":    "prod-key",
+	})
+	regProd := buildRegistry(mock2)
+	resultProd, err := resolve.ResolveWithProfile(env, regProd, "proj", "prod")
+	require.NoError(t, err)
+	assert.Equal(t, "prod-key", resultProd.Entries[0].Value)
+}
