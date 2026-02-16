@@ -41,6 +41,7 @@ Secrets are namespaced by project name from .envref.yaml.`,
 	cmd.AddCommand(newSecretListCmd())
 	cmd.AddCommand(newSecretGenerateCmd())
 	cmd.AddCommand(newSecretCopyCmd())
+	cmd.AddCommand(newSecretRotateCmd())
 
 	return cmd
 }

@@ -1,7 +1,7 @@
 # Project Status
 
 ## Last Completed
-- ENV-149: Security audit of secret handling — memory zeroing, passphrase clearing, error message audit [iter-57]
+- ENV-067: Added `envref secret rotate` command with history archival and configurable retention [iter-58]
 
 ## Current State
 - Go module `github.com/xcke/envref` initialized with Cobra + Viper + go-keyring + age + sqlite + testify + x/term dependencies
@@ -12,7 +12,8 @@
 - `envref get <KEY>` command loads `.env` + optional profile + `.env.local`, merges, interpolates, prints value
 - `envref set <KEY>=<VALUE>` command writes key-value pairs to .env files
 - `envref list` command prints all merged and interpolated key-value pairs
-- `envref secret set/get/delete/list/generate/copy` — full secret CRUD + generation + cross-project copy via configured backends with project namespace
+- `envref secret set/get/delete/list/generate/copy/rotate` — full secret CRUD + generation + cross-project copy + rotation via configured backends with project namespace
+- `envref secret rotate <KEY>` — generates new random value, archives old value as `<KEY>.__history.<N>`, supports `--keep` for configurable history retention, `--length`/`--charset`/`--print`/`--profile`/`--backend` flags
 - **Profile-scoped secrets:** `--profile` flag on all secret subcommands stores/retrieves secrets as `<project>/<profile>/<key>`; `secret get` falls back from profile to project scope; resolve pipeline tries profile-scoped first then project-scoped
 - `envref resolve` — loads .env + optional profile + .env.local, merges, interpolates, resolves `ref://` references
 - `envref resolve --profile <name>` — uses a named profile's env file in the merge chain and resolves profile-scoped secrets
