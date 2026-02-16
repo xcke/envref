@@ -17,7 +17,7 @@
 - [DONE] P2 | ENV-006 | Set up CI pipeline (GitHub Actions: test, lint, build)
 - [DONE] P2 | ENV-007 | Add `README.md` with project overview, install instructions, and quickstart
 - [TODO] P3 | ENV-008 | Add `LICENSE` (MIT or Apache 2.0)
-- [TODO] P3 | ENV-009 | Add `.gitignore` for Go projects
+- [DONE] P3 | ENV-009 | Add `.gitignore` for Go projects
 
 ---
 
@@ -194,7 +194,7 @@
 - [TODO] P2 | ENV-144 | Integration tests for keychain backend (platform-specific CI matrix)
 - [TODO] P2 | ENV-145 | Integration tests for direnv integration (end-to-end shell test)
 - [TODO] P2 | ENV-146 | Benchmark `envref resolve` — target <50ms for 100 vars
-- [TODO] P2 | ENV-147 | Set up code coverage reporting
+- [DONE] P2 | ENV-147 | Set up code coverage reporting
 - [TODO] P3 | ENV-148 | Fuzz testing for `.env` parser
 - [TODO] P3 | ENV-149 | Security audit of secret handling (memory zeroing, no secrets in logs/errors)
 ---

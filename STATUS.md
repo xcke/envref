@@ -1,7 +1,7 @@
 # Project Status
 
 ## Last Completed
-- ENV-084: Added benchmark tests and optimized resolve pipeline for <50ms startup [iter-48]
+- ENV-147: Set up code coverage reporting with Makefile targets and CI pipeline [iter-49]
 
 ## Current State
 - Go module `github.com/xcke/envref` initialized with Cobra + Viper + go-keyring + age + sqlite + testify + x/term dependencies
@@ -37,6 +37,7 @@
 - **Interactive passphrase prompt:** secret/resolve/run/status commands prompt for vault passphrase at terminal when not configured via env var or config
 - **Global verbosity flags, colorized output, fuzzy key matching, resolution cache**
 - **Performance benchmarks:** parser, envfile, resolve, config packages all benchmarked; optimizations reduce allocations 20-37% across pipeline
+- **Code coverage reporting:** `make cover` generates coverage profile, `make cover-html` generates HTML report, `make cover-func` shows per-function breakdown; CI uploads coverage artifacts; current total coverage: 85.8%
 - **README.md** with project overview, install instructions, quickstart, and command reference
 - `.env` file parser with full quote/multiline/comment/BOM/CRLF support
 - `ref://` URI parser, `Backend` interface, `Registry`, `NamespacedBackend`

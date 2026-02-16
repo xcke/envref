@@ -1,6 +1,9 @@
 # Build artifacts
 /build/
 
+# Coverage
+/coverage/
+
 # Go
 *.exe
 *.exe~
