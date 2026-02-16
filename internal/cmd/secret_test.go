@@ -2,8 +2,11 @@ package cmd
 
 import (
 	"bytes"
+	"encoding/base64"
+	"encoding/hex"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -625,6 +628,397 @@ func TestSecretListCmd_RejectsArguments(t *testing.T) {
 	err := root.Execute()
 	if err == nil {
 		t.Fatal("expected error for extra arguments, got nil")
+	}
+}
+
+// --- Tests for secret generate ---
+
+func TestGenerateSecret_Alphanumeric(t *testing.T) {
+	t.Run("default length", func(t *testing.T) {
+		val, err := generateSecret(32, "alphanumeric")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(val) != 32 {
+			t.Errorf("length: got %d, want 32", len(val))
+		}
+		for _, c := range val {
+			if !strings.ContainsRune(charsetAlphanumeric, c) {
+				t.Errorf("unexpected character %q in alphanumeric output", c)
+			}
+		}
+	})
+
+	t.Run("length 1", func(t *testing.T) {
+		val, err := generateSecret(1, "alphanumeric")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(val) != 1 {
+			t.Errorf("length: got %d, want 1", len(val))
+		}
+	})
+
+	t.Run("length 128", func(t *testing.T) {
+		val, err := generateSecret(128, "alphanumeric")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(val) != 128 {
+			t.Errorf("length: got %d, want 128", len(val))
+		}
+	})
+}
+
+func TestGenerateSecret_Hex(t *testing.T) {
+	tests := []int{1, 16, 32, 64}
+	for _, length := range tests {
+		val, err := generateSecret(length, "hex")
+		if err != nil {
+			t.Fatalf("length %d: unexpected error: %v", length, err)
+		}
+		if len(val) != length {
+			t.Errorf("length %d: got %d chars", length, len(val))
+		}
+		// Verify it's valid hex.
+		_, err = hex.DecodeString(val)
+		if length%2 != 0 {
+			// Odd length needs padding for decode verification.
+			_, err = hex.DecodeString(val + "0")
+		}
+		if err != nil {
+			t.Errorf("length %d: not valid hex: %v", length, err)
+		}
+	}
+}
+
+func TestGenerateSecret_Base64(t *testing.T) {
+	tests := []int{4, 16, 32, 64}
+	for _, length := range tests {
+		val, err := generateSecret(length, "base64")
+		if err != nil {
+			t.Fatalf("length %d: unexpected error: %v", length, err)
+		}
+		if len(val) != length {
+			t.Errorf("length %d: got %d chars", length, len(val))
+		}
+		// Pad to multiple of 4 for base64 decode check.
+		padded := val
+		for len(padded)%4 != 0 {
+			padded += "="
+		}
+		_, err = base64.StdEncoding.DecodeString(padded)
+		if err != nil {
+			t.Errorf("length %d: not valid base64: %v (value: %q)", length, err, val)
+		}
+	}
+}
+
+func TestGenerateSecret_ASCII(t *testing.T) {
+	val, err := generateSecret(64, "ascii")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(val) != 64 {
+		t.Errorf("length: got %d, want 64", len(val))
+	}
+	for _, c := range val {
+		if !strings.ContainsRune(charsetASCII, c) {
+			t.Errorf("unexpected character %q in ascii output", c)
+		}
+	}
+}
+
+func TestGenerateSecret_UnknownCharset(t *testing.T) {
+	_, err := generateSecret(32, "unknown")
+	if err == nil {
+		t.Fatal("expected error for unknown charset, got nil")
+	}
+	if !contains(err.Error(), "unknown charset") {
+		t.Errorf("expected 'unknown charset' error, got: %v", err)
+	}
+}
+
+func TestGenerateSecret_Uniqueness(t *testing.T) {
+	// Generate multiple secrets and verify they are unique.
+	seen := make(map[string]bool)
+	for i := 0; i < 100; i++ {
+		val, err := generateSecret(32, "alphanumeric")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if seen[val] {
+			t.Fatalf("duplicate secret generated on iteration %d: %q", i, val)
+		}
+		seen[val] = true
+	}
+}
+
+func TestSecretGenerateCmd_Success(t *testing.T) {
+	dir := t.TempDir()
+	writeTestConfig(t, dir, "testproject")
+
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getting cwd: %v", err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(origDir)
+	})
+
+	root := NewRootCmd()
+	buf := new(bytes.Buffer)
+	errBuf := new(bytes.Buffer)
+	root.SetOut(buf)
+	root.SetErr(errBuf)
+	root.SetArgs([]string{"secret", "generate", "API_KEY"})
+
+	err = root.Execute()
+	if err != nil {
+		// Expected in CI where keychain is not available.
+		errMsg := err.Error()
+		if contains(errMsg, "accepts 1 arg") || contains(errMsg, "unknown command") {
+			t.Fatalf("command structure error: %v", err)
+		}
+	} else {
+		// If it succeeds, stdout should be empty (no --print) and stderr should have confirmation.
+		if buf.String() != "" {
+			t.Errorf("expected no stdout without --print, got %q", buf.String())
+		}
+		if !contains(errBuf.String(), "generated and stored") {
+			t.Errorf("expected confirmation in stderr, got %q", errBuf.String())
+		}
+	}
+}
+
+func TestSecretGenerateCmd_WithPrint(t *testing.T) {
+	dir := t.TempDir()
+	writeTestConfig(t, dir, "testproject")
+
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getting cwd: %v", err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(origDir)
+	})
+
+	root := NewRootCmd()
+	buf := new(bytes.Buffer)
+	errBuf := new(bytes.Buffer)
+	root.SetOut(buf)
+	root.SetErr(errBuf)
+	root.SetArgs([]string{"secret", "generate", "API_KEY", "--print", "--length", "16", "--charset", "hex"})
+
+	err = root.Execute()
+	if err != nil {
+		errMsg := err.Error()
+		if contains(errMsg, "accepts 1 arg") || contains(errMsg, "unknown command") {
+			t.Fatalf("command structure error: %v", err)
+		}
+	} else {
+		// With --print, stdout should have the generated value.
+		output := strings.TrimSpace(buf.String())
+		if len(output) != 16 {
+			t.Errorf("expected 16 char output, got %d: %q", len(output), output)
+		}
+		if !contains(errBuf.String(), "hex") {
+			t.Errorf("expected charset info in stderr, got %q", errBuf.String())
+		}
+	}
+}
+
+func TestSecretGenerateCmd_NoArgs(t *testing.T) {
+	root := NewRootCmd()
+	root.SetOut(new(bytes.Buffer))
+	root.SetErr(new(bytes.Buffer))
+	root.SetArgs([]string{"secret", "generate"})
+
+	err := root.Execute()
+	if err == nil {
+		t.Fatal("expected error for missing argument, got nil")
+	}
+}
+
+func TestSecretGenerateCmd_InvalidLength(t *testing.T) {
+	dir := t.TempDir()
+	writeTestConfig(t, dir, "testproject")
+
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getting cwd: %v", err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(origDir)
+	})
+
+	root := NewRootCmd()
+	root.SetOut(new(bytes.Buffer))
+	root.SetErr(new(bytes.Buffer))
+	root.SetArgs([]string{"secret", "generate", "API_KEY", "--length", "0"})
+
+	err = root.Execute()
+	if err == nil {
+		t.Fatal("expected error for length 0, got nil")
+	}
+	if !contains(err.Error(), "length must be at least 1") {
+		t.Errorf("expected length validation error, got: %v", err)
+	}
+}
+
+func TestSecretGenerateCmd_LengthTooLarge(t *testing.T) {
+	dir := t.TempDir()
+	writeTestConfig(t, dir, "testproject")
+
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getting cwd: %v", err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(origDir)
+	})
+
+	root := NewRootCmd()
+	root.SetOut(new(bytes.Buffer))
+	root.SetErr(new(bytes.Buffer))
+	root.SetArgs([]string{"secret", "generate", "API_KEY", "--length", "2000"})
+
+	err = root.Execute()
+	if err == nil {
+		t.Fatal("expected error for length > 1024, got nil")
+	}
+	if !contains(err.Error(), "length must not exceed 1024") {
+		t.Errorf("expected length validation error, got: %v", err)
+	}
+}
+
+func TestSecretGenerateCmd_InvalidCharset(t *testing.T) {
+	dir := t.TempDir()
+	writeTestConfig(t, dir, "testproject")
+
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getting cwd: %v", err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(origDir)
+	})
+
+	root := NewRootCmd()
+	root.SetOut(new(bytes.Buffer))
+	root.SetErr(new(bytes.Buffer))
+	root.SetArgs([]string{"secret", "generate", "API_KEY", "--charset", "bogus"})
+
+	err = root.Execute()
+	if err == nil {
+		t.Fatal("expected error for unknown charset, got nil")
+	}
+	if !contains(err.Error(), "unknown charset") {
+		t.Errorf("expected charset validation error, got: %v", err)
+	}
+}
+
+func TestSecretGenerateCmd_NoConfig(t *testing.T) {
+	dir := t.TempDir()
+
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getting cwd: %v", err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(origDir)
+	})
+
+	root := NewRootCmd()
+	root.SetOut(new(bytes.Buffer))
+	root.SetErr(new(bytes.Buffer))
+	root.SetArgs([]string{"secret", "generate", "API_KEY"})
+
+	err = root.Execute()
+	if err == nil {
+		t.Fatal("expected error when no config found, got nil")
+	}
+	if !contains(err.Error(), "loading config") {
+		t.Errorf("expected config loading error, got: %v", err)
+	}
+}
+
+func TestSecretGenerateCmd_NoBackends(t *testing.T) {
+	dir := t.TempDir()
+	content := "project: testproject\n"
+	if err := os.WriteFile(filepath.Join(dir, ".envref.yaml"), []byte(content), 0o644); err != nil {
+		t.Fatalf("writing config: %v", err)
+	}
+
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getting cwd: %v", err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(origDir)
+	})
+
+	root := NewRootCmd()
+	root.SetOut(new(bytes.Buffer))
+	root.SetErr(new(bytes.Buffer))
+	root.SetArgs([]string{"secret", "generate", "API_KEY"})
+
+	err = root.Execute()
+	if err == nil {
+		t.Fatal("expected error when no backends configured, got nil")
+	}
+	if !contains(err.Error(), "no backends configured") {
+		t.Errorf("expected 'no backends configured' error, got: %v", err)
+	}
+}
+
+func TestSecretGenerateCmd_InvalidBackend(t *testing.T) {
+	dir := t.TempDir()
+	writeTestConfig(t, dir, "testproject")
+
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getting cwd: %v", err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(origDir)
+	})
+
+	root := NewRootCmd()
+	root.SetOut(new(bytes.Buffer))
+	root.SetErr(new(bytes.Buffer))
+	root.SetArgs([]string{"secret", "generate", "API_KEY", "--backend", "nonexistent"})
+
+	err = root.Execute()
+	if err == nil {
+		t.Fatal("expected error for nonexistent backend, got nil")
+	}
+	if !contains(err.Error(), "nonexistent") {
+		t.Errorf("expected error mentioning backend name, got: %v", err)
 	}
 }
 

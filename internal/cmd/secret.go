@@ -2,8 +2,12 @@ package cmd
 
 import (
 	"bufio"
+	"crypto/rand"
+	"encoding/base64"
+	"encoding/hex"
 	"fmt"
 	"io"
+	"math/big"
 	"os"
 	"strings"
 
@@ -27,6 +31,7 @@ Secrets are namespaced by project name from .envref.yaml.`,
 	cmd.AddCommand(newSecretGetCmd())
 	cmd.AddCommand(newSecretDeleteCmd())
 	cmd.AddCommand(newSecretListCmd())
+	cmd.AddCommand(newSecretGenerateCmd())
 
 	return cmd
 }
@@ -411,6 +416,186 @@ func readLine(r io.Reader) (string, error) {
 		return "", err
 	}
 	return "", fmt.Errorf("no input provided")
+}
+
+// Predefined character sets for secret generation.
+const (
+	charsetAlphanumeric = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	charsetASCII        = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()-_=+[]{}|;:,.<>?"
+)
+
+// newSecretGenerateCmd creates the secret generate subcommand.
+func newSecretGenerateCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "generate <KEY>",
+		Short: "Generate and store a random secret",
+		Long: `Generate a cryptographically random secret and store it in the configured backend.
+
+The generated secret uses a configurable character set and length.
+By default, a 32-character alphanumeric secret is generated.
+
+Available charsets:
+  alphanumeric  a-z, A-Z, 0-9 (default)
+  ascii         alphanumeric + common symbols
+  hex           0-9, a-f (lowercase hex)
+  base64        standard base64 encoding
+
+Use --print to display the generated secret value on stdout.
+
+Examples:
+  envref secret generate API_KEY                          # 32 char alphanumeric
+  envref secret generate API_KEY --length 64              # 64 char alphanumeric
+  envref secret generate API_KEY --charset hex            # hex string
+  envref secret generate API_KEY --charset base64         # base64 encoded
+  envref secret generate API_KEY --charset ascii          # include symbols
+  envref secret generate API_KEY --print                  # print the generated value
+  envref secret generate API_KEY --backend keychain       # specific backend`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			length, _ := cmd.Flags().GetInt("length")
+			charset, _ := cmd.Flags().GetString("charset")
+			backendName, _ := cmd.Flags().GetString("backend")
+			printVal, _ := cmd.Flags().GetBool("print")
+			return runSecretGenerate(cmd, args[0], length, charset, backendName, printVal)
+		},
+	}
+
+	cmd.Flags().IntP("length", "l", 32, "length of the generated secret")
+	cmd.Flags().StringP("charset", "c", "alphanumeric", "character set: alphanumeric, ascii, hex, base64")
+	cmd.Flags().StringP("backend", "b", "", "backend to store the secret in (default: first configured)")
+	cmd.Flags().BoolP("print", "p", false, "print the generated secret value to stdout")
+
+	return cmd
+}
+
+// runSecretGenerate generates a random secret and stores it in the configured backend.
+func runSecretGenerate(cmd *cobra.Command, key string, length int, charset, backendName string, printVal bool) error {
+	// Validate key.
+	if strings.TrimSpace(key) == "" {
+		return fmt.Errorf("key must not be empty")
+	}
+
+	// Validate length.
+	if length < 1 {
+		return fmt.Errorf("length must be at least 1")
+	}
+	if length > 1024 {
+		return fmt.Errorf("length must not exceed 1024")
+	}
+
+	// Generate the secret.
+	value, err := generateSecret(length, charset)
+	if err != nil {
+		return fmt.Errorf("generating secret: %w", err)
+	}
+
+	// Load project config.
+	cwd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("getting working directory: %w", err)
+	}
+
+	cfg, _, err := config.Load(cwd)
+	if err != nil {
+		return fmt.Errorf("loading config: %w", err)
+	}
+
+	if len(cfg.Backends) == 0 {
+		return fmt.Errorf("no backends configured in %s", config.FullFileName)
+	}
+
+	// Determine target backend.
+	if backendName == "" {
+		backendName = cfg.Backends[0].Name
+	}
+
+	// Build registry with backends.
+	registry, err := buildRegistry(cfg)
+	if err != nil {
+		return fmt.Errorf("initializing backends: %w", err)
+	}
+
+	// Wrap the target backend with project namespace.
+	targetBackend := registry.Backend(backendName)
+	if targetBackend == nil {
+		return fmt.Errorf("backend %q is not registered", backendName)
+	}
+
+	nsBackend, err := backend.NewNamespacedBackend(targetBackend, cfg.Project)
+	if err != nil {
+		return fmt.Errorf("creating namespaced backend: %w", err)
+	}
+
+	// Store the generated secret.
+	if err := nsBackend.Set(key, value); err != nil {
+		return fmt.Errorf("storing secret: %w", err)
+	}
+
+	if printVal {
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), value)
+	}
+
+	_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "secret %q generated and stored in backend %q (%d chars, %s)\n", key, backendName, length, charset)
+	return nil
+}
+
+// generateSecret produces a cryptographically random string of the given length
+// using the specified character set.
+func generateSecret(length int, charset string) (string, error) {
+	switch charset {
+	case "hex":
+		return generateHex(length)
+	case "base64":
+		return generateBase64(length)
+	case "alphanumeric":
+		return generateFromCharset(length, charsetAlphanumeric)
+	case "ascii":
+		return generateFromCharset(length, charsetASCII)
+	default:
+		return "", fmt.Errorf("unknown charset %q (valid: alphanumeric, ascii, hex, base64)", charset)
+	}
+}
+
+// generateFromCharset generates a random string of the given length by sampling
+// uniformly from the provided character set using crypto/rand.
+func generateFromCharset(length int, chars string) (string, error) {
+	max := big.NewInt(int64(len(chars)))
+	result := make([]byte, length)
+	for i := range result {
+		n, err := rand.Int(rand.Reader, max)
+		if err != nil {
+			return "", fmt.Errorf("reading random bytes: %w", err)
+		}
+		result[i] = chars[n.Int64()]
+	}
+	return string(result), nil
+}
+
+// generateHex generates a random hex-encoded string of exactly the given length.
+func generateHex(length int) (string, error) {
+	// Each byte produces 2 hex characters.
+	numBytes := (length + 1) / 2
+	b := make([]byte, numBytes)
+	if _, err := rand.Read(b); err != nil {
+		return "", fmt.Errorf("reading random bytes: %w", err)
+	}
+	return hex.EncodeToString(b)[:length], nil
+}
+
+// generateBase64 generates a random base64-encoded string of at least the given length,
+// truncated to exactly length characters.
+func generateBase64(length int) (string, error) {
+	// Base64 encodes 3 bytes into 4 chars. Over-allocate to ensure enough output.
+	numBytes := (length*3)/4 + 3
+	b := make([]byte, numBytes)
+	if _, err := rand.Read(b); err != nil {
+		return "", fmt.Errorf("reading random bytes: %w", err)
+	}
+	encoded := base64.StdEncoding.EncodeToString(b)
+	if len(encoded) < length {
+		return "", fmt.Errorf("base64 encoding produced fewer characters than expected")
+	}
+	return encoded[:length], nil
 }
 
 // buildRegistry creates a backend registry from the config, instantiating
