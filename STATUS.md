@@ -1,7 +1,7 @@
 # Project Status
 
 ## Last Completed
-- ENV-101: Added `envref status` command — shows project overview with file status, key counts, ref resolution, .env.example validation, and actionable hints [iter-18]
+- ENV-005: Added `.goreleaser.yml` for cross-platform binary releases (Linux/macOS/Windows, amd64/arm64) [iter-19]
 
 ## Current State
 - Go module `github.com/xcke/envref` initialized with Cobra + Viper + go-keyring + testify dependencies
@@ -18,30 +18,19 @@
 - `envref profile list` — shows available profiles from config and convention-based `.env.*` files, marks active profile
 - `envref profile use <name>` — sets active profile in `.envref.yaml`, validates against config and disk, supports `--clear`
 - `envref validate` — checks .env against .env.example schema, reports missing/extra keys, supports `--example`, `--profile-file` flags
-- `envref status` — shows environment overview: project info, file existence, key counts (config vs secrets), backend resolution status, .env.example validation, actionable hints; supports `--profile` flag
-- **Profile support:** `.envref.yaml` `active_profile` field, `profiles` map with custom `env_file` paths, convention-based naming (`.env.<name>`), `--profile` flag overrides config, 3-layer merge: base ← profile ← local
-- **Config write support:** `SetActiveProfile()` function for targeted YAML field updates preserving file formatting
+- `envref status` — shows environment overview: project info, file existence, key counts, backend resolution status, validation, actionable hints
+- **Profile support:** `.envref.yaml` `active_profile` field, `profiles` map, convention-based naming, `--profile` flag, 3-layer merge
+- **Config write support:** `SetActiveProfile()` function for targeted YAML field updates
 - Resolution pipeline: `internal/resolve` package with `Resolve()` function, per-key error collection, direct backend matching + fallback chain
-- Shell-safe quoting for direnv export output (single-quote escaping)
+- Shell-safe quoting for direnv export output
 - Variable interpolation (`${VAR}` and `$VAR` syntax)
 - `.envref.yaml` config schema with Viper-based loader and project root discovery
 - `.env` file parser with full quote/multiline/comment/BOM/CRLF support
 - `.env` file loader, merger, writer, and interpolator with ref:// handling
-- `ref://` URI parser (`ref://<backend>/<path>` format with nested path support)
-- `Backend` interface with `Name()`, `Get()`, `Set()`, `Delete()`, `List()` methods
-- `Registry` type with ordered fallback chain
-- `NamespacedBackend` wrapper for per-project secret isolation
-- `KeychainBackend` — cross-platform OS keychain backend using `go-keyring`
+- `ref://` URI parser, `Backend` interface, `Registry` with fallback chain, `NamespacedBackend`, `KeychainBackend`
+- **GoReleaser config** for cross-platform releases (Linux/macOS/Windows × amd64/arm64, tar.gz/zip, checksums, changelog)
 - Makefile with build/test/lint/install targets
-- **Parser test coverage: 100+ test cases**
-- **Merge test coverage: 38+ test cases**
-- **Resolve test coverage: 50+ test cases**
-- **Integration test coverage: 50+ test cases** (including profile tests)
-- **Profile list test coverage: 11 test cases**
-- **Profile use test coverage: 10 test cases**
-- **Config SetActiveProfile test coverage: 5 test cases**
-- **Validate test coverage: 11 test cases**
-- **Status test coverage: 12 test cases**
+- Comprehensive test coverage: parser (100+), merge (38+), resolve (50+), integration (50+), profile, validate, status tests
 - Directory structure: `cmd/envref/`, `internal/cmd/`, `internal/parser/`, `internal/envfile/`, `internal/config/`, `internal/ref/`, `internal/resolve/`, `internal/backend/`, `pkg/`
 - All checks pass: `go build`, `go vet`, `go test`, `golangci-lint`
 
