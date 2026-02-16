@@ -30,6 +30,29 @@ func TestDoctorCmd_NoIssues(t *testing.T) {
 	}
 }
 
+func TestDoctorCmd_NoIssues_Quiet(t *testing.T) {
+	dir := t.TempDir()
+	envPath := writeTestFile(t, dir, ".env", "DB_HOST=localhost\nDB_PORT=5432\n")
+	writeTestFile(t, dir, ".gitignore", ".env\n")
+
+	root := NewRootCmd()
+	buf := new(bytes.Buffer)
+	root.SetOut(buf)
+	root.SetErr(new(bytes.Buffer))
+	root.SetArgs([]string{"--quiet", "doctor",
+		"--file", envPath,
+		"--local-file", filepath.Join(dir, ".env.local"),
+	})
+
+	if err := root.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if buf.String() != "" {
+		t.Errorf("expected no output in quiet mode, got %q", buf.String())
+	}
+}
+
 func TestDoctorCmd_DuplicateKeys(t *testing.T) {
 	dir := t.TempDir()
 	envPath := writeTestFile(t, dir, ".env", "DB_HOST=localhost\nDB_PORT=5432\nDB_HOST=other\n")

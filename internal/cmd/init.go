@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/xcke/envref/internal/config"
+	"github.com/xcke/envref/internal/output"
 )
 
 // newInitCmd creates the init subcommand.
@@ -57,6 +58,7 @@ The .env.local entry is appended to .gitignore if not already present.`,
 
 // runInit scaffolds the envref project files in the given directory.
 func runInit(cmd *cobra.Command, dir, project string, direnv, force bool) error {
+	w := output.NewWriter(cmd)
 	out := cmd.OutOrStdout()
 
 	// Default project name to directory basename.
@@ -107,34 +109,39 @@ APP_PORT=3000
 eval "$(envref resolve --direnv 2>/dev/null)" || true
 `
 
-	// Write files.
-	if err := writeInitFile(out, filepath.Join(dir, config.FullFileName), configContent, force); err != nil {
+	// Write files. In quiet mode, pass io.Discard to suppress file-level messages.
+	msgOut := out
+	if w.IsQuiet() {
+		msgOut = io.Discard
+	}
+
+	if err := writeInitFile(msgOut, filepath.Join(dir, config.FullFileName), configContent, force); err != nil {
 		return err
 	}
 
-	if err := writeInitFile(out, filepath.Join(dir, ".env"), envContent, force); err != nil {
+	if err := writeInitFile(msgOut, filepath.Join(dir, ".env"), envContent, force); err != nil {
 		return err
 	}
 
-	if err := writeInitFile(out, filepath.Join(dir, ".env.local"), envLocalContent, force); err != nil {
+	if err := writeInitFile(msgOut, filepath.Join(dir, ".env.local"), envLocalContent, force); err != nil {
 		return err
 	}
 
 	if direnv {
-		if err := writeInitFile(out, filepath.Join(dir, ".envrc"), envrcContent, force); err != nil {
+		if err := writeInitFile(msgOut, filepath.Join(dir, ".envrc"), envrcContent, force); err != nil {
 			return err
 		}
 	}
 
 	// Update .gitignore.
-	if err := ensureGitignoreEntry(out, filepath.Join(dir, ".gitignore"), ".env.local"); err != nil {
+	if err := ensureGitignoreEntry(msgOut, filepath.Join(dir, ".gitignore"), ".env.local"); err != nil {
 		return err
 	}
 
-	_, _ = fmt.Fprintf(out, "\nInitialized envref project %q in %s\n", project, dir)
+	w.Info("\nInitialized envref project %q in %s\n", project, dir)
 
 	if direnv {
-		_, _ = fmt.Fprintln(out, "Run 'direnv allow' to activate the .envrc file.")
+		w.Info("Run 'direnv allow' to activate the .envrc file.\n")
 	}
 
 	return nil

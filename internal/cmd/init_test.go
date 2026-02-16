@@ -268,6 +268,34 @@ func TestInitCmd_RejectsArgs(t *testing.T) {
 	}
 }
 
+func TestInitCmd_QuietSuppressesOutput(t *testing.T) {
+	dir := t.TempDir()
+
+	root := NewRootCmd()
+	buf := new(bytes.Buffer)
+	root.SetOut(buf)
+	root.SetErr(new(bytes.Buffer))
+	root.SetArgs([]string{"--quiet", "init", "--dir", dir, "--project", "myapp"})
+
+	if err := root.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// In quiet mode, no informational output should be shown.
+	output := buf.String()
+	if strings.Contains(output, "create") {
+		t.Errorf("quiet mode should suppress file creation messages, got: %s", output)
+	}
+	if strings.Contains(output, "Initialized") {
+		t.Errorf("quiet mode should suppress initialization message, got: %s", output)
+	}
+
+	// But the files should still be created.
+	if _, err := os.Stat(filepath.Join(dir, config.FullFileName)); err != nil {
+		t.Errorf(".envref.yaml should still be created in quiet mode: %v", err)
+	}
+}
+
 func TestInitCmd_ConfigIsLoadable(t *testing.T) {
 	dir := t.TempDir()
 

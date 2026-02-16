@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/xcke/envref/internal/config"
+	"github.com/xcke/envref/internal/output"
 )
 
 // newProfileCmd creates the profile command group for managing environment profiles.
@@ -104,13 +105,15 @@ func runProfileUse(cmd *cobra.Command, name string) error {
 		return fmt.Errorf("loading config: %w", err)
 	}
 
+	w := output.NewWriter(cmd)
+
 	// If clearing the active profile, just update and return.
 	if name == "" {
 		configPath := filepath.Join(projectDir, config.FullFileName)
 		if err := config.SetActiveProfile(configPath, ""); err != nil {
 			return fmt.Errorf("updating config: %w", err)
 		}
-		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "Cleared active profile")
+		w.Info("Cleared active profile\n")
 		return nil
 	}
 
@@ -128,7 +131,7 @@ func runProfileUse(cmd *cobra.Command, name string) error {
 		return fmt.Errorf("updating config: %w", err)
 	}
 
-	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Active profile set to %q\n", name)
+	w.Info("Active profile set to %q\n", name)
 	return nil
 }
 

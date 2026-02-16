@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/xcke/envref/internal/output"
 	"github.com/xcke/envref/internal/parser"
 )
 
@@ -81,7 +82,10 @@ func runDoctor(cmd *cobra.Command, envPath, localPath string) error {
 	allIssues = append(allIssues, checkDirenvTrust()...)
 
 	if len(allIssues) == 0 {
-		_, _ = fmt.Fprintf(out, "OK: no issues found\n")
+		w := output.NewWriter(cmd)
+		if !w.IsQuiet() {
+			_, _ = fmt.Fprintf(out, "OK: no issues found\n")
+		}
 		return nil
 	}
 

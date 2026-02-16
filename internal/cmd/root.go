@@ -25,6 +25,12 @@ from your OS keychain or other secret backends at runtime.`,
 		SilenceUsage: true,
 	}
 
+	// Global verbosity flags (mutually exclusive by convention).
+	rootCmd.PersistentFlags().BoolP("quiet", "q", false, "suppress informational output (errors only)")
+	rootCmd.PersistentFlags().Bool("verbose", false, "show additional detail")
+	rootCmd.PersistentFlags().Bool("debug", false, "show debug information")
+	rootCmd.MarkFlagsMutuallyExclusive("quiet", "verbose", "debug")
+
 	rootCmd.AddCommand(newVersionCmd())
 	rootCmd.AddCommand(newGetCmd())
 	rootCmd.AddCommand(newSetCmd())

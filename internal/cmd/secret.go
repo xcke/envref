@@ -14,6 +14,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/xcke/envref/internal/backend"
 	"github.com/xcke/envref/internal/config"
+	"github.com/xcke/envref/internal/output"
 )
 
 // newSecretCmd creates the secret command group for managing secrets in backends.
@@ -189,7 +190,7 @@ func runSecretList(cmd *cobra.Command, backendName string) error {
 	}
 
 	if len(keys) == 0 {
-		_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "no secrets found")
+		output.NewWriter(cmd).Info("no secrets found\n")
 		return nil
 	}
 
@@ -293,7 +294,7 @@ func runSecretDelete(cmd *cobra.Command, key, backendName string, force bool) er
 		return fmt.Errorf("deleting secret: %w", err)
 	}
 
-	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "secret %q deleted from backend %q\n", key, backendName)
+	output.NewWriter(cmd).Info("secret %q deleted from backend %q\n", key, backendName)
 	return nil
 }
 
@@ -386,7 +387,7 @@ func runSecretSet(cmd *cobra.Command, key, value, backendName string) error {
 		return fmt.Errorf("storing secret: %w", err)
 	}
 
-	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "secret %q stored in backend %q\n", key, backendName)
+	output.NewWriter(cmd).Info("secret %q stored in backend %q\n", key, backendName)
 	return nil
 }
 
@@ -536,7 +537,7 @@ func runSecretGenerate(cmd *cobra.Command, key string, length int, charset, back
 		_, _ = fmt.Fprintln(cmd.OutOrStdout(), value)
 	}
 
-	_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "secret %q generated and stored in backend %q (%d chars, %s)\n", key, backendName, length, charset)
+	output.NewWriter(cmd).Info("secret %q generated and stored in backend %q (%d chars, %s)\n", key, backendName, length, charset)
 	return nil
 }
 
@@ -698,7 +699,7 @@ func runSecretCopy(cmd *cobra.Command, key, fromProject, backendName string) err
 		return fmt.Errorf("storing secret: %w", err)
 	}
 
-	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "secret %q copied from project %q to %q (backend %q)\n", key, fromProject, cfg.Project, backendName)
+	output.NewWriter(cmd).Info("secret %q copied from project %q to %q (backend %q)\n", key, fromProject, cfg.Project, backendName)
 	return nil
 }
 

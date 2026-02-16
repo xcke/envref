@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+	"github.com/xcke/envref/internal/output"
 	"github.com/xcke/envref/internal/parser"
 )
 
@@ -61,8 +62,13 @@ func runGet(cmd *cobra.Command, key, envPath, profilePath, localPath, formatStr 
 }
 
 // printWarnings writes parser warnings to stderr for the given file.
+// Warnings are suppressed in quiet mode.
 func printWarnings(cmd *cobra.Command, path string, warnings []parser.Warning) {
+	if len(warnings) == 0 {
+		return
+	}
+	ow := output.NewWriter(cmd)
 	for _, w := range warnings {
-		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "warning: %s: %s\n", path, w)
+		ow.Warn("%s: %s\n", path, w)
 	}
 }

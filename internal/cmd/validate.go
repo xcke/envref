@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/xcke/envref/internal/envfile"
+	"github.com/xcke/envref/internal/output"
 )
 
 // newValidateCmd creates the validate subcommand.
@@ -98,8 +99,9 @@ func runValidate(cmd *cobra.Command, envPath, profilePath, localPath, examplePat
 	sort.Strings(extra)
 
 	// Report results.
+	w := output.NewWriter(cmd)
 	if len(missing) == 0 && len(extra) == 0 {
-		if !ci {
+		if !ci && !w.IsQuiet() {
 			_, _ = fmt.Fprintf(out, "OK: all %d keys match %s\n", len(exampleKeys), examplePath)
 		}
 		return nil

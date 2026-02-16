@@ -1,7 +1,7 @@
 # Project Status
 
 ## Last Completed
-- ENV-104: Added `envref validate --ci` flag for CI pipelines — extra keys are errors, compact output, silent on success [iter-33]
+- ENV-112: Added `--quiet`, `--verbose`, `--debug` global flags with `internal/output` package [iter-34]
 
 ## Current State
 - Go module `github.com/xcke/envref` initialized with Cobra + Viper + go-keyring + testify dependencies
@@ -25,6 +25,8 @@
 - `envref doctor` — scans .env files for common issues
 - `envref config show` — prints resolved effective config (plain, JSON, table formats)
 - `envref completion <shell>` — generates shell completion scripts (bash, zsh, fish, powershell)
+- **Global verbosity flags:** `--quiet`/`-q` suppresses info output, `--verbose` shows file loading detail, `--debug` shows internal trace; mutually exclusive via Cobra
+- **`internal/output` package:** `Writer` type with `Info`/`Verbose`/`Debug`/`Warn`/`Error` methods keyed to verbosity level
 - **Resolution cache:** Duplicate `ref://` URIs within a single resolve call are resolved once, avoiding redundant backend queries
 - **Config validation on load:** `Load()` calls `Validate()` automatically, returning `*ValidationError` for semantic errors
 - **Config inheritance:** Global config at `~/.config/envref/config.yaml` merged with project `.envref.yaml`
@@ -38,7 +40,7 @@
 - **GitHub Actions CI pipeline** with test, lint, build jobs
 - Makefile with build/test/lint/install targets
 - Comprehensive test coverage across all packages
-- Directory structure: `cmd/envref/`, `internal/cmd/`, `internal/parser/`, `internal/envfile/`, `internal/config/`, `internal/ref/`, `internal/resolve/`, `internal/backend/`, `pkg/`
+- Directory structure: `cmd/envref/`, `internal/cmd/`, `internal/parser/`, `internal/envfile/`, `internal/config/`, `internal/ref/`, `internal/resolve/`, `internal/backend/`, `internal/output/`, `pkg/`
 - All checks pass: `go build`, `go vet`, `go test`, `golangci-lint`
 
 ## Known Issues

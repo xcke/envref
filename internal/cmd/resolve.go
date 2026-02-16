@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/xcke/envref/internal/config"
 	"github.com/xcke/envref/internal/envfile"
+	"github.com/xcke/envref/internal/output"
 	"github.com/xcke/envref/internal/parser"
 	"github.com/xcke/envref/internal/resolve"
 )
@@ -59,6 +60,8 @@ Examples:
 
 // runResolve implements the resolve command logic.
 func runResolve(cmd *cobra.Command, direnv bool, profileOverride, formatStr string, strict bool) error {
+	w := output.NewWriter(cmd)
+
 	// --direnv is a shorthand for --format shell.
 	if direnv {
 		formatStr = "shell"
@@ -79,6 +82,8 @@ func runResolve(cmd *cobra.Command, direnv bool, profileOverride, formatStr stri
 		return fmt.Errorf("loading config: %w", err)
 	}
 
+	w.Debug("config loaded from %s/%s\n", projectDir, config.FullFileName)
+
 	// Resolve file paths relative to the project root.
 	envPath := resolveFilePath(projectDir, cfg.EnvFile)
 	localPath := resolveFilePath(projectDir, cfg.LocalFile)
@@ -88,6 +93,7 @@ func runResolve(cmd *cobra.Command, direnv bool, profileOverride, formatStr stri
 	profile := cfg.EffectiveProfile(profileOverride)
 	if profile != "" {
 		profilePath = resolveFilePath(projectDir, cfg.ProfileEnvFile(profile))
+		w.Verbose("using profile %q\n", profile)
 	}
 
 	// Load and merge env files.
@@ -95,6 +101,8 @@ func runResolve(cmd *cobra.Command, direnv bool, profileOverride, formatStr stri
 	if err != nil {
 		return err
 	}
+
+	w.Debug("merged %d keys (%d refs)\n", env.Len(), len(env.Refs()))
 
 	// If no refs, just output without backend resolution.
 	if !env.HasRefs() {
@@ -110,6 +118,8 @@ func runResolve(cmd *cobra.Command, direnv bool, profileOverride, formatStr stri
 	if err != nil {
 		return fmt.Errorf("initializing backends: %w", err)
 	}
+
+	w.Debug("registered %d backend(s)\n", len(cfg.Backends))
 
 	// Resolve references.
 	result, err := resolve.Resolve(env, registry, cfg.Project)
@@ -154,15 +164,20 @@ func resolveFilePath(projectDir, filePath string) string {
 // The profilePath parameter is optional — pass an empty string to skip the
 // profile layer (backwards-compatible with the two-layer merge).
 func loadAndMergeEnv(cmd *cobra.Command, envPath, profilePath, localPath string) (*envfile.Env, error) {
+	w := output.NewWriter(cmd)
+
+	w.Verbose("loading %s\n", envPath)
 	base, warnings, err := envfile.Load(envPath)
 	if err != nil {
 		return nil, fmt.Errorf("loading %s: %w", envPath, err)
 	}
 	printWarnings(cmd, envPath, warnings)
+	w.Debug("loaded %d entries from %s\n", base.Len(), envPath)
 
 	// Optional profile layer: .env.<profile> (e.g., .env.staging).
 	var profile *envfile.Env
 	if profilePath != "" {
+		w.Verbose("loading profile %s\n", profilePath)
 		var profileWarnings []parser.Warning
 		profile, profileWarnings, err = envfile.LoadOptional(profilePath)
 		if err != nil {
@@ -171,6 +186,7 @@ func loadAndMergeEnv(cmd *cobra.Command, envPath, profilePath, localPath string)
 		printWarnings(cmd, profilePath, profileWarnings)
 	}
 
+	w.Verbose("loading %s\n", localPath)
 	local, localWarnings, err := envfile.LoadOptional(localPath)
 	if err != nil {
 		return nil, fmt.Errorf("loading %s: %w", localPath, err)
