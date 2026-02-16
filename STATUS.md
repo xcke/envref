@@ -1,7 +1,7 @@
 # Project Status
 
 ## Last Completed
-- ENV-062: Added `envref secret delete <KEY>` command with confirmation prompt and `--force` flag [iter-7]
+- ENV-063: Added `envref secret list` command to list stored secret keys (no values) for current project [iter-8]
 
 ## Current State
 - Go module `github.com/xcke/envref` initialized with Cobra + Viper + go-keyring dependencies
@@ -14,6 +14,7 @@
 - **`envref secret set <KEY>`** — stores secrets in configured backend with project namespace; supports `--value` flag for non-interactive use and `--backend` to target specific backend
 - **`envref secret get <KEY>`** — retrieves and prints secret from configured backend; supports `--backend` flag
 - **`envref secret delete <KEY>`** — deletes secret from configured backend with confirmation prompt; supports `--force` to skip confirmation and `--backend` to target specific backend
+- **`envref secret list`** — lists all secret key names for the current project from configured backend; supports `--backend` flag; prints "no secrets found" to stderr when empty
 - Variable interpolation (`${VAR}` and `$VAR` syntax)
 - `.envref.yaml` config schema with Viper-based loader and project root discovery
 - `.env` file parser with full quote/multiline/comment/BOM/CRLF support

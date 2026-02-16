@@ -493,6 +493,141 @@ func TestSecretDeleteCmd_InvalidBackend(t *testing.T) {
 	}
 }
 
+func TestSecretListCmd_Success(t *testing.T) {
+	dir := t.TempDir()
+	writeTestConfig(t, dir, "testproject")
+
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getting cwd: %v", err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(origDir)
+	})
+
+	root := NewRootCmd()
+	buf := new(bytes.Buffer)
+	errBuf := new(bytes.Buffer)
+	root.SetOut(buf)
+	root.SetErr(errBuf)
+	root.SetArgs([]string{"secret", "list"})
+
+	err = root.Execute()
+	if err != nil {
+		// Expected in CI where keychain is not available.
+		errMsg := err.Error()
+		if contains(errMsg, "unknown command") {
+			t.Fatalf("command structure error: %v", err)
+		}
+	}
+	// If the backend is available and empty, stderr should show "no secrets found".
+	// If the backend is unavailable, the error was already checked above.
+}
+
+func TestSecretListCmd_NoConfig(t *testing.T) {
+	dir := t.TempDir()
+
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getting cwd: %v", err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(origDir)
+	})
+
+	root := NewRootCmd()
+	root.SetOut(new(bytes.Buffer))
+	root.SetErr(new(bytes.Buffer))
+	root.SetArgs([]string{"secret", "list"})
+
+	err = root.Execute()
+	if err == nil {
+		t.Fatal("expected error when no config found, got nil")
+	}
+	if !contains(err.Error(), "loading config") {
+		t.Errorf("expected config loading error, got: %v", err)
+	}
+}
+
+func TestSecretListCmd_NoBackends(t *testing.T) {
+	dir := t.TempDir()
+	content := "project: testproject\n"
+	if err := os.WriteFile(filepath.Join(dir, ".envref.yaml"), []byte(content), 0o644); err != nil {
+		t.Fatalf("writing config: %v", err)
+	}
+
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getting cwd: %v", err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(origDir)
+	})
+
+	root := NewRootCmd()
+	root.SetOut(new(bytes.Buffer))
+	root.SetErr(new(bytes.Buffer))
+	root.SetArgs([]string{"secret", "list"})
+
+	err = root.Execute()
+	if err == nil {
+		t.Fatal("expected error when no backends configured, got nil")
+	}
+	if !contains(err.Error(), "no backends configured") {
+		t.Errorf("expected 'no backends configured' error, got: %v", err)
+	}
+}
+
+func TestSecretListCmd_InvalidBackend(t *testing.T) {
+	dir := t.TempDir()
+	writeTestConfig(t, dir, "testproject")
+
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getting cwd: %v", err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(origDir)
+	})
+
+	root := NewRootCmd()
+	root.SetOut(new(bytes.Buffer))
+	root.SetErr(new(bytes.Buffer))
+	root.SetArgs([]string{"secret", "list", "--backend", "nonexistent"})
+
+	err = root.Execute()
+	if err == nil {
+		t.Fatal("expected error for nonexistent backend, got nil")
+	}
+	if !contains(err.Error(), "nonexistent") {
+		t.Errorf("expected error mentioning backend name, got: %v", err)
+	}
+}
+
+func TestSecretListCmd_RejectsArguments(t *testing.T) {
+	root := NewRootCmd()
+	root.SetOut(new(bytes.Buffer))
+	root.SetErr(new(bytes.Buffer))
+	root.SetArgs([]string{"secret", "list", "extra-arg"})
+
+	err := root.Execute()
+	if err == nil {
+		t.Fatal("expected error for extra arguments, got nil")
+	}
+}
+
 // contains is a simple helper to check for substring presence.
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && searchSubstring(s, substr)

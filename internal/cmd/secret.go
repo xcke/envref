@@ -26,6 +26,7 @@ Secrets are namespaced by project name from .envref.yaml.`,
 	cmd.AddCommand(newSecretSetCmd())
 	cmd.AddCommand(newSecretGetCmd())
 	cmd.AddCommand(newSecretDeleteCmd())
+	cmd.AddCommand(newSecretListCmd())
 
 	return cmd
 }
@@ -106,6 +107,89 @@ func runSecretGet(cmd *cobra.Command, key, backendName string) error {
 	}
 
 	_, _ = fmt.Fprintln(cmd.OutOrStdout(), value)
+	return nil
+}
+
+// newSecretListCmd creates the secret list subcommand.
+func newSecretListCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "list",
+		Short: "List secret keys stored in a backend",
+		Long: `List all secret keys stored in the configured backend for the current project.
+
+Only key names are shown — secret values are never printed.
+
+By default, the first configured backend from .envref.yaml is used.
+Use --backend to specify a different backend.
+
+Examples:
+  envref secret list                    # list from default backend
+  envref secret list --backend keychain # list from specific backend`,
+		Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			backendName, _ := cmd.Flags().GetString("backend")
+			return runSecretList(cmd, backendName)
+		},
+	}
+
+	cmd.Flags().StringP("backend", "b", "", "backend to list secrets from (default: first configured)")
+
+	return cmd
+}
+
+// runSecretList lists all secret keys for the current project from the configured backend.
+func runSecretList(cmd *cobra.Command, backendName string) error {
+	// Load project config.
+	cwd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("getting working directory: %w", err)
+	}
+
+	cfg, _, err := config.Load(cwd)
+	if err != nil {
+		return fmt.Errorf("loading config: %w", err)
+	}
+
+	if len(cfg.Backends) == 0 {
+		return fmt.Errorf("no backends configured in %s", config.FullFileName)
+	}
+
+	// Determine target backend.
+	if backendName == "" {
+		backendName = cfg.Backends[0].Name
+	}
+
+	// Build registry with backends.
+	registry, err := buildRegistry(cfg)
+	if err != nil {
+		return fmt.Errorf("initializing backends: %w", err)
+	}
+
+	// Wrap the target backend with project namespace.
+	targetBackend := registry.Backend(backendName)
+	if targetBackend == nil {
+		return fmt.Errorf("backend %q is not registered", backendName)
+	}
+
+	nsBackend, err := backend.NewNamespacedBackend(targetBackend, cfg.Project)
+	if err != nil {
+		return fmt.Errorf("creating namespaced backend: %w", err)
+	}
+
+	// List keys.
+	keys, err := nsBackend.List()
+	if err != nil {
+		return fmt.Errorf("listing secrets: %w", err)
+	}
+
+	if len(keys) == 0 {
+		_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "no secrets found")
+		return nil
+	}
+
+	for _, key := range keys {
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), key)
+	}
 	return nil
 }
 
