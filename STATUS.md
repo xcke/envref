@@ -1,7 +1,7 @@
 # Project Status
 
 ## Last Completed
-- ENV-105: Added envref audit command with entropy analysis and pattern matching for plaintext secrets [iter-55]
+- ENV-148: Added fuzz testing for .env parser, ref:// URI parser, and variable interpolation [iter-56]
 
 ## Current State
 - Go module `github.com/xcke/envref` initialized with Cobra + Viper + go-keyring + age + sqlite + testify + x/term dependencies
@@ -43,6 +43,7 @@
 - GoReleaser config, GitHub Actions CI + release pipelines, Makefile with coverage targets
 - Comprehensive test coverage across all packages (~85.8%)
 - Performance benchmarks for parser, envfile, resolve, config packages
+- **Fuzz tests** for .env parser (4 fuzz targets), ref:// URI parser (2 fuzz targets), and variable interpolation (3 fuzz targets) — all validated with 10s runs
 - All checks pass: `go build`, `go vet`, `go test`, `golangci-lint`
 
 ## Known Issues
