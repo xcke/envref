@@ -1387,6 +1387,114 @@ profiles:
 	}
 }
 
+// --- Strict Mode Tests -------------------------------------------------------
+
+func TestIntegration_Resolve_Strict_NoRefs_OutputProduced(t *testing.T) {
+	dir := setupProject(t, "testproject", "HOST=localhost\nPORT=5432\n", "")
+	chdir(t, dir)
+
+	stdout, stderr, err := execCmd(t, "resolve", "--strict")
+	if err != nil {
+		t.Fatalf("resolve --strict with no refs should succeed, got: %v", err)
+	}
+
+	expected := "HOST=localhost\nPORT=5432\n"
+	if stdout != expected {
+		t.Errorf("resolve --strict: got %q, want %q", stdout, expected)
+	}
+	if stderr != "" {
+		t.Errorf("resolve --strict: unexpected stderr: %q", stderr)
+	}
+}
+
+func TestIntegration_Resolve_Strict_WithFailedRefs_NoOutput(t *testing.T) {
+	dir := t.TempDir()
+	cfgContent := "project: testproject\nbackends:\n  - name: keychain\n    type: keychain\n"
+	writeTestFile(t, dir, config.FullFileName, cfgContent)
+	writeTestFile(t, dir, ".env", "HOST=localhost\nAPI_KEY=ref://keychain/api_key\n")
+	chdir(t, dir)
+
+	// The keychain backend will fail to find the secret (no mock store set up
+	// at the cmd level), so the ref will be unresolved.
+	stdout, stderr, err := execCmd(t, "resolve", "--strict")
+	if err == nil {
+		t.Fatal("resolve --strict with failed refs should return error")
+	}
+
+	// Strict mode: stdout should be empty (no partial output).
+	if stdout != "" {
+		t.Errorf("resolve --strict: expected empty stdout, got %q", stdout)
+	}
+
+	// Error message should mention strict mode.
+	if !strings.Contains(err.Error(), "strict mode") {
+		t.Errorf("error should mention strict mode, got: %v", err)
+	}
+
+	// Stderr should contain the per-key error.
+	if !strings.Contains(stderr, "API_KEY") {
+		t.Errorf("stderr should report API_KEY error, got: %q", stderr)
+	}
+}
+
+func TestIntegration_Resolve_NonStrict_WithFailedRefs_PartialOutput(t *testing.T) {
+	dir := t.TempDir()
+	cfgContent := "project: testproject\nbackends:\n  - name: keychain\n    type: keychain\n"
+	writeTestFile(t, dir, config.FullFileName, cfgContent)
+	writeTestFile(t, dir, ".env", "HOST=localhost\nAPI_KEY=ref://keychain/api_key\n")
+	chdir(t, dir)
+
+	// Without --strict, partial output should be produced.
+	stdout, stderr, err := execCmd(t, "resolve")
+	if err == nil {
+		t.Fatal("resolve with failed refs should return error")
+	}
+
+	// Non-strict: stdout should contain partial output (the resolved HOST and the unresolved ref).
+	if !strings.Contains(stdout, "HOST=localhost") {
+		t.Errorf("resolve without strict: should output resolved keys, got %q", stdout)
+	}
+
+	// Error message should NOT mention strict mode.
+	if strings.Contains(err.Error(), "strict mode") {
+		t.Errorf("error should not mention strict mode without --strict, got: %v", err)
+	}
+
+	// Stderr should contain the per-key error.
+	if !strings.Contains(stderr, "API_KEY") {
+		t.Errorf("stderr should report API_KEY error, got: %q", stderr)
+	}
+}
+
+func TestIntegration_Resolve_Strict_WithDirenv_NoOutput(t *testing.T) {
+	dir := t.TempDir()
+	cfgContent := "project: testproject\nbackends:\n  - name: keychain\n    type: keychain\n"
+	writeTestFile(t, dir, config.FullFileName, cfgContent)
+	writeTestFile(t, dir, ".env", "HOST=localhost\nSECRET=ref://keychain/secret\n")
+	chdir(t, dir)
+
+	stdout, _, err := execCmd(t, "resolve", "--strict", "--direnv")
+	if err == nil {
+		t.Fatal("resolve --strict --direnv with failed refs should return error")
+	}
+
+	// Strict mode: no output even when --direnv is requested.
+	if stdout != "" {
+		t.Errorf("resolve --strict --direnv: expected empty stdout, got %q", stdout)
+	}
+}
+
+func TestIntegration_Resolve_Strict_HelpText(t *testing.T) {
+	stdout, _, err := execCmd(t, "resolve", "--help")
+	if err != nil {
+		t.Fatalf("resolve --help: %v", err)
+	}
+
+	if !strings.Contains(stdout, "--strict") {
+		t.Error("resolve help should mention --strict flag")
+	}
+}
+
 func TestIntegration_ResolveWithProfile_InterpolationAcrossLayers(t *testing.T) {
 	dir := t.TempDir()
 

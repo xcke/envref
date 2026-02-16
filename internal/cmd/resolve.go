@@ -29,30 +29,36 @@ By default, output is in KEY=VALUE format (one per line). Use --direnv
 to output in direnv-compatible format (export KEY=VALUE), or use --format
 to select from plain, json, shell, or table.
 
+Use --strict to suppress output entirely if any reference fails to resolve.
+This is useful in CI pipelines where partial output is unsafe.
+
 Examples:
   envref resolve                         # output KEY=VALUE pairs
   envref resolve --profile staging       # use staging profile
   envref resolve --direnv                # output export KEY=VALUE for direnv
   envref resolve --format json           # output as JSON array
+  envref resolve --strict                # fail with no output if any ref fails
   eval "$(envref resolve --direnv)"      # inject into current shell`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			direnv, _ := cmd.Flags().GetBool("direnv")
 			profile, _ := cmd.Flags().GetString("profile")
 			formatStr, _ := cmd.Flags().GetString("format")
-			return runResolve(cmd, direnv, profile, formatStr)
+			strict, _ := cmd.Flags().GetBool("strict")
+			return runResolve(cmd, direnv, profile, formatStr, strict)
 		},
 	}
 
 	cmd.Flags().Bool("direnv", false, "output in direnv-compatible format (export KEY=VALUE)")
 	cmd.Flags().StringP("profile", "P", "", "environment profile to use (e.g., staging, production)")
 	cmd.Flags().String("format", "plain", "output format: plain, json, shell, table")
+	cmd.Flags().Bool("strict", false, "fail with no output if any reference cannot be resolved")
 
 	return cmd
 }
 
 // runResolve implements the resolve command logic.
-func runResolve(cmd *cobra.Command, direnv bool, profileOverride, formatStr string) error {
+func runResolve(cmd *cobra.Command, direnv bool, profileOverride, formatStr string, strict bool) error {
 	// --direnv is a shorthand for --format shell.
 	if direnv {
 		formatStr = "shell"
@@ -114,6 +120,11 @@ func runResolve(cmd *cobra.Command, direnv bool, profileOverride, formatStr stri
 	// Report resolution errors to stderr.
 	for _, keyErr := range result.Errors {
 		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "error: %s\n", keyErr.Error())
+	}
+
+	// In strict mode, suppress all output if any reference failed.
+	if strict && !result.Resolved() {
+		return fmt.Errorf("%d reference(s) could not be resolved (strict mode: no output produced)", len(result.Errors))
 	}
 
 	// Output resolved entries.

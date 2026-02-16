@@ -97,8 +97,8 @@
 - [DONE] P1 | ENV-071 | Implement resolution pipeline: parse → resolve refs → merge → output
 - [DONE] P1 | ENV-072 | Add `envref resolve` command — output fully resolved KEY=VALUE pairs to stdout
 - [DONE] P1 | ENV-073 | Add `--direnv` output format (`export KEY=VALUE` lines for `eval`)
-- [TODO] P2 | ENV-074 | Handle resolution failures gracefully — partial resolve with clear error per failed key
-- [TODO] P2 | ENV-075 | Add `--strict` flag — fail entirely if any ref can't be resolved
+- [DONE] P2 | ENV-074 | Handle resolution failures gracefully — partial resolve with clear error per failed key
+- [DONE] P2 | ENV-075 | Add `--strict` flag — fail entirely if any ref can't be resolved
 - [TODO] P2 | ENV-076 | Cache resolved values in memory during a single resolve call (avoid duplicate backend hits)
 - [TODO] P3 | ENV-077 | Support nested references (`DB_URL=postgres://${ref://secrets/db_user}:${ref://secrets/db_pass}@localhost/app`)
 
