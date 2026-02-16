@@ -196,7 +196,7 @@
 - [DONE] P2 | ENV-146 | Benchmark `envref resolve` — target <50ms for 100 vars
 - [DONE] P2 | ENV-147 | Set up code coverage reporting
 - [DONE] P3 | ENV-148 | Fuzz testing for `.env` parser
-- [TODO] P3 | ENV-149 | Security audit of secret handling (memory zeroing, no secrets in logs/errors)
+- [DONE] P3 | ENV-149 | Security audit of secret handling (memory zeroing, no secrets in logs/errors)
 ---
 
 ## Milestone Summary

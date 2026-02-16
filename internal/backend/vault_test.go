@@ -630,7 +630,7 @@ func TestVaultBackend_ReopenAfterClose(t *testing.T) {
 		t.Fatalf("NewVaultBackend: %v", err)
 	}
 
-	// Set, close, then set again (lazy reopen).
+	// Set, close.
 	if err := v.Set("k1", "v1"); err != nil {
 		t.Fatalf("Set before close: %v", err)
 	}
@@ -638,17 +638,26 @@ func TestVaultBackend_ReopenAfterClose(t *testing.T) {
 		t.Fatalf("Close: %v", err)
 	}
 
-	// Operations after close should lazily reopen the database.
-	if err := v.Set("k2", "v2"); err != nil {
-		t.Fatalf("Set after close: %v", err)
+	// After Close, the passphrase is cleared from memory. Operations should
+	// fail with ErrVaultClosed to prevent use of a cleared vault.
+	err = v.Set("k2", "v2")
+	if !errors.Is(err, ErrVaultClosed) {
+		t.Fatalf("Set after close: got %v, want ErrVaultClosed", err)
 	}
 
-	val, err := v.Get("k2")
+	// To continue, create a new vault instance.
+	v2, err := NewVaultBackend("pass", WithVaultPath(dbPath))
 	if err != nil {
-		t.Fatalf("Get after reopen: %v", err)
+		t.Fatalf("NewVaultBackend v2: %v", err)
 	}
-	if val != "v2" {
-		t.Fatalf("Get after reopen: got %q, want %q", val, "v2")
+	defer func() { _ = v2.Close() }()
+
+	val, err := v2.Get("k1")
+	if err != nil {
+		t.Fatalf("Get from v2: %v", err)
+	}
+	if val != "v1" {
+		t.Fatalf("Get from v2: got %q, want %q", val, "v1")
 	}
 }
 
@@ -1002,4 +1011,109 @@ func TestVaultBackend_ImportEmptySecrets(t *testing.T) {
 	if count != 0 {
 		t.Fatalf("Import empty count: got %d, want 0", count)
 	}
+}
+
+// --- Security-focused tests ---
+
+func TestVaultBackend_Close_ClearsPassphrase(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "vault.db")
+
+	v, err := NewVaultBackend("secret-passphrase-123", WithVaultPath(dbPath))
+	if err != nil {
+		t.Fatalf("NewVaultBackend: %v", err)
+	}
+
+	// Verify passphrase is set.
+	if len(v.passphrase) == 0 {
+		t.Fatal("passphrase should be set before Close")
+	}
+
+	// Store the length to verify zeroing.
+	passLen := len(v.passphrase)
+
+	// Get a reference to the underlying array before Close clears it.
+	passRef := v.passphrase
+
+	if err := v.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+
+	// After Close, the passphrase field should be nil.
+	if v.passphrase != nil {
+		t.Fatal("passphrase should be nil after Close")
+	}
+
+	// The original backing array should be zeroed.
+	for i := 0; i < passLen; i++ {
+		if passRef[i] != 0 {
+			t.Fatalf("passphrase byte at index %d should be zero after Close, got %d", i, passRef[i])
+		}
+	}
+}
+
+func TestVaultBackend_OperationsAfterClose_Fail(t *testing.T) {
+	v := testVault(t)
+
+	// Store a secret.
+	if err := v.Set("key", "value"); err != nil {
+		t.Fatalf("Set: %v", err)
+	}
+
+	// Close clears passphrase.
+	if err := v.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+
+	// All operations that need the passphrase should fail.
+	_, err := v.Get("key")
+	if !errors.Is(err, ErrVaultClosed) {
+		t.Fatalf("Get after close: got %v, want ErrVaultClosed", err)
+	}
+
+	err = v.Set("key2", "value2")
+	if !errors.Is(err, ErrVaultClosed) {
+		t.Fatalf("Set after close: got %v, want ErrVaultClosed", err)
+	}
+}
+
+func TestVaultBackend_ErrorMessages_NoSecretValues(t *testing.T) {
+	v := testVault(t)
+
+	// Store a secret, then close to force error.
+	if err := v.Set("my_key", "super-secret-value-xyz"); err != nil {
+		t.Fatalf("Set: %v", err)
+	}
+
+	// Close the vault.
+	if err := v.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+
+	// Get should fail. Verify the error message contains the key name
+	// but NOT the secret value.
+	_, err := v.Get("my_key")
+	if err == nil {
+		t.Fatal("Get should fail after Close")
+	}
+
+	errMsg := err.Error()
+	// The error message should not contain the secret value.
+	if contains(errMsg, "super-secret-value-xyz") {
+		t.Fatalf("error message should not contain secret value, got: %s", errMsg)
+	}
+}
+
+// contains checks if s contains substr (simple helper for test clarity).
+func contains(s, substr string) bool {
+	return len(s) >= len(substr) && searchString(s, substr)
+}
+
+func searchString(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
 }

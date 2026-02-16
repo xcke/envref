@@ -1,7 +1,7 @@
 # Project Status
 
 ## Last Completed
-- ENV-148: Added fuzz testing for .env parser, ref:// URI parser, and variable interpolation [iter-56]
+- ENV-149: Security audit of secret handling — memory zeroing, passphrase clearing, error message audit [iter-57]
 
 ## Current State
 - Go module `github.com/xcke/envref` initialized with Cobra + Viper + go-keyring + age + sqlite + testify + x/term dependencies
@@ -34,6 +34,7 @@
 - `envref vault export` — export all vault secrets to JSON file or stdout for backup/migration
 - `envref vault import` — import secrets from JSON file or stdin into the vault
 - **Two secret backends:** `KeychainBackend` (OS keychain via go-keyring) and `VaultBackend` (local SQLite + age encryption)
+- **Security hardening:** Vault passphrase stored as `[]byte` (clearable), zeroed on Close; decrypted plaintext bytes cleared after use; terminal passphrase input bytes cleared; ErrVaultClosed prevents use-after-close; error messages never contain secret values
 - **Comprehensive README** with architecture diagram, resolution pipeline, backend chain, project structure, vault docs, and benchmarks
 - **docs/ directory** with four usage guides: getting-started, direnv-integration, profiles, secret-backends
 - **Homebrew tap:** GoReleaser `brews` config auto-publishes to `xcke/homebrew-tap`; `Formula/envref.rb` template for build-from-source; release workflow on tag push

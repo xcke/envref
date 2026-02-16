@@ -27,6 +27,8 @@ import (
 	"filippo.io/age"
 	"filippo.io/age/armor"
 	_ "modernc.org/sqlite"
+
+	"github.com/xcke/envref/internal/secret"
 )
 
 // Default vault database path relative to the user's config directory.
@@ -43,7 +45,7 @@ const defaultVaultFile = "vault.db"
 // Thread safety is provided via a sync.Mutex.
 type VaultBackend struct {
 	dbPath     string
-	passphrase string
+	passphrase []byte
 	mu         sync.Mutex
 	db         *sql.DB
 }
@@ -72,7 +74,7 @@ func NewVaultBackend(passphrase string, opts ...VaultOption) (*VaultBackend, err
 	}
 
 	v := &VaultBackend{
-		passphrase: passphrase,
+		passphrase: []byte(passphrase),
 	}
 
 	for _, opt := range opts {
@@ -238,6 +240,10 @@ func (v *VaultBackend) List() ([]string, error) {
 func (v *VaultBackend) Close() error {
 	v.mu.Lock()
 	defer v.mu.Unlock()
+
+	// Clear the passphrase from memory.
+	secret.ClearBytes(v.passphrase)
+	v.passphrase = nil
 
 	if v.db != nil {
 		err := v.db.Close()
@@ -536,10 +542,17 @@ func (v *VaultBackend) open() (*sql.DB, error) {
 	return v.db, nil
 }
 
+// ErrVaultClosed is returned when an operation is attempted on a vault whose
+// passphrase has been cleared (after Close).
+var ErrVaultClosed = errors.New("vault is closed: passphrase has been cleared from memory")
+
 // encrypt encrypts a plaintext string using age scrypt passphrase encryption
 // and returns the ASCII-armored ciphertext.
 func (v *VaultBackend) encrypt(plaintext string) (string, error) {
-	recipient, err := age.NewScryptRecipient(v.passphrase)
+	if v.passphrase == nil {
+		return "", ErrVaultClosed
+	}
+	recipient, err := age.NewScryptRecipient(string(v.passphrase))
 	if err != nil {
 		return "", fmt.Errorf("creating age recipient: %w", err)
 	}
@@ -574,7 +587,10 @@ func (v *VaultBackend) encrypt(plaintext string) (string, error) {
 // decrypt decrypts an ASCII-armored age ciphertext using the vault passphrase
 // and returns the plaintext string.
 func (v *VaultBackend) decrypt(armored string) (string, error) {
-	identity, err := age.NewScryptIdentity(v.passphrase)
+	if v.passphrase == nil {
+		return "", ErrVaultClosed
+	}
+	identity, err := age.NewScryptIdentity(string(v.passphrase))
 	if err != nil {
 		return "", fmt.Errorf("creating age identity: %w", err)
 	}
@@ -591,7 +607,13 @@ func (v *VaultBackend) decrypt(armored string) (string, error) {
 		return "", fmt.Errorf("reading plaintext: %w", err)
 	}
 
-	return string(plaintext), nil
+	// Convert to string before clearing the byte slice. The string will
+	// hold its own copy; clearing the original byte slice reduces the
+	// number of copies of the secret in memory.
+	result := string(plaintext)
+	secret.ClearBytes(plaintext)
+
+	return result, nil
 }
 
 // DBPath returns the path to the vault database file.

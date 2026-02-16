@@ -9,6 +9,7 @@ import (
 	"github.com/xcke/envref/internal/backend"
 	"github.com/xcke/envref/internal/config"
 	"github.com/xcke/envref/internal/output"
+	"github.com/xcke/envref/internal/secret"
 	"golang.org/x/term"
 )
 
@@ -405,8 +406,7 @@ func promptVaultPassphrase(cmd *cobra.Command, confirm bool) (string, error) {
 		return "", fmt.Errorf("reading passphrase: %w", err)
 	}
 
-	passphrase := string(passBytes)
-	if passphrase == "" {
+	if len(passBytes) == 0 {
 		return "", fmt.Errorf("passphrase must not be empty")
 	}
 
@@ -415,13 +415,24 @@ func promptVaultPassphrase(cmd *cobra.Command, confirm bool) (string, error) {
 		confirmBytes, err := term.ReadPassword(stdinFd)
 		_, _ = fmt.Fprintln(stderr)
 		if err != nil {
+			secret.ClearBytes(passBytes)
 			return "", fmt.Errorf("reading passphrase confirmation: %w", err)
 		}
 
-		if passphrase != string(confirmBytes) {
+		if string(passBytes) != string(confirmBytes) {
+			secret.ClearBytes(passBytes)
+			secret.ClearBytes(confirmBytes)
 			return "", fmt.Errorf("passphrases do not match")
 		}
+		// Clear the confirmation copy; the primary copy is converted below.
+		secret.ClearBytes(confirmBytes)
 	}
+
+	// Convert to string for the return value, then clear the byte slice.
+	// The string copy is necessary because NewVaultBackend accepts a string,
+	// but clearing the original bytes reduces duplicate copies in memory.
+	passphrase := string(passBytes)
+	secret.ClearBytes(passBytes)
 
 	return passphrase, nil
 }
