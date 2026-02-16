@@ -1,7 +1,7 @@
 # Project Status
 
 ## Last Completed
-- ENV-103: Added `.env.schema.json` support with type checking (string, number, boolean, url, enum, email, port) [iter-40]
+- ENV-115: Added `envref edit` command to open .env files in $VISUAL/$EDITOR [iter-41]
 
 ## Current State
 - Go module `github.com/xcke/envref` initialized with Cobra + Viper + go-keyring + testify dependencies
@@ -29,6 +29,7 @@
 - `envref doctor` — scans .env files for common issues
 - `envref config show` — prints resolved effective config (plain, JSON, table formats)
 - `envref completion <shell>` — generates shell completion scripts (bash, zsh, fish, powershell)
+- `envref edit` — opens .env files in `$VISUAL`/`$EDITOR` (default `vi`); supports `--local`, `--config`, `--profile` flags and explicit file argument
 - **Global verbosity flags:** `--quiet`/`-q`, `--verbose`, `--debug`; mutually exclusive
 - **Colorized output:** auto-detected via TTY; disabled with `--no-color` flag or `NO_COLOR` env var
 - **`internal/output` package:** `Writer` type with verbosity and color support

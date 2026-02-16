@@ -154,7 +154,7 @@
 - [DONE] P2 | ENV-112 | Add `--quiet` / `--verbose` / `--debug` global flags
 - [DONE] P2 | ENV-113 | Implement fuzzy key matching in error messages ("KEY not found, did you mean API_KEY?")
 - [DONE] P2 | ENV-114 | Add `envref run -- <command>` — inject resolved env vars and exec (alternative to direnv)
-- [TODO] P2 | ENV-115 | Add `envref edit` — open `.env` in `$EDITOR` with syntax highlighting hints
+- [DONE] P2 | ENV-115 | Add `envref edit` — open `.env` in `$EDITOR`
 - [TODO] P3 | ENV-116 | Add `envref import <file|url>` — import env vars from another format (Docker, Vercel, Heroku)
 - [TODO] P3 | ENV-117 | Add `envref export --format <docker|github|gitlab>` — export for CI platforms
 - [TODO] P3 | ENV-118 | Add interactive TUI mode for browsing/editing (Bubble Tea)
