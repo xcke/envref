@@ -1,7 +1,7 @@
 # Project Status
 
 ## Last Completed
-- ENV-141: Added comprehensive unit tests for merge logic — override precedence (single/multi overlay, three-way merge), ref detection through merges (ref→plain, plain→ref, mixed), immutability of base/overlays, order preservation, edge cases (empty envs, large merges, empty values), merge+interpolate interaction, file-loaded merge scenarios, and ResolvedRefs after merge [iter-11]
+- ENV-142: Added comprehensive unit tests for resolution pipeline — 50+ test cases covering input validation, direct backend match, fallback chain (first wins, three backends, not found), missing secrets, invalid ref URIs, mixed resolution (partial success), project namespace separation, nested paths, backend connection errors, order preservation, special characters, large envs (500 entries), duplicate ref paths, cross-backend resolution, error isolation, WasRef flag semantics, error message formatting, repeated calls, and table-driven scenarios [iter-12]
 
 ## Current State
 - Go module `github.com/xcke/envref` initialized with Cobra + Viper + go-keyring + testify dependencies
@@ -29,6 +29,7 @@
 - Makefile with build/test/lint/install targets
 - **Parser test coverage: 100+ test cases** covering all quote styles, edge cases, multiline, escapes, BOM, CRLF, duplicates, unicode, large inputs, and real-world mixed files
 - **Merge test coverage: 38+ test cases** covering override precedence, ref detection, immutability, order preservation, edge cases, three-way profile merges, merge+interpolate interaction, file-loaded merges, and ResolvedRefs verification
+- **Resolve test coverage: 50+ test cases** covering input validation, direct/fallback resolution, error handling, namespace isolation, special characters, large envs, and all error paths
 - Directory structure: `cmd/envref/`, `internal/cmd/`, `internal/parser/`, `internal/envfile/`, `internal/config/`, `internal/ref/`, `internal/resolve/`, `internal/backend/`, `pkg/`
 - All checks pass: `go build`, `go vet`, `go test`, `golangci-lint`
 
