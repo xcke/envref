@@ -174,7 +174,7 @@
 ## Phase 11 — Documentation & Distribution
 
 - [DONE] P2 | ENV-130 | Write comprehensive README with architecture diagram
-- [TODO] P2 | ENV-131 | Add `docs/` with usage guides per feature (getting started, direnv, profiles, backends)
+- [DONE] P2 | ENV-131 | Add `docs/` with usage guides per feature (getting started, direnv, profiles, backends)
 - [DONE] P2 | ENV-132 | Set up GoReleaser for GitHub Releases (Linux, macOS, Windows binaries)
 - [TODO] P2 | ENV-133 | Add Homebrew tap formula
 - [TODO] P3 | ENV-134 | Add AUR package

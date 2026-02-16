@@ -1,7 +1,7 @@
 # Project Status
 
 ## Last Completed
-- ENV-130: Enhanced README with architecture diagram, resolution pipeline, backend chain, project structure, vault docs, and benchmark info [iter-50]
+- ENV-131: Added docs/ directory with four usage guides (getting-started, direnv-integration, profiles, secret-backends) [iter-51]
 
 ## Current State
 - Go module `github.com/xcke/envref` initialized with Cobra + Viper + go-keyring + age + sqlite + testify + x/term dependencies
@@ -32,6 +32,7 @@
 - `envref vault unlock` — unlock vault after verifying passphrase to restore secret access
 - **Two secret backends:** `KeychainBackend` (OS keychain via go-keyring) and `VaultBackend` (local SQLite + age encryption)
 - **Comprehensive README** with architecture diagram, resolution pipeline, backend chain, project structure, vault docs, and benchmarks
+- **docs/ directory** with four usage guides: getting-started, direnv-integration, profiles, secret-backends
 - `.env` file parser with full quote/multiline/comment/BOM/CRLF support
 - `ref://` URI parser, `Backend` interface, `Registry`, `NamespacedBackend`
 - GoReleaser config, GitHub Actions CI pipeline, Makefile with coverage targets
