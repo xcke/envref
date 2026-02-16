@@ -1,0 +1,1162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>envref — Separate config from secrets in .env files</title>
+<meta name="description" content="CLI tool that keeps secrets out of .env files. References (ref://) point to OS keychain, 1Password, Vault, or AWS SSM. Safe to commit, fast to resolve.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0a0e14;
+  --bg-surface: #111820;
+  --bg-elevated: #1a2230;
+  --bg-terminal: #0d1117;
+  --border: #1e2a3a;
+  --border-bright: #2d3f54;
+  --text: #c5cdd8;
+  --text-muted: #6b7d93;
+  --text-bright: #e6edf5;
+  --green: #7ee787;
+  --green-dim: #3fb950;
+  --blue: #79c0ff;
+  --cyan: #76e4f7;
+  --purple: #d2a8ff;
+  --yellow: #ffa657;
+  --red: #ff7b72;
+  --pink: #ff9bce;
+  --prompt: #7ee787;
+  --comment: #6b7d93;
+  --mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+  --sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html {
+  scroll-behavior: smooth;
+  font-size: 16px;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--mono);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: rgba(126, 231, 135, 0.2);
+  color: var(--green);
+}
+
+a {
+  color: var(--blue);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+a:hover { color: var(--cyan); }
+
+/* ── Layout ─────────────────────────────────── */
+
+.container {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+}
+
+section {
+  padding: 5rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+/* ── Nav ────────────────────────────────────── */
+
+nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background: rgba(10, 14, 20, 0.85);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  padding: 0.75rem 0;
+}
+
+nav .container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.nav-logo {
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--green);
+  letter-spacing: -0.02em;
+}
+
+.nav-logo span { color: var(--text-muted); }
+
+.nav-links {
+  display: flex;
+  gap: 1.5rem;
+  list-style: none;
+  font-size: 0.85rem;
+}
+
+.nav-links a {
+  color: var(--text-muted);
+  transition: color 0.15s;
+}
+.nav-links a:hover { color: var(--text-bright); }
+
+.nav-github {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  padding: 0.35rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  transition: all 0.15s;
+}
+.nav-github:hover {
+  color: var(--text-bright);
+  border-color: var(--border-bright);
+  background: var(--bg-elevated);
+}
+
+/* ── Hero ───────────────────────────────────── */
+
+.hero {
+  padding: 10rem 0 6rem;
+  text-align: center;
+  border-bottom: 1px solid var(--border);
+  position: relative;
+  overflow: hidden;
+}
+
+.hero::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(126, 231, 135, 0.06) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.hero-badge {
+  display: inline-block;
+  font-size: 0.75rem;
+  color: var(--green-dim);
+  border: 1px solid rgba(126, 231, 135, 0.2);
+  border-radius: 20px;
+  padding: 0.3rem 0.9rem;
+  margin-bottom: 1.5rem;
+  background: rgba(126, 231, 135, 0.05);
+}
+
+.hero h1 {
+  font-family: var(--mono);
+  font-size: 3rem;
+  font-weight: 700;
+  color: var(--text-bright);
+  line-height: 1.15;
+  margin-bottom: 1rem;
+  letter-spacing: -0.03em;
+}
+
+.hero h1 .accent { color: var(--green); }
+
+.hero-sub {
+  font-family: var(--sans);
+  font-size: 1.15rem;
+  color: var(--text-muted);
+  max-width: 600px;
+  margin: 0 auto 2.5rem;
+  line-height: 1.6;
+}
+
+.hero-model {
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  margin-bottom: 3rem;
+  display: flex;
+  justify-content: center;
+  gap: 2rem;
+  flex-wrap: wrap;
+}
+
+.hero-model code {
+  color: var(--text);
+  background: var(--bg-elevated);
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+}
+
+/* ── Terminal blocks ────────────────────────── */
+
+.terminal {
+  background: var(--bg-terminal);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  text-align: left;
+  max-width: 680px;
+  margin: 0 auto;
+  font-size: 0.85rem;
+}
+
+.terminal-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0.6rem 0.9rem;
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--border);
+}
+
+.terminal-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--border-bright);
+}
+.terminal-dot.r { background: #ff5f57; }
+.terminal-dot.y { background: #febc2e; }
+.terminal-dot.g { background: #28c840; }
+
+.terminal-title {
+  flex: 1;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.terminal-body {
+  padding: 1rem 1.25rem;
+  line-height: 1.7;
+  overflow-x: auto;
+}
+
+.terminal-body .prompt { color: var(--prompt); }
+.terminal-body .cmd { color: var(--text-bright); }
+.terminal-body .flag { color: var(--blue); }
+.terminal-body .arg { color: var(--yellow); }
+.terminal-body .comment { color: var(--comment); font-style: italic; }
+.terminal-body .output { color: var(--text-muted); }
+.terminal-body .val { color: var(--cyan); }
+.terminal-body .ref { color: var(--purple); }
+.terminal-body .key { color: var(--text); }
+.terminal-body .eq { color: var(--text-muted); }
+.terminal-body .str { color: var(--green); }
+.terminal-body .err { color: var(--red); }
+
+/* ── Install bar ────────────────────────────── */
+
+.install-bar {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 2rem;
+  flex-wrap: wrap;
+}
+
+.install-cmd {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.55rem 1rem;
+  font-size: 0.85rem;
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.15s;
+  position: relative;
+}
+
+.install-cmd:hover {
+  border-color: var(--green-dim);
+  background: rgba(126, 231, 135, 0.05);
+}
+
+.install-cmd .prompt-char { color: var(--green); }
+
+.install-cmd .copy-icon {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  transition: color 0.15s;
+}
+.install-cmd:hover .copy-icon { color: var(--text); }
+
+.install-cmd .copied-msg {
+  position: absolute;
+  top: -2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--green);
+  color: var(--bg);
+  font-size: 0.7rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+.install-cmd .copied-msg.show { opacity: 1; }
+
+/* ── Section headers ────────────────────────── */
+
+.section-label {
+  font-size: 0.75rem;
+  color: var(--green-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 0.5rem;
+}
+
+.section-title {
+  font-family: var(--mono);
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: var(--text-bright);
+  margin-bottom: 0.75rem;
+  letter-spacing: -0.02em;
+}
+
+.section-desc {
+  font-family: var(--sans);
+  color: var(--text-muted);
+  font-size: 1rem;
+  max-width: 600px;
+  margin-bottom: 3rem;
+}
+
+/* ── Concept cards ──────────────────────────── */
+
+.concept-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 3rem;
+}
+
+.concept-card {
+  background: var(--bg-surface);
+  padding: 1.75rem;
+}
+
+.concept-card .label {
+  font-size: 0.7rem;
+  color: var(--comment);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 0.5rem;
+}
+
+.concept-card code {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--green);
+  margin-bottom: 0.5rem;
+}
+
+.concept-card p {
+  font-family: var(--sans);
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+/* ── Feature grid ───────────────────────────── */
+
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.feature-card {
+  background: var(--bg-surface);
+  padding: 1.75rem;
+}
+
+.feature-card .icon {
+  font-size: 0.85rem;
+  color: var(--green);
+  margin-bottom: 0.75rem;
+  font-weight: 600;
+}
+
+.feature-card h3 {
+  font-family: var(--mono);
+  font-size: 0.95rem;
+  color: var(--text-bright);
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+}
+
+.feature-card p {
+  font-family: var(--sans);
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+/* ── Pipeline ───────────────────────────────── */
+
+.pipeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  max-width: 680px;
+  margin: 0 auto;
+}
+
+.pipe-step {
+  display: flex;
+  align-items: stretch;
+  gap: 1.25rem;
+}
+
+.pipe-line {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 20px;
+  flex-shrink: 0;
+}
+
+.pipe-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--green);
+  flex-shrink: 0;
+  margin-top: 0.35rem;
+}
+
+.pipe-connector {
+  width: 1px;
+  flex: 1;
+  background: var(--border-bright);
+  min-height: 1.5rem;
+}
+
+.pipe-content {
+  flex: 1;
+  padding-bottom: 2rem;
+}
+
+.pipe-content h4 {
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  color: var(--text-bright);
+  margin-bottom: 0.25rem;
+}
+
+.pipe-content p {
+  font-family: var(--sans);
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.pipe-content code {
+  font-size: 0.8rem;
+  color: var(--cyan);
+  background: var(--bg-elevated);
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+}
+
+/* ── Backend table ──────────────────────────── */
+
+.backend-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.backend-table th {
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+  font-weight: 500;
+  text-align: left;
+  padding: 0.75rem 1rem;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid var(--border);
+}
+
+.backend-table td {
+  padding: 0.7rem 1rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+.backend-table tr:last-child td { border-bottom: none; }
+
+.backend-table .type-badge {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--purple);
+  background: rgba(210, 168, 255, 0.1);
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+}
+
+.backend-table .name { color: var(--text-bright); font-weight: 500; }
+
+.backend-table .desc {
+  font-family: var(--sans);
+  color: var(--text-muted);
+}
+
+/* ── Commands ───────────────────────────────── */
+
+.cmd-group {
+  margin-bottom: 2rem;
+}
+
+.cmd-group-title {
+  font-size: 0.75rem;
+  color: var(--yellow);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.cmd-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.cmd-item {
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+  padding: 0.4rem 0;
+}
+
+.cmd-item .cmd-name {
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  color: var(--cyan);
+  white-space: nowrap;
+  min-width: 280px;
+}
+
+.cmd-item .cmd-desc {
+  font-family: var(--sans);
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+/* ── Install section ────────────────────────── */
+
+.install-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.install-method {
+  background: var(--bg-surface);
+  padding: 1.5rem;
+}
+
+.install-method .method-name {
+  font-size: 0.75rem;
+  color: var(--yellow);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 0.75rem;
+}
+
+.install-method pre {
+  font-size: 0.8rem;
+  line-height: 1.6;
+  color: var(--text);
+  overflow-x: auto;
+}
+
+.install-method .prompt-char { color: var(--green); }
+.install-method .cmd-text { color: var(--text-bright); }
+
+/* ── Docs links ─────────────────────────────── */
+
+.docs-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+}
+
+.doc-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1.5rem;
+  transition: all 0.15s;
+  display: block;
+}
+
+.doc-card:hover {
+  border-color: var(--border-bright);
+  background: var(--bg-elevated);
+}
+
+.doc-card h3 {
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  color: var(--text-bright);
+  margin-bottom: 0.35rem;
+}
+
+.doc-card p {
+  font-family: var(--sans);
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.doc-card .arrow {
+  color: var(--green-dim);
+  font-size: 0.8rem;
+  margin-top: 0.5rem;
+  display: block;
+}
+
+/* ── Footer ─────────────────────────────────── */
+
+footer {
+  padding: 3rem 0;
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+footer a { color: var(--text-muted); }
+footer a:hover { color: var(--text-bright); }
+
+.footer-links {
+  display: flex;
+  justify-content: center;
+  gap: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+/* ── Responsive ─────────────────────────────── */
+
+@media (max-width: 768px) {
+  .hero h1 { font-size: 2rem; }
+  .section-title { font-size: 1.4rem; }
+  .concept-grid { grid-template-columns: 1fr; }
+  .feature-grid { grid-template-columns: 1fr; }
+  .install-grid { grid-template-columns: 1fr; }
+  .docs-grid { grid-template-columns: 1fr; }
+  .cmd-item { flex-direction: column; gap: 0.2rem; }
+  .cmd-item .cmd-name { min-width: 0; }
+  .nav-links { display: none; }
+  .hero-model { flex-direction: column; gap: 0.5rem; }
+  .backend-table { font-size: 0.75rem; }
+  .backend-table td, .backend-table th { padding: 0.5rem; }
+}
+
+@media (max-width: 480px) {
+  .hero { padding: 7rem 0 4rem; }
+  section { padding: 3rem 0; }
+  .hero h1 { font-size: 1.6rem; }
+  .terminal { font-size: 0.75rem; }
+}
+</style>
+</head>
+<body>
+
+<!-- ── Nav ────────────────────────────────────── -->
+<nav>
+  <div class="container">
+    <a href="#" class="nav-logo">envref<span> /</span></a>
+    <ul class="nav-links">
+      <li><a href="#features">Features</a></li>
+      <li><a href="#how-it-works">How it works</a></li>
+      <li><a href="#backends">Backends</a></li>
+      <li><a href="#commands">Commands</a></li>
+      <li><a href="#install">Install</a></li>
+      <li><a href="#docs">Docs</a></li>
+    </ul>
+    <a href="https://github.com/xcke/envref" class="nav-github">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+      GitHub
+    </a>
+  </div>
+</nav>
+
+<!-- ── Hero ───────────────────────────────────── -->
+<section class="hero">
+  <div class="container">
+    <div class="hero-badge">Open source CLI tool</div>
+    <h1>Keep secrets out of<br><span class="accent">.env</span> files</h1>
+    <p class="hero-sub">
+      envref replaces plaintext secrets with <code>ref://</code> references that resolve at runtime from your OS keychain, 1Password, Vault, or AWS SSM. Your <code>.env</code> stays safe to commit.
+    </p>
+    <div class="hero-model">
+      <span>.env <code>ref://secrets/api_key</code></span>
+      <span style="color:var(--text-muted)">&rarr;</span>
+      <span>resolve <code>sk-abc...xyz</code></span>
+    </div>
+
+    <div class="terminal">
+      <div class="terminal-bar">
+        <span class="terminal-dot r"></span>
+        <span class="terminal-dot y"></span>
+        <span class="terminal-dot g"></span>
+        <span class="terminal-title">~/my-project</span>
+      </div>
+      <div class="terminal-body">
+<span class="comment"># Your .env — committed to git, no secrets</span>
+<span class="key">APP_NAME</span><span class="eq">=</span><span class="str">my-app</span>
+<span class="key">DATABASE_URL</span><span class="eq">=</span><span class="ref">ref://secrets/database_url</span>
+<span class="key">API_KEY</span><span class="eq">=</span><span class="ref">ref://secrets/api_key</span>
+
+<span class="prompt">$</span> <span class="cmd">envref resolve</span>
+<span class="output">APP_NAME=my-app</span>
+<span class="output">DATABASE_URL=postgres://localhost:5432/mydb</span>
+<span class="output">API_KEY=sk-abc123...xyz</span>
+
+<span class="prompt">$</span> <span class="cmd">envref run</span> <span class="flag">--</span> <span class="arg">node server.js</span>
+<span class="output">Server running on :3000</span>
+      </div>
+    </div>
+
+    <div class="install-bar">
+      <div class="install-cmd" onclick="copyCmd(this, 'brew install xcke/tap/envref')">
+        <span class="prompt-char">$</span>
+        <span>brew install xcke/tap/envref</span>
+        <span class="copy-icon">[copy]</span>
+        <span class="copied-msg">Copied!</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Mental Model ──────────────────────────── -->
+<section id="features">
+  <div class="container">
+    <div class="section-label"># Mental model</div>
+    <h2 class="section-title">Config and secrets, separated</h2>
+    <p class="section-desc">
+      Your <code>.env</code> holds config values and references. Secrets live in secure backends. envref bridges the gap at runtime.
+    </p>
+
+    <div class="concept-grid">
+      <div class="concept-card">
+        <div class="label">.env file</div>
+        <code>API_KEY=ref://secrets/api_key</code>
+        <p>Config values and secret references. Committed to git. No plaintext secrets.</p>
+      </div>
+      <div class="concept-card">
+        <div class="label">Secret backends</div>
+        <code>keychain | vault | 1password | ssm</code>
+        <p>OS keychain, local vault, 1Password, AWS SSM, HashiCorp Vault, OCI, or custom plugins.</p>
+      </div>
+      <div class="concept-card">
+        <div class="label">envref resolve</div>
+        <code>config + secrets &rarr; env vars</code>
+        <p>Resolves references, merges layers, interpolates variables. Output to shell, direnv, or JSON.</p>
+      </div>
+    </div>
+
+    <div class="feature-grid">
+      <div class="feature-card">
+        <div class="icon">&gt;_ Zero secrets on disk</div>
+        <h3>ref:// references</h3>
+        <p>Secrets stay in your OS keychain or password manager. The .env file holds only references &mdash; safe to commit, share, and review.</p>
+      </div>
+      <div class="feature-card">
+        <div class="icon">&gt;_ direnv integration</div>
+        <h3>Automatic resolution</h3>
+        <p>Run <code>envref init --direnv</code> and secrets resolve automatically when you <code>cd</code> into the project. Sub-50ms startup.</p>
+      </div>
+      <div class="feature-card">
+        <div class="icon">&gt;_ 7 backend types</div>
+        <h3>Flexible storage</h3>
+        <p>OS keychain out of the box. Add 1Password, AWS SSM, HashiCorp Vault, OCI, or write a plugin &mdash; backends chain with fallback.</p>
+      </div>
+      <div class="feature-card">
+        <div class="icon">&gt;_ Profiles</div>
+        <h3>Environment switching</h3>
+        <p>Layer <code>.env</code> &larr; <code>.env.staging</code> &larr; <code>.env.local</code>. Profile-scoped secrets keep environments isolated.</p>
+      </div>
+      <div class="feature-card">
+        <div class="icon">&gt;_ Team sharing</div>
+        <h3>Encrypted sync</h3>
+        <p>Share secrets with teammates via age encryption. <code>envref sync push</code> encrypts for the whole team. New members run <code>envref onboard</code>.</p>
+      </div>
+      <div class="feature-card">
+        <div class="icon">&gt;_ Validation</div>
+        <h3>Schema checks</h3>
+        <p>Validate .env against .env.example or a JSON schema. <code>--ci</code> flag returns exit code 1 for pipeline integration.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── How It Works ──────────────────────────── -->
+<section id="how-it-works">
+  <div class="container">
+    <div class="section-label"># Resolution pipeline</div>
+    <h2 class="section-title">How it works</h2>
+    <p class="section-desc">
+      Every <code>envref resolve</code> call follows a deterministic pipeline from file loading to formatted output.
+    </p>
+
+    <div class="pipeline">
+      <div class="pipe-step">
+        <div class="pipe-line"><div class="pipe-dot"></div><div class="pipe-connector"></div></div>
+        <div class="pipe-content">
+          <h4>Load &amp; merge .env files</h4>
+          <p>Three-layer merge: <code>.env</code> (base) &larr; <code>.env.&lt;profile&gt;</code> (environment) &larr; <code>.env.local</code> (personal). Later files override earlier ones.</p>
+        </div>
+      </div>
+      <div class="pipe-step">
+        <div class="pipe-line"><div class="pipe-dot"></div><div class="pipe-connector"></div></div>
+        <div class="pipe-content">
+          <h4>Variable interpolation</h4>
+          <p>Expand <code>${VAR}</code> references within values. <code>DB_URL=postgres://${DB_HOST}:${DB_PORT}/app</code> becomes a complete connection string.</p>
+        </div>
+      </div>
+      <div class="pipe-step">
+        <div class="pipe-line"><div class="pipe-dot"></div><div class="pipe-connector"></div></div>
+        <div class="pipe-content">
+          <h4>Reference resolution</h4>
+          <p>Parse <code>ref://</code> URIs and look up each secret through the backend chain. Backends are tried in order; first match wins. Results are cached per-call.</p>
+        </div>
+      </div>
+      <div class="pipe-step">
+        <div class="pipe-line"><div class="pipe-dot"></div><div class="pipe-connector"></div></div>
+        <div class="pipe-content">
+          <h4>Nested resolution</h4>
+          <p>A second pass catches <code>${ref://secrets/key}</code> patterns embedded in interpolated values. Supports arbitrary nesting depth.</p>
+        </div>
+      </div>
+      <div class="pipe-step">
+        <div class="pipe-line"><div class="pipe-dot" style="background:var(--cyan)"></div></div>
+        <div class="pipe-content">
+          <h4>Format &amp; output</h4>
+          <p>Emit as <code>KEY=VALUE</code> (plain), <code>export KEY=VALUE</code> (shell/direnv), JSON, or bordered table. Pipe to direnv, inject into commands, or use in CI.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Backends ───────────────────────────────── -->
+<section id="backends">
+  <div class="container">
+    <div class="section-label"># Secret backends</div>
+    <h2 class="section-title">Seven ways to store secrets</h2>
+    <p class="section-desc">
+      Two built-in backends, four CLI wrappers for enterprise tools, and a plugin system for everything else. Chain them with ordered fallback.
+    </p>
+
+    <table class="backend-table">
+      <thead>
+        <tr>
+          <th>Backend</th>
+          <th>Type</th>
+          <th>Use case</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="name">OS Keychain</td>
+          <td><span class="type-badge">keychain</span></td>
+          <td class="desc">Default &mdash; uses macOS Keychain, Linux Secret Service, or Windows Credential Manager. Zero setup.</td>
+        </tr>
+        <tr>
+          <td class="name">Local Vault</td>
+          <td><span class="type-badge">vault</span></td>
+          <td class="desc">SQLite + age encryption. For headless servers, containers, and CI environments.</td>
+        </tr>
+        <tr>
+          <td class="name">1Password</td>
+          <td><span class="type-badge">1password</span></td>
+          <td class="desc">Teams already using 1Password. Wraps the <code>op</code> CLI.</td>
+        </tr>
+        <tr>
+          <td class="name">AWS SSM</td>
+          <td><span class="type-badge">aws-ssm</span></td>
+          <td class="desc">AWS Systems Manager Parameter Store. For AWS infrastructure.</td>
+        </tr>
+        <tr>
+          <td class="name">HashiCorp Vault</td>
+          <td><span class="type-badge">hashicorp-vault</span></td>
+          <td class="desc">Enterprise secret management with KV v2 secrets engine.</td>
+        </tr>
+        <tr>
+          <td class="name">OCI Vault</td>
+          <td><span class="type-badge">oci-vault</span></td>
+          <td class="desc">Oracle Cloud Infrastructure Vault for OCI workloads.</td>
+        </tr>
+        <tr>
+          <td class="name">Plugin</td>
+          <td><span class="type-badge">plugin</span></td>
+          <td class="desc">Custom external executables via a JSON protocol. Extend to any secret store.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ── Quickstart ─────────────────────────────── -->
+<section id="quickstart">
+  <div class="container">
+    <div class="section-label"># Quickstart</div>
+    <h2 class="section-title">Up and running in 60 seconds</h2>
+    <p class="section-desc">
+      Four steps from install to resolved environment variables.
+    </p>
+
+    <div class="terminal" style="max-width:720px">
+      <div class="terminal-bar">
+        <span class="terminal-dot r"></span>
+        <span class="terminal-dot y"></span>
+        <span class="terminal-dot g"></span>
+        <span class="terminal-title">quickstart</span>
+      </div>
+      <div class="terminal-body">
+<span class="comment"># 1. Install</span>
+<span class="prompt">$</span> <span class="cmd">brew install</span> <span class="arg">xcke/tap/envref</span>
+
+<span class="comment"># 2. Initialize your project</span>
+<span class="prompt">$</span> <span class="cmd">envref init</span> <span class="flag">--project</span> <span class="arg">my-app</span> <span class="flag">--direnv</span>
+<span class="output">Created .envref.yaml</span>
+<span class="output">Created .env with example entries</span>
+<span class="output">Created .envrc for direnv integration</span>
+
+<span class="comment"># 3. Store a secret in your OS keychain</span>
+<span class="prompt">$</span> <span class="cmd">envref secret set</span> <span class="arg">database_url</span>
+<span class="output">Enter value: ********</span>
+<span class="output">Stored database_url in keychain backend</span>
+
+<span class="comment"># 4. Resolve and use</span>
+<span class="prompt">$</span> <span class="cmd">envref resolve</span>
+<span class="output">APP_NAME=my-app</span>
+<span class="output">DATABASE_URL=postgres://user:pass@localhost/mydb</span>
+
+<span class="prompt">$</span> <span class="cmd">envref run</span> <span class="flag">--</span> <span class="arg">node server.js</span>
+<span class="output">Server listening on :3000</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Commands ───────────────────────────────── -->
+<section id="commands">
+  <div class="container">
+    <div class="section-label"># CLI reference</div>
+    <h2 class="section-title">Commands</h2>
+    <p class="section-desc">
+      28 commands organized by workflow. Run <code>envref &lt;cmd&gt; --help</code> for full details.
+    </p>
+
+    <div class="cmd-group">
+      <div class="cmd-group-title">Core</div>
+      <div class="cmd-list">
+        <div class="cmd-item"><span class="cmd-name">envref init</span><span class="cmd-desc">Scaffold a new envref project</span></div>
+        <div class="cmd-item"><span class="cmd-name">envref get &lt;KEY&gt;</span><span class="cmd-desc">Print the resolved value of a variable</span></div>
+        <div class="cmd-item"><span class="cmd-name">envref set &lt;KEY&gt;=&lt;VALUE&gt;</span><span class="cmd-desc">Write a variable to a .env file</span></div>
+        <div class="cmd-item"><span class="cmd-name">envref list</span><span class="cmd-desc">List all merged environment variables</span></div>
+        <div class="cmd-item"><span class="cmd-name">envref resolve</span><span class="cmd-desc">Resolve all references, output KEY=VALUE</span></div>
+        <div class="cmd-item"><span class="cmd-name">envref run -- &lt;cmd&gt;</span><span class="cmd-desc">Execute a command with resolved env injected</span></div>
+        <div class="cmd-item"><span class="cmd-name">envref edit</span><span class="cmd-desc">Open .env files in $EDITOR</span></div>
+      </div>
+    </div>
+
+    <div class="cmd-group">
+      <div class="cmd-group-title">Secrets</div>
+      <div class="cmd-list">
+        <div class="cmd-item"><span class="cmd-name">envref secret set|get|delete|list</span><span class="cmd-desc">Full CRUD for secrets in backends</span></div>
+        <div class="cmd-item"><span class="cmd-name">envref secret generate &lt;key&gt;</span><span class="cmd-desc">Generate and store a random secret</span></div>
+        <div class="cmd-item"><span class="cmd-name">envref secret copy &lt;key&gt; --from &lt;proj&gt;</span><span class="cmd-desc">Copy secret between projects</span></div>
+        <div class="cmd-item"><span class="cmd-name">envref secret rotate &lt;key&gt;</span><span class="cmd-desc">Rotate with history retention</span></div>
+        <div class="cmd-item"><span class="cmd-name">envref secret share &lt;key&gt; --to &lt;age-key&gt;</span><span class="cmd-desc">Encrypt secret for a recipient</span></div>
+      </div>
+    </div>
+
+    <div class="cmd-group">
+      <div class="cmd-group-title">Profiles</div>
+      <div class="cmd-list">
+        <div class="cmd-item"><span class="cmd-name">envref profile list|use|create|diff</span><span class="cmd-desc">Manage environment profiles</span></div>
+        <div class="cmd-item"><span class="cmd-name">envref profile export &lt;name&gt;</span><span class="cmd-desc">Export profile as JSON, plain, shell, or table</span></div>
+      </div>
+    </div>
+
+    <div class="cmd-group">
+      <div class="cmd-group-title">Validation &amp; diagnostics</div>
+      <div class="cmd-list">
+        <div class="cmd-item"><span class="cmd-name">envref validate</span><span class="cmd-desc">Check .env against schema or .env.example</span></div>
+        <div class="cmd-item"><span class="cmd-name">envref status</span><span class="cmd-desc">Show environment overview with actionable hints</span></div>
+        <div class="cmd-item"><span class="cmd-name">envref doctor</span><span class="cmd-desc">Scan .env files for common issues</span></div>
+        <div class="cmd-item"><span class="cmd-name">envref audit</span><span class="cmd-desc">Detect plaintext secrets via entropy analysis</span></div>
+        <div class="cmd-item"><span class="cmd-name">envref audit-log</span><span class="cmd-desc">View append-only log of secret operations</span></div>
+      </div>
+    </div>
+
+    <div class="cmd-group">
+      <div class="cmd-group-title">Team &amp; sync</div>
+      <div class="cmd-list">
+        <div class="cmd-item"><span class="cmd-name">envref sync push|pull</span><span class="cmd-desc">Sync secrets via encrypted git file</span></div>
+        <div class="cmd-item"><span class="cmd-name">envref team list|add|remove</span><span class="cmd-desc">Manage team members and age keys</span></div>
+        <div class="cmd-item"><span class="cmd-name">envref onboard</span><span class="cmd-desc">Interactive setup for new team members</span></div>
+      </div>
+    </div>
+
+    <div class="cmd-group">
+      <div class="cmd-group-title">Vault &amp; config</div>
+      <div class="cmd-list">
+        <div class="cmd-item"><span class="cmd-name">envref vault init|lock|unlock|export|import</span><span class="cmd-desc">Local encrypted vault management</span></div>
+        <div class="cmd-item"><span class="cmd-name">envref config show</span><span class="cmd-desc">Print resolved effective configuration</span></div>
+        <div class="cmd-item"><span class="cmd-name">envref completion &lt;shell&gt;</span><span class="cmd-desc">Generate shell completions (bash/zsh/fish)</span></div>
+        <div class="cmd-item"><span class="cmd-name">envref version</span><span class="cmd-desc">Print version</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Install ────────────────────────────────── -->
+<section id="install">
+  <div class="container">
+    <div class="section-label"># Install</div>
+    <h2 class="section-title">Get envref</h2>
+    <p class="section-desc">
+      Available for macOS, Linux, and Windows via multiple package managers.
+    </p>
+
+    <div class="install-grid">
+      <div class="install-method">
+        <div class="method-name">Homebrew (macOS / Linux)</div>
+        <pre><span class="prompt-char">$</span> <span class="cmd-text">brew install xcke/tap/envref</span></pre>
+      </div>
+      <div class="install-method">
+        <div class="method-name">Scoop (Windows)</div>
+        <pre><span class="prompt-char">&gt;</span> <span class="cmd-text">scoop bucket add xcke https://github.com/xcke/scoop-bucket</span>
+<span class="prompt-char">&gt;</span> <span class="cmd-text">scoop install envref</span></pre>
+      </div>
+      <div class="install-method">
+        <div class="method-name">Go install</div>
+        <pre><span class="prompt-char">$</span> <span class="cmd-text">go install github.com/xcke/envref/cmd/envref@latest</span></pre>
+      </div>
+      <div class="install-method">
+        <div class="method-name">Nix</div>
+        <pre><span class="prompt-char">$</span> <span class="cmd-text">nix run github:xcke/envref</span></pre>
+      </div>
+      <div class="install-method">
+        <div class="method-name">AUR (Arch Linux)</div>
+        <pre><span class="prompt-char">$</span> <span class="cmd-text">yay -S envref-bin</span></pre>
+      </div>
+      <div class="install-method">
+        <div class="method-name">From source</div>
+        <pre><span class="prompt-char">$</span> <span class="cmd-text">git clone https://github.com/xcke/envref.git</span>
+<span class="prompt-char">$</span> <span class="cmd-text">cd envref && make build</span></pre>
+      </div>
+    </div>
+
+    <p style="text-align:center;margin-top:1.5rem;font-size:0.85rem;color:var(--text-muted)">
+      Pre-built binaries for all platforms on <a href="https://github.com/xcke/envref/releases">GitHub Releases</a>.
+    </p>
+  </div>
+</section>
+
+<!-- ── Docs ────────────────────────────────────── -->
+<section id="docs">
+  <div class="container">
+    <div class="section-label"># Documentation</div>
+    <h2 class="section-title">Learn more</h2>
+    <p class="section-desc">
+      In-depth guides for each feature area.
+    </p>
+
+    <div class="docs-grid">
+      <a href="https://github.com/xcke/envref/blob/main/docs/getting-started.md" class="doc-card">
+        <h3>Getting started</h3>
+        <p>Installation, project initialization, storing and resolving secrets, output formats, and shell completions.</p>
+        <span class="arrow">&rarr; Read guide</span>
+      </a>
+      <a href="https://github.com/xcke/envref/blob/main/docs/secret-backends.md" class="doc-card">
+        <h3>Secret backends</h3>
+        <p>Configuration for all seven backend types. Multi-backend chains, plugin protocol spec, and troubleshooting.</p>
+        <span class="arrow">&rarr; Read guide</span>
+      </a>
+      <a href="https://github.com/xcke/envref/blob/main/docs/profiles.md" class="doc-card">
+        <h3>Profiles</h3>
+        <p>Three-layer merge strategy, profile-scoped secrets, environment switching, and recommended workflows.</p>
+        <span class="arrow">&rarr; Read guide</span>
+      </a>
+      <a href="https://github.com/xcke/envref/blob/main/docs/direnv-integration.md" class="doc-card">
+        <h3>direnv integration</h3>
+        <p>Automatic env loading, watch mode, strict mode for CI, performance optimization, and troubleshooting.</p>
+        <span class="arrow">&rarr; Read guide</span>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ── Footer ─────────────────────────────────── -->
+<footer>
+  <div class="container">
+    <div class="footer-links">
+      <a href="https://github.com/xcke/envref">GitHub</a>
+      <a href="https://github.com/xcke/envref/releases">Releases</a>
+      <a href="https://github.com/xcke/envref/blob/main/docs/getting-started.md">Docs</a>
+      <a href="https://github.com/xcke/envref/blob/main/LICENSE">MIT License</a>
+    </div>
+    <p>envref &mdash; separate config from secrets</p>
+  </div>
+</footer>
+
+<script>
+function copyCmd(el, text) {
+  navigator.clipboard.writeText(text).then(function() {
+    var msg = el.querySelector('.copied-msg');
+    msg.classList.add('show');
+    setTimeout(function() { msg.classList.remove('show'); }, 1500);
+  });
+}
+</script>
+
+</body>
+</html>

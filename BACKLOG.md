@@ -182,7 +182,7 @@
 - [DONE] P3 | ENV-134 | Add AUR package
 - [DONE] P3 | ENV-135 | Add Scoop manifest (Windows)
 - [DONE] P3 | ENV-136 | Add Nix flake
-- [TODO] P3 | ENV-137 | Create project website / landing page Shell inspired Github Page landing page for the tool, with excelent documentation
+- [DONE] P3 | ENV-137 | Create project website / landing page Shell inspired Github Page landing page for the tool, with excelent documentation
 - [TODO] P3 | ENV-138 | Record demo GIF / asciinema for README
 
 ---

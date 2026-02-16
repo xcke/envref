@@ -1,7 +1,7 @@
 # Project Status
 
 ## Last Completed
-- ENV-136: Added Nix flake with package definition and dev shell [iter-75]
+- ENV-137: Created project landing page with terminal-inspired design and GitHub Pages deploy workflow [iter-76]
 
 ## Current State
 - Go module `github.com/xcke/envref` initialized with Cobra + Viper + go-keyring + age + sqlite + testify + x/term dependencies
@@ -44,7 +44,8 @@
 - **Security hardening:** Vault passphrase stored as `[]byte` (clearable), zeroed on Close; decrypted plaintext bytes cleared after use
 - **Comprehensive README** with architecture diagram, resolution pipeline, project structure, vault docs, and benchmarks
 - **docs/ directory** with four usage guides: getting-started, direnv-integration, profiles, secret-backends
-- **Distribution:** Homebrew tap via GoReleaser `brews` config; AUR `envref-bin` package via GoReleaser `aurs` publisher; Scoop bucket via GoReleaser `scoops` publisher (Windows); **Nix flake** with `buildGoModule` package and dev shell
+- **Distribution:** Homebrew tap via GoReleaser `brews` config; AUR `envref-bin` package via GoReleaser `aurs` publisher; Scoop bucket via GoReleaser `scoops` publisher (Windows); Nix flake with `buildGoModule` package and dev shell
+- **Project website:** Single-page landing page in `site/` with terminal-inspired dark theme, feature overview, backend comparison, CLI reference, installation methods, and documentation links; GitHub Pages deploy workflow in `.github/workflows/pages.yml`
 - **MIT LICENSE** file included
 - `.env` file parser with full quote/multiline/comment/BOM/CRLF support
 - `ref://` URI parser with `FindAll` for embedded ref discovery, `Backend` interface, `Registry`, `NamespacedBackend`
