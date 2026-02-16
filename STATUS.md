@@ -1,7 +1,7 @@
 # Project Status
 
 ## Last Completed
-- ENV-030: Defined SecretBackend interface with Get/Set/Delete/List, ErrNotFound, and KeyError types [iter-1]
+- ENV-031: Implemented backend registry with ordered fallback chain, Get/Set/Delete/List by name, and String representation [iter-2]
 
 ## Current State
 - Go module `github.com/xcke/envref` initialized with Cobra + Viper dependencies
@@ -17,6 +17,7 @@
 - `.env` file loader, merger, writer, and interpolator with ref:// handling
 - `ref://` URI parser
 - **`Backend` interface** in `internal/backend/` with `Name()`, `Get()`, `Set()`, `Delete()`, `List()` methods
+- **`Registry`** type with ordered fallback chain: `Get()` tries backends in order; `GetFrom`/`SetIn`/`DeleteFrom`/`ListFrom` target specific backends
 - `ErrNotFound` sentinel error and `KeyError` structured error type for backend operations
 - Makefile with build/test/lint/install targets
 - Directory structure: `cmd/envref/`, `internal/cmd/`, `internal/parser/`, `internal/envfile/`, `internal/config/`, `internal/ref/`, `internal/backend/`, `pkg/`
