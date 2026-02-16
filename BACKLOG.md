@@ -186,7 +186,7 @@
 ## Phase 12 — Testing & Quality
 
 - [DONE] P1 | ENV-140 | Unit tests for `.env` parser (edge cases, multiline, quotes, comments)
-- [TODO] P1 | ENV-141 | Unit tests for merge logic (override precedence, ref detection)
+- [DONE] P1 | ENV-141 | Unit tests for merge logic (override precedence, ref detection)
 - [TODO] P1 | ENV-142 | Unit tests for resolution pipeline (mock backends)
 - [TODO] P1 | ENV-143 | Integration tests for CLI commands (cobra test helpers)
 - [TODO] P2 | ENV-144 | Integration tests for keychain backend (platform-specific CI matrix)

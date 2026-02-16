@@ -1,8 +1,7 @@
 # Project Status
 
 ## Last Completed
-- ENV-140: Added comprehensive unit tests for .env parser — quote styles, export variations, special keys, inline comments, nested quotes, ref:// in quoted values, multiline edge cases, escape edge cases, unicode, line numbers, large input, CRLF in multiline, empty keys, equals in values, error line context, and real-world mixed input [iter-10]
-- ENV-080, ENV-081: Marked as DONE (already implemented in iter-9 as part of init --direnv and resolve --direnv)
+- ENV-141: Added comprehensive unit tests for merge logic — override precedence (single/multi overlay, three-way merge), ref detection through merges (ref→plain, plain→ref, mixed), immutability of base/overlays, order preservation, edge cases (empty envs, large merges, empty values), merge+interpolate interaction, file-loaded merge scenarios, and ResolvedRefs after merge [iter-11]
 
 ## Current State
 - Go module `github.com/xcke/envref` initialized with Cobra + Viper + go-keyring + testify dependencies
@@ -29,6 +28,7 @@
 - `KeychainBackend` — cross-platform OS keychain backend using `go-keyring`
 - Makefile with build/test/lint/install targets
 - **Parser test coverage: 100+ test cases** covering all quote styles, edge cases, multiline, escapes, BOM, CRLF, duplicates, unicode, large inputs, and real-world mixed files
+- **Merge test coverage: 38+ test cases** covering override precedence, ref detection, immutability, order preservation, edge cases, three-way profile merges, merge+interpolate interaction, file-loaded merges, and ResolvedRefs verification
 - Directory structure: `cmd/envref/`, `internal/cmd/`, `internal/parser/`, `internal/envfile/`, `internal/config/`, `internal/ref/`, `internal/resolve/`, `internal/backend/`, `pkg/`
 - All checks pass: `go build`, `go vet`, `go test`, `golangci-lint`
 
