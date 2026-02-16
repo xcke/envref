@@ -31,6 +31,7 @@ from your OS keychain or other secret backends at runtime.`,
 	rootCmd.AddCommand(newInitCmd())
 	rootCmd.AddCommand(newSecretCmd())
 	rootCmd.AddCommand(newResolveCmd())
+	rootCmd.AddCommand(newProfileCmd())
 
 	return rootCmd
 }

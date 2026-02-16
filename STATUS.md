@@ -1,7 +1,7 @@
 # Project Status
 
 ## Last Completed
-- ENV-090 + ENV-093: Defined profile structure and updated resolve pipeline for 3-layer merge (.env ← .env.<profile> ← .env.local). Added `active_profile` config field, `--profile` flag on resolve, `--profile-file` flag on get/list, `ProfileEnvFile`/`HasProfile`/`EffectiveProfile` methods, config validation for active_profile, and 12 new profile integration tests [iter-14]
+- ENV-091: Added `envref profile list` command — shows configured profiles, discovers convention-based `.env.*` files on disk, marks active profile with `*` [iter-15]
 
 ## Current State
 - Go module `github.com/xcke/envref` initialized with Cobra + Viper + go-keyring + testify dependencies
@@ -15,6 +15,7 @@
 - `envref resolve` — loads .env + optional profile + .env.local, merges, interpolates, resolves `ref://` references
 - `envref resolve --profile <name>` — uses a named profile's env file in the merge chain
 - `envref resolve --direnv` — outputs `export KEY=VALUE` format for shell integration
+- `envref profile list` — shows available profiles from config and convention-based `.env.*` files, marks active profile
 - **Profile support:** `.envref.yaml` `active_profile` field, `profiles` map with custom `env_file` paths, convention-based naming (`.env.<name>`), `--profile` flag overrides config, 3-layer merge: base ← profile ← local
 - Resolution pipeline: `internal/resolve` package with `Resolve()` function, per-key error collection, direct backend matching + fallback chain
 - Shell-safe quoting for direnv export output (single-quote escaping)
@@ -31,8 +32,8 @@
 - **Parser test coverage: 100+ test cases**
 - **Merge test coverage: 38+ test cases**
 - **Resolve test coverage: 50+ test cases**
-- **Integration test coverage: 50+ test cases** (including 12 new profile tests)
-- **Config test coverage:** ProfileEnvFile, HasProfile, EffectiveProfile, active_profile validation, LoadFile with profiles
+- **Integration test coverage: 50+ test cases** (including profile tests)
+- **Profile list test coverage: 11 test cases**
 - Directory structure: `cmd/envref/`, `internal/cmd/`, `internal/parser/`, `internal/envfile/`, `internal/config/`, `internal/ref/`, `internal/resolve/`, `internal/backend/`, `pkg/`
 - All checks pass: `go build`, `go vet`, `go test`, `golangci-lint`
 
