@@ -30,6 +30,7 @@ from your OS keychain or other secret backends at runtime.`,
 	rootCmd.AddCommand(newListCmd())
 	rootCmd.AddCommand(newInitCmd())
 	rootCmd.AddCommand(newSecretCmd())
+	rootCmd.AddCommand(newResolveCmd())
 
 	return rootCmd
 }
