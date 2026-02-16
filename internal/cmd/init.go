@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -141,10 +142,34 @@ eval "$(envref resolve --direnv 2>/dev/null)" || true
 	w.Info("\nInitialized envref project %q in %s\n", project, dir)
 
 	if direnv {
-		w.Info("Run 'direnv allow' to activate the .envrc file.\n")
+		handleDirenvAllow(w, dir)
 	}
 
 	return nil
+}
+
+// handleDirenvAllow attempts to run "direnv allow" after creating .envrc.
+// If direnv is installed, it runs the allow command automatically. If direnv
+// is not found, it provides installation guidance to the user.
+func handleDirenvAllow(w *output.Writer, dir string) {
+	direnvBin, err := exec.LookPath("direnv")
+	if err != nil {
+		w.Info("Run 'direnv allow' to activate the .envrc file.\n")
+		w.Warn("direnv is not installed. Install it from https://direnv.net to use .envrc integration.\n")
+		return
+	}
+
+	envrcPath := filepath.Join(dir, ".envrc")
+	cmd := exec.Command(direnvBin, "allow", envrcPath)
+	cmd.Dir = dir
+
+	if out, err := cmd.CombinedOutput(); err != nil {
+		w.Warn("could not run 'direnv allow': %s\n", strings.TrimSpace(string(out)))
+		w.Info("Run 'direnv allow' manually to activate the .envrc file.\n")
+		return
+	}
+
+	w.Info("Ran 'direnv allow' — .envrc is now trusted.\n")
 }
 
 // writeInitFile writes content to path. If the file already exists and force

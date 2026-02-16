@@ -1,13 +1,14 @@
 # Project Status
 
 ## Last Completed
-- ENV-115: Added `envref edit` command to open .env files in $VISUAL/$EDITOR [iter-41]
+- ENV-082: Added automatic `direnv allow` flow to `envref init --direnv` [iter-42]
 
 ## Current State
 - Go module `github.com/xcke/envref` initialized with Cobra + Viper + go-keyring + testify dependencies
 - Root command with help text describing envref's purpose
 - `envref version` subcommand prints version (set via `-ldflags` at build time)
 - `envref init` command scaffolds new envref projects (`.envref.yaml`, `.env`, `.env.local`, optional `.envrc`)
+- `envref init --direnv` auto-runs `direnv allow` if direnv is installed; provides install guidance if not
 - `envref get <KEY>` command loads `.env` + optional profile + `.env.local`, merges, interpolates, prints value
 - `envref set <KEY>=<VALUE>` command writes key-value pairs to .env files
 - `envref list` command prints all merged and interpolated key-value pairs

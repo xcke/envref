@@ -80,8 +80,9 @@ func TestInitCmd_DirenvFlag(t *testing.T) {
 
 	root := NewRootCmd()
 	buf := new(bytes.Buffer)
+	errBuf := new(bytes.Buffer)
 	root.SetOut(buf)
-	root.SetErr(new(bytes.Buffer))
+	root.SetErr(errBuf)
 	root.SetArgs([]string{"init", "--dir", dir, "--project", "myapp", "--direnv"})
 
 	if err := root.Execute(); err != nil {
@@ -101,6 +102,44 @@ func TestInitCmd_DirenvFlag(t *testing.T) {
 	output := buf.String()
 	if !strings.Contains(output, "direnv allow") {
 		t.Errorf("output should mention 'direnv allow': %s", output)
+	}
+}
+
+func TestInitCmd_DirenvNotInstalled(t *testing.T) {
+	dir := t.TempDir()
+
+	// Ensure direnv is not in PATH for this test.
+	t.Setenv("PATH", dir)
+
+	root := NewRootCmd()
+	buf := new(bytes.Buffer)
+	errBuf := new(bytes.Buffer)
+	root.SetOut(buf)
+	root.SetErr(errBuf)
+	root.SetArgs([]string{"init", "--dir", dir, "--project", "myapp", "--direnv"})
+
+	if err := root.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// .envrc should still be created.
+	if _, err := os.Stat(filepath.Join(dir, ".envrc")); err != nil {
+		t.Fatalf(".envrc should exist: %v", err)
+	}
+
+	// Stdout should tell user to run direnv allow manually.
+	output := buf.String()
+	if !strings.Contains(output, "direnv allow") {
+		t.Errorf("output should mention 'direnv allow': %s", output)
+	}
+
+	// Stderr should warn about direnv not being installed.
+	errOutput := errBuf.String()
+	if !strings.Contains(errOutput, "direnv is not installed") {
+		t.Errorf("stderr should warn about direnv not being installed: %s", errOutput)
+	}
+	if !strings.Contains(errOutput, "https://direnv.net") {
+		t.Errorf("stderr should include direnv install URL: %s", errOutput)
 	}
 }
 
