@@ -269,6 +269,145 @@ func TestValidateCmd_CustomExampleFlag(t *testing.T) {
 	}
 }
 
+func TestValidateCmd_CI_AllKeysMatch(t *testing.T) {
+	dir := t.TempDir()
+	writeTestFile(t, dir, ".env.example", "DB_HOST=localhost\nDB_PORT=5432\n")
+	envPath := writeTestFile(t, dir, ".env", "DB_HOST=myhost\nDB_PORT=3306\n")
+
+	root := NewRootCmd()
+	buf := new(bytes.Buffer)
+	errBuf := new(bytes.Buffer)
+	root.SetOut(buf)
+	root.SetErr(errBuf)
+	root.SetArgs([]string{"validate",
+		"--ci",
+		"--file", envPath,
+		"--local-file", filepath.Join(dir, ".env.local"),
+		"--example", filepath.Join(dir, ".env.example"),
+	})
+
+	if err := root.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// CI mode: no output on success.
+	if buf.String() != "" {
+		t.Errorf("expected no stdout in CI mode, got %q", buf.String())
+	}
+	if errBuf.String() != "" {
+		t.Errorf("expected no stderr in CI mode on success, got %q", errBuf.String())
+	}
+}
+
+func TestValidateCmd_CI_MissingKeys(t *testing.T) {
+	dir := t.TempDir()
+	writeTestFile(t, dir, ".env.example", "DB_HOST=localhost\nDB_PORT=5432\nAPI_KEY=ref://secrets/key\n")
+	envPath := writeTestFile(t, dir, ".env", "DB_HOST=myhost\n")
+
+	root := NewRootCmd()
+	buf := new(bytes.Buffer)
+	errBuf := new(bytes.Buffer)
+	root.SetOut(buf)
+	root.SetErr(errBuf)
+	root.SetArgs([]string{"validate",
+		"--ci",
+		"--file", envPath,
+		"--local-file", filepath.Join(dir, ".env.local"),
+		"--example", filepath.Join(dir, ".env.example"),
+	})
+
+	err := root.Execute()
+	if err == nil {
+		t.Fatal("expected error for missing keys in CI mode, got nil")
+	}
+
+	stderr := errBuf.String()
+	// Compact "error:" prefix format.
+	if !strings.Contains(stderr, "error: missing key API_KEY") {
+		t.Errorf("expected compact error for API_KEY, got %q", stderr)
+	}
+	if !strings.Contains(stderr, "error: missing key DB_PORT") {
+		t.Errorf("expected compact error for DB_PORT, got %q", stderr)
+	}
+	if !strings.Contains(err.Error(), "2 error(s)") {
+		t.Errorf("expected '2 error(s)' in error message, got %q", err.Error())
+	}
+}
+
+func TestValidateCmd_CI_ExtraKeysAreErrors(t *testing.T) {
+	dir := t.TempDir()
+	writeTestFile(t, dir, ".env.example", "DB_HOST=localhost\n")
+	envPath := writeTestFile(t, dir, ".env", "DB_HOST=myhost\nEXTRA_VAR=value\n")
+
+	root := NewRootCmd()
+	buf := new(bytes.Buffer)
+	errBuf := new(bytes.Buffer)
+	root.SetOut(buf)
+	root.SetErr(errBuf)
+	root.SetArgs([]string{"validate",
+		"--ci",
+		"--file", envPath,
+		"--local-file", filepath.Join(dir, ".env.local"),
+		"--example", filepath.Join(dir, ".env.example"),
+	})
+
+	// In CI mode, extra keys ARE errors (unlike default mode).
+	err := root.Execute()
+	if err == nil {
+		t.Fatal("expected error for extra keys in CI mode, got nil")
+	}
+
+	stderr := errBuf.String()
+	if !strings.Contains(stderr, "error: extra key EXTRA_VAR") {
+		t.Errorf("expected compact error for EXTRA_VAR, got %q", stderr)
+	}
+	if !strings.Contains(err.Error(), "1 error(s)") {
+		t.Errorf("expected '1 error(s)' in error message, got %q", err.Error())
+	}
+	if !strings.Contains(err.Error(), "1 extra") {
+		t.Errorf("expected '1 extra' in error message, got %q", err.Error())
+	}
+}
+
+func TestValidateCmd_CI_MissingAndExtra(t *testing.T) {
+	dir := t.TempDir()
+	writeTestFile(t, dir, ".env.example", "DB_HOST=localhost\nDB_PORT=5432\n")
+	envPath := writeTestFile(t, dir, ".env", "DB_HOST=myhost\nEXTRA=val\n")
+
+	root := NewRootCmd()
+	errBuf := new(bytes.Buffer)
+	root.SetOut(new(bytes.Buffer))
+	root.SetErr(errBuf)
+	root.SetArgs([]string{"validate",
+		"--ci",
+		"--file", envPath,
+		"--local-file", filepath.Join(dir, ".env.local"),
+		"--example", filepath.Join(dir, ".env.example"),
+	})
+
+	err := root.Execute()
+	if err == nil {
+		t.Fatal("expected error for missing+extra keys in CI mode, got nil")
+	}
+
+	stderr := errBuf.String()
+	if !strings.Contains(stderr, "error: missing key DB_PORT") {
+		t.Errorf("expected compact error for DB_PORT, got %q", stderr)
+	}
+	if !strings.Contains(stderr, "error: extra key EXTRA") {
+		t.Errorf("expected compact error for EXTRA, got %q", stderr)
+	}
+	if !strings.Contains(err.Error(), "2 error(s)") {
+		t.Errorf("expected '2 error(s)' in error message, got %q", err.Error())
+	}
+	if !strings.Contains(err.Error(), "1 missing") {
+		t.Errorf("expected '1 missing' in error message, got %q", err.Error())
+	}
+	if !strings.Contains(err.Error(), "1 extra") {
+		t.Errorf("expected '1 extra' in error message, got %q", err.Error())
+	}
+}
+
 func TestValidateCmd_RejectsArguments(t *testing.T) {
 	root := NewRootCmd()
 	root.SetOut(new(bytes.Buffer))

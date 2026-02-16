@@ -1,7 +1,7 @@
 # Project Status
 
 ## Last Completed
-- ENV-076: Added in-memory resolution cache to avoid duplicate backend hits for identical ref:// URIs [iter-32]
+- ENV-104: Added `envref validate --ci` flag for CI pipelines — extra keys are errors, compact output, silent on success [iter-33]
 
 ## Current State
 - Go module `github.com/xcke/envref` initialized with Cobra + Viper + go-keyring + testify dependencies
@@ -20,6 +20,7 @@
 - `envref profile list` — shows available profiles from config and convention-based `.env.*` files
 - `envref profile use <name>` — sets active profile in `.envref.yaml`
 - `envref validate` — checks .env against .env.example schema
+- `envref validate --ci` — CI mode: extra keys are errors, compact output, silent on success, exit code 1 on any failure
 - `envref status` — shows environment overview with actionable hints
 - `envref doctor` — scans .env files for common issues
 - `envref config show` — prints resolved effective config (plain, JSON, table formats)
@@ -29,7 +30,7 @@
 - **Config inheritance:** Global config at `~/.config/envref/config.yaml` merged with project `.envref.yaml`
 - **Output format support:** `--format` flag on `get`, `list`, `resolve`, and `config show` commands (plain, json, shell, table)
 - **Profile support:** 3-layer merge with `--profile` flag
-- **Keychain error handling:** `KeychainError` type classifies raw go-keyring errors into categories (Unavailable, Locked, Permission, DataTooBig) with platform-specific actionable hints
+- **Keychain error handling:** `KeychainError` type classifies raw go-keyring errors into categories with platform-specific actionable hints
 - Resolution pipeline with per-key error collection, partial resolution, direct backend matching + fallback chain
 - `.env` file parser with full quote/multiline/comment/BOM/CRLF support
 - `ref://` URI parser, `Backend` interface, `Registry`, `NamespacedBackend`, `KeychainBackend`

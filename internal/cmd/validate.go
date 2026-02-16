@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 	"sort"
 	"strings"
 
@@ -26,17 +27,22 @@ and reports:
 Missing keys cause a non-zero exit code, making this suitable for CI checks.
 Extra keys are reported as warnings but do not cause failure.
 
+Use --ci for CI pipelines: extra keys are treated as errors, output is compact,
+and success produces no output (exit code 0 = pass, 1 = fail).
+
 Examples:
   envref validate                                # compare .env against .env.example
   envref validate --example .env.schema          # use custom schema file
-  envref validate --file .env.staging            # validate a specific env file`,
+  envref validate --file .env.staging            # validate a specific env file
+  envref validate --ci                           # strict CI mode (extra keys are errors, silent on success)`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			envFile, _ := cmd.Flags().GetString("file")
 			localFile, _ := cmd.Flags().GetString("local-file")
 			profileFile, _ := cmd.Flags().GetString("profile-file")
 			exampleFile, _ := cmd.Flags().GetString("example")
-			return runValidate(cmd, envFile, profileFile, localFile, exampleFile)
+			ci, _ := cmd.Flags().GetBool("ci")
+			return runValidate(cmd, envFile, profileFile, localFile, exampleFile, ci)
 		},
 	}
 
@@ -44,12 +50,15 @@ Examples:
 	cmd.Flags().String("local-file", ".env.local", "path to the .env.local override file")
 	cmd.Flags().String("profile-file", "", "path to a profile-specific .env file")
 	cmd.Flags().StringP("example", "e", ".env.example", "path to the example/schema .env file")
+	cmd.Flags().Bool("ci", false, "CI mode: extra keys are errors, silent on success, exit code 1 on any failure")
 
 	return cmd
 }
 
 // runValidate compares the merged environment against the example schema file.
-func runValidate(cmd *cobra.Command, envPath, profilePath, localPath, examplePath string) error {
+// When ci is true, extra keys are treated as errors, output is compact, and
+// success produces no output (exit code 0 = pass, 1 = fail).
+func runValidate(cmd *cobra.Command, envPath, profilePath, localPath, examplePath string, ci bool) error {
 	out := cmd.OutOrStdout()
 	errOut := cmd.ErrOrStderr()
 
@@ -90,8 +99,14 @@ func runValidate(cmd *cobra.Command, envPath, profilePath, localPath, examplePat
 
 	// Report results.
 	if len(missing) == 0 && len(extra) == 0 {
-		_, _ = fmt.Fprintf(out, "OK: all %d keys match %s\n", len(exampleKeys), examplePath)
+		if !ci {
+			_, _ = fmt.Fprintf(out, "OK: all %d keys match %s\n", len(exampleKeys), examplePath)
+		}
 		return nil
+	}
+
+	if ci {
+		return runValidateCI(errOut, missing, extra, examplePath)
 	}
 
 	if len(missing) > 0 {
@@ -124,6 +139,27 @@ func runValidate(cmd *cobra.Command, envPath, profilePath, localPath, examplePat
 	}
 
 	return nil
+}
+
+// runValidateCI handles CI mode output. In CI mode, both missing and extra keys
+// are errors, and output uses a compact format suitable for CI log parsers.
+func runValidateCI(w io.Writer, missing, extra []string, examplePath string) error {
+	for _, key := range missing {
+		_, _ = fmt.Fprintf(w, "error: missing key %s (required by %s)\n", key, examplePath)
+	}
+	for _, key := range extra {
+		_, _ = fmt.Fprintf(w, "error: extra key %s (not in %s)\n", key, examplePath)
+	}
+
+	total := len(missing) + len(extra)
+	var parts []string
+	if len(missing) > 0 {
+		parts = append(parts, fmt.Sprintf("%d missing", len(missing)))
+	}
+	if len(extra) > 0 {
+		parts = append(parts, fmt.Sprintf("%d extra", len(extra)))
+	}
+	return fmt.Errorf("validation failed: %d error(s) (%s)", total, strings.Join(parts, ", "))
 }
 
 // keySet converts a slice of strings to a set (map).

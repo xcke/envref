@@ -142,7 +142,7 @@
   - `.env` not in `.gitignore`
   - `.envrc` not trusted by direnv
 - [TODO] P2 | ENV-103 | Add `.env.schema.json` support — type checking (string, number, boolean, url, enum)
-- [TODO] P2 | ENV-104 | Add `envref validate --ci` — exit code 1 on failure for CI pipelines
+- [DONE] P2 | ENV-104 | Add `envref validate --ci` — exit code 1 on failure for CI pipelines
 - [TODO] P3 | ENV-105 | Add `envref audit` — warn about secrets that might be in plaintext `.env` (entropy analysis, pattern matching for API keys/tokens)
 
 ---
