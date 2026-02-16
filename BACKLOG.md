@@ -165,7 +165,9 @@
 
 - [DONE] P3 | ENV-120 | Add `envref secret share <key> --to <teammate>` — encrypt secret for specific recipient (age public key)
 - [DONE] P3 | ENV-121 | Add `envref sync push` / `envref sync pull` — sync secrets via shared encrypted git file
-- [TODO] P3 | ENV-122 | Add `.envref.team.yaml` — team-level config with member public keys
+- [DONE] P3 | ENV-122 | Add `.envref.team.yaml` — team-level config with member public keys
+  Plan: Added TeamMember struct to Config, team list/add/remove commands,
+  --to-team flag on sync push, validation, AddTeamMember/RemoveTeamMember file ops.
 - [TODO] P3 | ENV-123 | Add `envref onboard` — interactive setup for new team members (walk through all missing secrets)
 - [TODO] P3 | ENV-124 | Add audit log — track who set/changed which secrets (local git-backed log)
 

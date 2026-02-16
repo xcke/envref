@@ -156,6 +156,12 @@ func mergeConfigs(global, project *Config) *Config {
 		}
 	}
 
+	// Team: project replaces entirely if present, otherwise inherit global.
+	if len(merged.Team) == 0 && len(global.Team) > 0 {
+		merged.Team = make([]TeamMember, len(global.Team))
+		copy(merged.Team, global.Team)
+	}
+
 	return &merged
 }
 
@@ -182,6 +188,10 @@ type Config struct {
 
 	// Profiles defines named environment profiles (e.g., development, staging).
 	Profiles map[string]ProfileConfig `mapstructure:"profiles" yaml:"profiles"`
+
+	// Team defines team members with their age public keys for secret sharing.
+	// Each member has a name (identifier) and an age X25519 public key.
+	Team []TeamMember `mapstructure:"team" yaml:"team"`
 }
 
 // BackendConfig describes a single secret backend.
@@ -202,6 +212,34 @@ type ProfileConfig struct {
 	// EnvFile is the path to the profile-specific .env file
 	// (e.g., ".env.staging"). If empty, defaults to ".env.<profile-name>".
 	EnvFile string `mapstructure:"env_file" yaml:"env_file"`
+}
+
+// TeamMember represents a team member with an age public key for secret sharing.
+type TeamMember struct {
+	// Name is the identifier for this team member (e.g., "alice", "bob").
+	Name string `mapstructure:"name" yaml:"name"`
+
+	// PublicKey is the member's age X25519 public key (age1...).
+	PublicKey string `mapstructure:"public_key" yaml:"public_key"`
+}
+
+// TeamMemberByName returns the team member with the given name, or nil if not found.
+func (c *Config) TeamMemberByName(name string) *TeamMember {
+	for i := range c.Team {
+		if c.Team[i].Name == name {
+			return &c.Team[i]
+		}
+	}
+	return nil
+}
+
+// TeamPublicKeys returns all team member public keys.
+func (c *Config) TeamPublicKeys() []string {
+	keys := make([]string, len(c.Team))
+	for i, m := range c.Team {
+		keys[i] = m.PublicKey
+	}
+	return keys
 }
 
 // Defaults returns a Config populated with default values.
@@ -304,6 +342,31 @@ func (c *Config) Validate() error {
 	if c.ActiveProfile != "" && len(c.Profiles) > 0 {
 		if _, ok := c.Profiles[c.ActiveProfile]; !ok {
 			errs = append(errs, fmt.Sprintf("active_profile %q is not defined in profiles", c.ActiveProfile))
+		}
+	}
+
+	// Validate team members.
+	seenTeamNames := make(map[string]bool)
+	seenTeamKeys := make(map[string]bool)
+	for i, m := range c.Team {
+		if m.Name == "" {
+			errs = append(errs, fmt.Sprintf("team[%d]: name is required", i))
+		} else if strings.TrimSpace(m.Name) != m.Name {
+			errs = append(errs, fmt.Sprintf("team[%d]: name %q must not have leading or trailing whitespace", i, m.Name))
+		} else if seenTeamNames[m.Name] {
+			errs = append(errs, fmt.Sprintf("team[%d]: duplicate team member name %q", i, m.Name))
+		} else {
+			seenTeamNames[m.Name] = true
+		}
+
+		if m.PublicKey == "" {
+			errs = append(errs, fmt.Sprintf("team[%d]: public_key is required", i))
+		} else if !strings.HasPrefix(m.PublicKey, "age1") {
+			errs = append(errs, fmt.Sprintf("team[%d]: public_key must be an age public key (age1...)", i))
+		} else if seenTeamKeys[m.PublicKey] {
+			errs = append(errs, fmt.Sprintf("team[%d]: duplicate public_key", i))
+		} else {
+			seenTeamKeys[m.PublicKey] = true
 		}
 	}
 
@@ -530,6 +593,195 @@ func AddProfile(path, profile, envFile string) error {
 	}
 
 	content := strings.Join(lines, "\n")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		return fmt.Errorf("writing config %s: %w", path, err)
+	}
+	return nil
+}
+
+// AddTeamMember adds a new team member entry to the config file at path.
+// It preserves existing file content by performing a targeted insertion
+// into the team section. If no team section exists, one is created.
+// Returns an error if a member with the same name already exists.
+func AddTeamMember(path, name, publicKey string) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("reading config %s: %w", path, err)
+	}
+
+	lines := strings.Split(string(data), "\n")
+
+	// Check if the member already exists.
+	inTeam := false
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "team:" {
+			inTeam = true
+			continue
+		}
+		if inTeam {
+			if len(line) > 0 && line[0] != ' ' && line[0] != '#' && trimmed != "" {
+				inTeam = false
+				continue
+			}
+			if strings.HasPrefix(trimmed, "- name: ") {
+				existingName := strings.TrimPrefix(trimmed, "- name: ")
+				if existingName == name {
+					return fmt.Errorf("team member %q already exists in config", name)
+				}
+			}
+		}
+	}
+
+	// Build the new team member entry.
+	entry := "  - name: " + name + "\n    public_key: " + publicKey
+
+	// Find the team section and insert the new entry.
+	teamSectionIdx := -1
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "team:" {
+			teamSectionIdx = i
+			break
+		}
+	}
+
+	if teamSectionIdx >= 0 {
+		// Find the end of the team section (next top-level key or EOF).
+		insertIdx := teamSectionIdx + 1
+		for insertIdx < len(lines) {
+			line := lines[insertIdx]
+			trimmed := strings.TrimSpace(line)
+			if trimmed == "" || strings.HasPrefix(line, "  ") || strings.HasPrefix(line, "#") {
+				insertIdx++
+				continue
+			}
+			break
+		}
+
+		entryLines := strings.Split(entry, "\n")
+		newLines := make([]string, 0, len(lines)+len(entryLines))
+		newLines = append(newLines, lines[:insertIdx]...)
+		newLines = append(newLines, entryLines...)
+		newLines = append(newLines, lines[insertIdx:]...)
+		lines = newLines
+	} else {
+		// No team section — add one at the end.
+		insertIdx := len(lines)
+		for insertIdx > 0 && strings.TrimSpace(lines[insertIdx-1]) == "" {
+			insertIdx--
+		}
+
+		section := "\nteam:\n" + entry
+		sectionLines := strings.Split(section, "\n")
+		newLines := make([]string, 0, len(lines)+len(sectionLines))
+		newLines = append(newLines, lines[:insertIdx]...)
+		newLines = append(newLines, sectionLines...)
+		newLines = append(newLines, lines[insertIdx:]...)
+		lines = newLines
+	}
+
+	content := strings.Join(lines, "\n")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		return fmt.Errorf("writing config %s: %w", path, err)
+	}
+	return nil
+}
+
+// RemoveTeamMember removes a team member from the config file at path.
+// Returns an error if the member is not found.
+func RemoveTeamMember(path, name string) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("reading config %s: %w", path, err)
+	}
+
+	lines := strings.Split(string(data), "\n")
+
+	// Find the team member entry and remove it.
+	inTeam := false
+	memberStart := -1
+	memberEnd := -1
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "team:" {
+			inTeam = true
+			continue
+		}
+		if inTeam {
+			if len(line) > 0 && line[0] != ' ' && line[0] != '#' && trimmed != "" {
+				inTeam = false
+				continue
+			}
+			if strings.HasPrefix(trimmed, "- name: ") {
+				existingName := strings.TrimPrefix(trimmed, "- name: ")
+				if existingName == name {
+					memberStart = i
+					// Find the end of this member entry (next list item or end of section).
+					memberEnd = i + 1
+					for memberEnd < len(lines) {
+						nextTrimmed := strings.TrimSpace(lines[memberEnd])
+						nextLine := lines[memberEnd]
+						// Stop at: next list item, top-level key, or section boundary.
+						if strings.HasPrefix(nextTrimmed, "- ") {
+							break
+						}
+						if len(nextLine) > 0 && nextLine[0] != ' ' && nextLine[0] != '#' && nextTrimmed != "" {
+							break
+						}
+						if nextTrimmed == "" {
+							break
+						}
+						memberEnd++
+					}
+					break
+				}
+			}
+		}
+	}
+
+	if memberStart == -1 {
+		return fmt.Errorf("team member %q not found in config", name)
+	}
+
+	// Remove the member lines.
+	newLines := make([]string, 0, len(lines))
+	newLines = append(newLines, lines[:memberStart]...)
+	newLines = append(newLines, lines[memberEnd:]...)
+
+	// If team section is now empty, remove it too.
+	teamIdx := -1
+	teamHasMembers := false
+	for i, line := range newLines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "team:" {
+			teamIdx = i
+			continue
+		}
+		if teamIdx >= 0 && i > teamIdx {
+			if len(line) > 0 && line[0] != ' ' && line[0] != '#' && trimmed != "" {
+				break
+			}
+			if strings.HasPrefix(trimmed, "- name: ") {
+				teamHasMembers = true
+				break
+			}
+		}
+	}
+
+	if teamIdx >= 0 && !teamHasMembers {
+		// Remove the empty "team:" line.
+		finalLines := make([]string, 0, len(newLines))
+		finalLines = append(finalLines, newLines[:teamIdx]...)
+		// Also remove any trailing blank line that was before team:
+		if teamIdx > 0 && strings.TrimSpace(newLines[teamIdx-1]) == "" {
+			finalLines = finalLines[:len(finalLines)-1]
+		}
+		finalLines = append(finalLines, newLines[teamIdx+1:]...)
+		newLines = finalLines
+	}
+
+	content := strings.Join(newLines, "\n")
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		return fmt.Errorf("writing config %s: %w", path, err)
 	}

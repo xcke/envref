@@ -57,7 +57,8 @@ func newSyncPushCmd() *cobra.Command {
 
 The file contains a JSON map of key-value pairs, encrypted for the specified
 recipients. Each recipient's age public key is provided via --to flags
-(repeatable) or --to-file flags pointing to files containing public keys.
+(repeatable), --to-file flags pointing to files containing public keys,
+or --to-team to use all team members defined in .envref.yaml.
 
 At least one recipient must be specified. The encrypted output is written
 to .envref.secrets.age by default (configurable via --file).
@@ -66,21 +67,25 @@ Examples:
   envref sync push --to age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p
   envref sync push --to age1... --to age1...     # multiple recipients
   envref sync push --to-file team-keys.txt       # keys from file (one per line)
+  envref sync push --to-team                     # encrypt for all team members
+  envref sync push --to-team --to age1...        # team members + extra recipients
   envref sync push --file secrets.age            # custom output file
   envref sync push --backend keychain            # specific backend
   envref sync push --profile staging             # profile-scoped secrets`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			toKeys, _ := cmd.Flags().GetStringArray("to")
 			toFiles, _ := cmd.Flags().GetStringArray("to-file")
+			toTeam, _ := cmd.Flags().GetBool("to-team")
 			file, _ := cmd.Flags().GetString("file")
 			backendName, _ := cmd.Flags().GetString("backend")
 			profile, _ := cmd.Flags().GetString("profile")
-			return runSyncPush(cmd, toKeys, toFiles, file, backendName, profile)
+			return runSyncPush(cmd, toKeys, toFiles, toTeam, file, backendName, profile)
 		},
 	}
 
 	cmd.Flags().StringArray("to", nil, "recipient's age public key (age1...) — repeatable")
 	cmd.Flags().StringArray("to-file", nil, "file containing age public keys (one per line) — repeatable")
+	cmd.Flags().Bool("to-team", false, "encrypt for all team members defined in .envref.yaml")
 	cmd.Flags().StringP("file", "f", defaultSyncFile, "path to the encrypted sync file")
 	cmd.Flags().StringP("backend", "b", "", "backend to export secrets from (default: first configured)")
 	cmd.Flags().StringP("profile", "P", "", "profile scope for secrets (e.g., staging, production)")
@@ -132,19 +137,10 @@ Examples:
 }
 
 // runSyncPush exports secrets from a backend and encrypts them into a sync file.
-func runSyncPush(cmd *cobra.Command, toKeys, toFiles []string, file, backendName, profile string) error {
+func runSyncPush(cmd *cobra.Command, toKeys, toFiles []string, toTeam bool, file, backendName, profile string) error {
 	w := output.NewWriter(cmd)
 
-	// Collect all recipient public keys.
-	recipients, err := collectRecipients(toKeys, toFiles)
-	if err != nil {
-		return err
-	}
-	if len(recipients) == 0 {
-		return fmt.Errorf("at least one recipient is required (use --to or --to-file)")
-	}
-
-	// Load project config.
+	// Load project config (needed for backends and potentially team keys).
 	cwd, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("getting working directory: %w", err)
@@ -153,6 +149,23 @@ func runSyncPush(cmd *cobra.Command, toKeys, toFiles []string, file, backendName
 	cfg, configDir, err := config.Load(cwd)
 	if err != nil {
 		return fmt.Errorf("loading config: %w", err)
+	}
+
+	// If --to-team is set, append team member public keys to the recipient list.
+	if toTeam {
+		if len(cfg.Team) == 0 {
+			return fmt.Errorf("no team members configured (add with: envref team add <name> <key>)")
+		}
+		toKeys = append(toKeys, cfg.TeamPublicKeys()...)
+	}
+
+	// Collect all recipient public keys.
+	recipients, err := collectRecipients(toKeys, toFiles)
+	if err != nil {
+		return err
+	}
+	if len(recipients) == 0 {
+		return fmt.Errorf("at least one recipient is required (use --to, --to-file, or --to-team)")
 	}
 
 	if len(cfg.Backends) == 0 {

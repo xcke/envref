@@ -1638,6 +1638,537 @@ profiles:
 	}
 }
 
+// --- Team member tests ---
+
+func TestConfig_Validate_Team(t *testing.T) {
+	tests := []struct {
+		name    string
+		config  Config
+		wantErr bool
+		errMsg  string
+	}{
+		{
+			name: "valid team members",
+			config: Config{
+				Project:   "myapp",
+				EnvFile:   ".env",
+				LocalFile: ".env.local",
+				Team: []TeamMember{
+					{Name: "alice", PublicKey: "age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p"},
+					{Name: "bob", PublicKey: "age1u5scmatqm6kfmmezqlhm4rsz3wxyp6afjxre63quqnefpkynpf2qfzcjpr"},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "team member missing name",
+			config: Config{
+				Project:   "myapp",
+				EnvFile:   ".env",
+				LocalFile: ".env.local",
+				Team: []TeamMember{
+					{Name: "", PublicKey: "age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p"},
+				},
+			},
+			wantErr: true,
+			errMsg:  "team[0]: name is required",
+		},
+		{
+			name: "team member missing public_key",
+			config: Config{
+				Project:   "myapp",
+				EnvFile:   ".env",
+				LocalFile: ".env.local",
+				Team: []TeamMember{
+					{Name: "alice", PublicKey: ""},
+				},
+			},
+			wantErr: true,
+			errMsg:  "team[0]: public_key is required",
+		},
+		{
+			name: "team member invalid public_key prefix",
+			config: Config{
+				Project:   "myapp",
+				EnvFile:   ".env",
+				LocalFile: ".env.local",
+				Team: []TeamMember{
+					{Name: "alice", PublicKey: "ssh-ed25519 AAAAC3Nz..."},
+				},
+			},
+			wantErr: true,
+			errMsg:  "team[0]: public_key must be an age public key",
+		},
+		{
+			name: "team member name with whitespace",
+			config: Config{
+				Project:   "myapp",
+				EnvFile:   ".env",
+				LocalFile: ".env.local",
+				Team: []TeamMember{
+					{Name: " alice ", PublicKey: "age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p"},
+				},
+			},
+			wantErr: true,
+			errMsg:  "must not have leading or trailing whitespace",
+		},
+		{
+			name: "duplicate team member names",
+			config: Config{
+				Project:   "myapp",
+				EnvFile:   ".env",
+				LocalFile: ".env.local",
+				Team: []TeamMember{
+					{Name: "alice", PublicKey: "age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p"},
+					{Name: "alice", PublicKey: "age1u5scmatqm6kfmmezqlhm4rsz3wxyp6afjxre63quqnefpkynpf2qfzcjpr"},
+				},
+			},
+			wantErr: true,
+			errMsg:  "duplicate team member name",
+		},
+		{
+			name: "duplicate team member public keys",
+			config: Config{
+				Project:   "myapp",
+				EnvFile:   ".env",
+				LocalFile: ".env.local",
+				Team: []TeamMember{
+					{Name: "alice", PublicKey: "age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p"},
+					{Name: "bob", PublicKey: "age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p"},
+				},
+			},
+			wantErr: true,
+			errMsg:  "duplicate public_key",
+		},
+		{
+			name: "empty team is valid",
+			config: Config{
+				Project:   "myapp",
+				EnvFile:   ".env",
+				LocalFile: ".env.local",
+				Team:      nil,
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.config.Validate()
+			if tt.wantErr && err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if !tt.wantErr && err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if tt.wantErr && tt.errMsg != "" {
+				if got := err.Error(); !contains(got, tt.errMsg) {
+					t.Errorf("error = %q, want to contain %q", got, tt.errMsg)
+				}
+			}
+		})
+	}
+}
+
+func TestConfig_TeamMemberByName(t *testing.T) {
+	cfg := Config{
+		Team: []TeamMember{
+			{Name: "alice", PublicKey: "age1alice..."},
+			{Name: "bob", PublicKey: "age1bob..."},
+		},
+	}
+
+	tests := []struct {
+		name     string
+		lookup   string
+		wantNil  bool
+		wantName string
+	}{
+		{"found alice", "alice", false, "alice"},
+		{"found bob", "bob", false, "bob"},
+		{"not found", "charlie", true, ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := cfg.TeamMemberByName(tt.lookup)
+			if tt.wantNil && m != nil {
+				t.Errorf("expected nil, got %v", m)
+			}
+			if !tt.wantNil {
+				if m == nil {
+					t.Fatal("expected non-nil member")
+				}
+				if m.Name != tt.wantName {
+					t.Errorf("Name = %q, want %q", m.Name, tt.wantName)
+				}
+			}
+		})
+	}
+}
+
+func TestConfig_TeamMemberByName_Empty(t *testing.T) {
+	cfg := Config{}
+	if m := cfg.TeamMemberByName("alice"); m != nil {
+		t.Errorf("expected nil for empty team, got %v", m)
+	}
+}
+
+func TestConfig_TeamPublicKeys(t *testing.T) {
+	cfg := Config{
+		Team: []TeamMember{
+			{Name: "alice", PublicKey: "age1alice"},
+			{Name: "bob", PublicKey: "age1bob"},
+		},
+	}
+
+	keys := cfg.TeamPublicKeys()
+	if len(keys) != 2 {
+		t.Fatalf("expected 2 keys, got %d", len(keys))
+	}
+	if keys[0] != "age1alice" {
+		t.Errorf("keys[0] = %q, want %q", keys[0], "age1alice")
+	}
+	if keys[1] != "age1bob" {
+		t.Errorf("keys[1] = %q, want %q", keys[1], "age1bob")
+	}
+}
+
+func TestConfig_TeamPublicKeys_Empty(t *testing.T) {
+	cfg := Config{}
+	keys := cfg.TeamPublicKeys()
+	if len(keys) != 0 {
+		t.Errorf("expected 0 keys, got %d", len(keys))
+	}
+}
+
+func TestLoadFile_WithTeam(t *testing.T) {
+	dir := t.TempDir()
+	content := `project: myapp
+team:
+  - name: alice
+    public_key: age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p
+  - name: bob
+    public_key: age1u5scmatqm6kfmmezqlhm4rsz3wxyp6afjxre63quqnefpkynpf2qfzcjpr
+`
+	path := writeFile(t, dir, FullFileName, content)
+
+	cfg, err := LoadFile(path)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(cfg.Team) != 2 {
+		t.Fatalf("expected 2 team members, got %d", len(cfg.Team))
+	}
+	if cfg.Team[0].Name != "alice" {
+		t.Errorf("Team[0].Name = %q, want %q", cfg.Team[0].Name, "alice")
+	}
+	if cfg.Team[1].Name != "bob" {
+		t.Errorf("Team[1].Name = %q, want %q", cfg.Team[1].Name, "bob")
+	}
+}
+
+func TestAddTeamMember_NewTeamSection(t *testing.T) {
+	dir := t.TempDir()
+	cfgContent := `project: myapp
+env_file: .env
+local_file: .env.local
+`
+	path := writeFile(t, dir, FullFileName, cfgContent)
+
+	err := AddTeamMember(path, "alice", "age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	cfg, loadErr := LoadFile(path)
+	if loadErr != nil {
+		t.Fatalf("LoadFile error: %v", loadErr)
+	}
+	if len(cfg.Team) != 1 {
+		t.Fatalf("expected 1 team member, got %d", len(cfg.Team))
+	}
+	if cfg.Team[0].Name != "alice" {
+		t.Errorf("Team[0].Name = %q, want %q", cfg.Team[0].Name, "alice")
+	}
+	if cfg.Team[0].PublicKey != "age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p" {
+		t.Errorf("Team[0].PublicKey = %q, want correct key", cfg.Team[0].PublicKey)
+	}
+}
+
+func TestAddTeamMember_ExistingTeamSection(t *testing.T) {
+	dir := t.TempDir()
+	cfgContent := `project: myapp
+team:
+  - name: alice
+    public_key: age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p
+`
+	path := writeFile(t, dir, FullFileName, cfgContent)
+
+	err := AddTeamMember(path, "bob", "age1u5scmatqm6kfmmezqlhm4rsz3wxyp6afjxre63quqnefpkynpf2qfzcjpr")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	cfg, loadErr := LoadFile(path)
+	if loadErr != nil {
+		t.Fatalf("LoadFile error: %v", loadErr)
+	}
+	if len(cfg.Team) != 2 {
+		t.Fatalf("expected 2 team members, got %d", len(cfg.Team))
+	}
+	if cfg.Team[0].Name != "alice" {
+		t.Errorf("Team[0].Name = %q, want %q", cfg.Team[0].Name, "alice")
+	}
+	if cfg.Team[1].Name != "bob" {
+		t.Errorf("Team[1].Name = %q, want %q", cfg.Team[1].Name, "bob")
+	}
+}
+
+func TestAddTeamMember_Duplicate(t *testing.T) {
+	dir := t.TempDir()
+	cfgContent := `project: myapp
+team:
+  - name: alice
+    public_key: age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p
+`
+	path := writeFile(t, dir, FullFileName, cfgContent)
+
+	err := AddTeamMember(path, "alice", "age1u5scmatqm6kfmmezqlhm4rsz3wxyp6afjxre63quqnefpkynpf2qfzcjpr")
+	if err == nil {
+		t.Fatal("expected error for duplicate team member")
+	}
+	if !contains(err.Error(), "already exists") {
+		t.Errorf("error = %q, want to contain 'already exists'", err.Error())
+	}
+}
+
+func TestAddTeamMember_PreservesExistingContent(t *testing.T) {
+	dir := t.TempDir()
+	cfgContent := `project: myapp
+env_file: .env
+local_file: .env.local
+backends:
+  - name: keychain
+    type: keychain
+profiles:
+  staging:
+    env_file: .env.staging
+`
+	path := writeFile(t, dir, FullFileName, cfgContent)
+
+	err := AddTeamMember(path, "alice", "age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	cfg, loadErr := LoadFile(path)
+	if loadErr != nil {
+		t.Fatalf("LoadFile error: %v", loadErr)
+	}
+	if cfg.Project != "myapp" {
+		t.Errorf("Project = %q, want %q", cfg.Project, "myapp")
+	}
+	if len(cfg.Backends) != 1 {
+		t.Fatalf("len(Backends) = %d, want 1", len(cfg.Backends))
+	}
+	if cfg.Backends[0].Name != "keychain" {
+		t.Errorf("Backends[0].Name = %q, want %q", cfg.Backends[0].Name, "keychain")
+	}
+	if !cfg.HasProfile("staging") {
+		t.Error("profile 'staging' should still exist")
+	}
+	if len(cfg.Team) != 1 {
+		t.Fatalf("expected 1 team member, got %d", len(cfg.Team))
+	}
+}
+
+func TestAddTeamMember_NonexistentFile(t *testing.T) {
+	err := AddTeamMember("/nonexistent/path/.envref.yaml", "alice", "age1...")
+	if err == nil {
+		t.Fatal("expected error for nonexistent file")
+	}
+}
+
+func TestRemoveTeamMember_Success(t *testing.T) {
+	dir := t.TempDir()
+	cfgContent := `project: myapp
+team:
+  - name: alice
+    public_key: age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p
+  - name: bob
+    public_key: age1u5scmatqm6kfmmezqlhm4rsz3wxyp6afjxre63quqnefpkynpf2qfzcjpr
+`
+	path := writeFile(t, dir, FullFileName, cfgContent)
+
+	err := RemoveTeamMember(path, "alice")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	cfg, loadErr := LoadFile(path)
+	if loadErr != nil {
+		t.Fatalf("LoadFile error: %v", loadErr)
+	}
+	if len(cfg.Team) != 1 {
+		t.Fatalf("expected 1 team member, got %d", len(cfg.Team))
+	}
+	if cfg.Team[0].Name != "bob" {
+		t.Errorf("remaining member Name = %q, want %q", cfg.Team[0].Name, "bob")
+	}
+}
+
+func TestRemoveTeamMember_LastMember(t *testing.T) {
+	dir := t.TempDir()
+	cfgContent := `project: myapp
+team:
+  - name: alice
+    public_key: age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p
+`
+	path := writeFile(t, dir, FullFileName, cfgContent)
+
+	err := RemoveTeamMember(path, "alice")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	cfg, loadErr := LoadFile(path)
+	if loadErr != nil {
+		t.Fatalf("LoadFile error: %v", loadErr)
+	}
+	if len(cfg.Team) != 0 {
+		t.Fatalf("expected 0 team members, got %d", len(cfg.Team))
+	}
+}
+
+func TestRemoveTeamMember_NotFound(t *testing.T) {
+	dir := t.TempDir()
+	cfgContent := `project: myapp
+team:
+  - name: alice
+    public_key: age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p
+`
+	path := writeFile(t, dir, FullFileName, cfgContent)
+
+	err := RemoveTeamMember(path, "charlie")
+	if err == nil {
+		t.Fatal("expected error for missing member")
+	}
+	if !contains(err.Error(), "not found") {
+		t.Errorf("error = %q, want to contain 'not found'", err.Error())
+	}
+}
+
+func TestRemoveTeamMember_PreservesOtherContent(t *testing.T) {
+	dir := t.TempDir()
+	cfgContent := `project: myapp
+backends:
+  - name: keychain
+    type: keychain
+team:
+  - name: alice
+    public_key: age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p
+  - name: bob
+    public_key: age1u5scmatqm6kfmmezqlhm4rsz3wxyp6afjxre63quqnefpkynpf2qfzcjpr
+`
+	path := writeFile(t, dir, FullFileName, cfgContent)
+
+	err := RemoveTeamMember(path, "alice")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	cfg, loadErr := LoadFile(path)
+	if loadErr != nil {
+		t.Fatalf("LoadFile error: %v", loadErr)
+	}
+	if cfg.Project != "myapp" {
+		t.Errorf("Project = %q, want %q", cfg.Project, "myapp")
+	}
+	if len(cfg.Backends) != 1 {
+		t.Fatalf("len(Backends) = %d, want 1", len(cfg.Backends))
+	}
+	if cfg.Backends[0].Name != "keychain" {
+		t.Errorf("Backends[0].Name = %q, want %q", cfg.Backends[0].Name, "keychain")
+	}
+	if len(cfg.Team) != 1 {
+		t.Fatalf("expected 1 team member, got %d", len(cfg.Team))
+	}
+}
+
+func TestRemoveTeamMember_NonexistentFile(t *testing.T) {
+	err := RemoveTeamMember("/nonexistent/path/.envref.yaml", "alice")
+	if err == nil {
+		t.Fatal("expected error for nonexistent file")
+	}
+}
+
+func TestMergeConfigs_Team(t *testing.T) {
+	tests := []struct {
+		name    string
+		global  *Config
+		project *Config
+		check   func(t *testing.T, cfg *Config)
+	}{
+		{
+			name: "project inherits global team when empty",
+			global: &Config{
+				Team: []TeamMember{
+					{Name: "alice", PublicKey: "age1alice"},
+				},
+			},
+			project: &Config{
+				Project:   "myapp",
+				EnvFile:   ".env",
+				LocalFile: ".env.local",
+			},
+			check: func(t *testing.T, cfg *Config) {
+				t.Helper()
+				if len(cfg.Team) != 1 {
+					t.Fatalf("len(Team) = %d, want 1", len(cfg.Team))
+				}
+				if cfg.Team[0].Name != "alice" {
+					t.Errorf("Team[0].Name = %q, want %q", cfg.Team[0].Name, "alice")
+				}
+			},
+		},
+		{
+			name: "project team replaces global entirely",
+			global: &Config{
+				Team: []TeamMember{
+					{Name: "alice", PublicKey: "age1alice"},
+				},
+			},
+			project: &Config{
+				Project:   "myapp",
+				EnvFile:   ".env",
+				LocalFile: ".env.local",
+				Team: []TeamMember{
+					{Name: "bob", PublicKey: "age1bob"},
+				},
+			},
+			check: func(t *testing.T, cfg *Config) {
+				t.Helper()
+				if len(cfg.Team) != 1 {
+					t.Fatalf("len(Team) = %d, want 1", len(cfg.Team))
+				}
+				if cfg.Team[0].Name != "bob" {
+					t.Errorf("Team[0].Name = %q, want %q (project should override global)", cfg.Team[0].Name, "bob")
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := mergeConfigs(tt.global, tt.project)
+			if tt.check != nil {
+				tt.check(t, got)
+			}
+		})
+	}
+}
+
 // contains reports whether s contains substr.
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && containsAt(s, substr)

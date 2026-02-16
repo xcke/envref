@@ -1,7 +1,7 @@
 # Project Status
 
 ## Last Completed
-- ENV-121: Added `envref sync push` / `envref sync pull` commands for syncing secrets via shared age-encrypted git file [iter-68]
+- ENV-122: Added team-level config with member public keys, team management commands, and --to-team sync integration [iter-69]
 
 ## Current State
 - Go module `github.com/xcke/envref` initialized with Cobra + Viper + go-keyring + age + sqlite + testify + x/term dependencies
@@ -32,7 +32,10 @@
 - `envref edit` — opens .env files in `$VISUAL`/`$EDITOR`
 - `envref vault init/lock/unlock/export/import` — full vault management
 - **`envref sync push/pull`** — sync secrets via shared age-encrypted git file; push exports all secrets from a backend encrypted for multiple recipients; pull decrypts and imports into a backend with skip/force semantics
+- **`envref sync push --to-team`** — encrypts for all team members defined in `.envref.yaml`
+- **`envref team list/add/remove`** — manage team members and their age public keys in `.envref.yaml`
 - **Seven backend types:** `KeychainBackend` (OS keychain via go-keyring), `VaultBackend` (local SQLite + age encryption), `OnePasswordBackend` (1Password via `op` CLI), `AWSSSMBackend` (AWS SSM Parameter Store via `aws` CLI), `OCIVaultBackend` (Oracle OCI Vault via `oci` CLI), `HashiVaultBackend` (HashiCorp Vault via `vault` CLI), and `PluginBackend` (external executables via JSON protocol)
+- **Team config:** `.envref.yaml` supports a `team` section with member names and age public keys; validated on load (unique names/keys, age1... format)
 - **Nested references:** `${ref://secrets/key}` in values and embedded `ref://` URIs after interpolation are resolved via a second pass in the resolution pipeline
 - **Security hardening:** Vault passphrase stored as `[]byte` (clearable), zeroed on Close; decrypted plaintext bytes cleared after use
 - **Comprehensive README** with architecture diagram, resolution pipeline, project structure, vault docs, and benchmarks
