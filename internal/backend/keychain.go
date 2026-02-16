@@ -66,27 +66,29 @@ func (k *KeychainBackend) Name() string {
 }
 
 // Get retrieves the secret value for the given key from the OS keychain.
-// Returns ErrNotFound if the key does not exist.
+// Returns ErrNotFound if the key does not exist. Other errors are returned
+// as *KeychainError with a classified kind and actionable hint.
 func (k *KeychainBackend) Get(key string) (string, error) {
 	val, err := keyringProvider.Get(k.service, key)
 	if err != nil {
 		if isNotFoundErr(err) {
 			return "", ErrNotFound
 		}
-		return "", fmt.Errorf("keychain get %q: %w", key, err)
+		return "", classifyKeychainErr("get", key, err)
 	}
 	return val, nil
 }
 
 // Set stores a secret value under the given key in the OS keychain.
 // If the key already exists, its value is overwritten. The key index
-// is updated to include the new key.
+// is updated to include the new key. Errors are returned as *KeychainError
+// with a classified kind and actionable hint.
 func (k *KeychainBackend) Set(key, value string) error {
 	k.mu.Lock()
 	defer k.mu.Unlock()
 
 	if err := keyringProvider.Set(k.service, key, value); err != nil {
-		return fmt.Errorf("keychain set %q: %w", key, err)
+		return classifyKeychainErr("set", key, err)
 	}
 
 	// Update the key index.
@@ -94,14 +96,15 @@ func (k *KeychainBackend) Set(key, value string) error {
 		// Best effort: the secret is stored but the index update failed.
 		// Attempt to clean up by deleting the secret.
 		_ = keyringProvider.Delete(k.service, key)
-		return fmt.Errorf("keychain update index after set %q: %w", key, err)
+		return classifyKeychainErr("set", key, err)
 	}
 
 	return nil
 }
 
 // Delete removes the secret for the given key from the OS keychain.
-// Returns ErrNotFound if the key does not exist.
+// Returns ErrNotFound if the key does not exist. Other errors are returned
+// as *KeychainError with a classified kind and actionable hint.
 func (k *KeychainBackend) Delete(key string) error {
 	k.mu.Lock()
 	defer k.mu.Unlock()
@@ -111,24 +114,29 @@ func (k *KeychainBackend) Delete(key string) error {
 		if isNotFoundErr(err) {
 			return ErrNotFound
 		}
-		return fmt.Errorf("keychain delete %q: %w", key, err)
+		return classifyKeychainErr("delete", key, err)
 	}
 
 	// Update the key index.
 	if err := k.removeFromIndex(key); err != nil {
-		return fmt.Errorf("keychain update index after delete %q: %w", key, err)
+		return classifyKeychainErr("delete", key, err)
 	}
 
 	return nil
 }
 
 // List returns all secret keys stored in this backend by reading the
-// key index. The returned keys are sorted alphabetically.
+// key index. The returned keys are sorted alphabetically. Errors are
+// returned as *KeychainError with a classified kind and actionable hint.
 func (k *KeychainBackend) List() ([]string, error) {
 	k.mu.Lock()
 	defer k.mu.Unlock()
 
-	return k.loadIndex()
+	keys, err := k.loadIndex()
+	if err != nil {
+		return nil, classifyKeychainErr("list", "", err)
+	}
+	return keys, nil
 }
 
 // loadIndex reads the key index from the keychain. Returns an empty slice

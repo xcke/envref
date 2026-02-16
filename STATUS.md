@@ -1,7 +1,7 @@
 # Project Status
 
 ## Last Completed
-- ENV-025: Added `envref config show` command with plain, JSON, and table output formats [iter-27]
+- ENV-036: Added graceful keychain error handling with classified errors and actionable hints [iter-28]
 
 ## Current State
 - Go module `github.com/xcke/envref` initialized with Cobra + Viper + go-keyring + testify dependencies
@@ -27,6 +27,7 @@
 - **Config inheritance:** Global config at `~/.config/envref/config.yaml` merged with project `.envref.yaml`
 - **Output format support:** `--format` flag on `get`, `list`, `resolve`, and `config show` commands (plain, json, shell, table)
 - **Profile support:** 3-layer merge with `--profile` flag
+- **Keychain error handling:** `KeychainError` type classifies raw go-keyring errors into categories (Unavailable, Locked, Permission, DataTooBig) with platform-specific actionable hints
 - Resolution pipeline with per-key error collection, partial resolution, direct backend matching + fallback chain
 - `.env` file parser with full quote/multiline/comment/BOM/CRLF support
 - `ref://` URI parser, `Backend` interface, `Registry`, `NamespacedBackend`, `KeychainBackend`

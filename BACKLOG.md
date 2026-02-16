@@ -60,7 +60,7 @@
 - [DONE] P1 | ENV-033 | Implement macOS Keychain backend via `go-keyring`
 - [DONE] P1 | ENV-034 | Implement Linux `libsecret` / `secret-service` backend via `go-keyring`
 - [DONE] P1 | ENV-035 | Implement Windows Credential Manager backend via `go-keyring`
-- [TODO] P2 | ENV-036 | Handle keychain access errors gracefully (locked keychain, permissions, missing daemon)
+- [DONE] P2 | ENV-036 | Handle keychain access errors gracefully (locked keychain, permissions, missing daemon)
 
 ### 3c — Local Encrypted Vault Backend (fallback)
 
