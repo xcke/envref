@@ -23,6 +23,7 @@ import (
 // since future backends may be added via plugins.
 var KnownBackendTypes = []string{
 	"keychain",
+	"1password",
 }
 
 // ValidationError is returned when the config is syntactically valid YAML but

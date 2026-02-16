@@ -1506,7 +1506,7 @@ func TestConfig_Warnings(t *testing.T) {
 			config: Config{
 				Backends: []BackendConfig{
 					{Name: "vault", Type: "encrypted-vault"},
-					{Name: "op", Type: "1password"},
+					{Name: "custom", Type: "custom-store"},
 				},
 			},
 			wantCount: 2,

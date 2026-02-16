@@ -852,11 +852,31 @@ func createBackend(bc config.BackendConfig) (backend.Backend, error) {
 		return backend.NewKeychainBackend(), nil
 	case "vault":
 		return createVaultBackend(bc)
+	case "1password":
+		return createOnePasswordBackend(bc), nil
 	case "plugin":
 		return createPluginBackend(bc)
 	default:
 		return nil, fmt.Errorf("unknown backend type %q", bc.EffectiveType())
 	}
+}
+
+// createOnePasswordBackend creates a OnePasswordBackend from the backend config.
+// Optional config keys: "vault" (default "Personal"), "account" (optional).
+func createOnePasswordBackend(bc config.BackendConfig) *backend.OnePasswordBackend {
+	vault := bc.Config["vault"]
+	if vault == "" {
+		vault = "Personal"
+	}
+
+	var opts []backend.OnePasswordOption
+	if account := bc.Config["account"]; account != "" {
+		opts = append(opts, backend.WithOnePasswordAccount(account))
+	}
+	if command := bc.Config["command"]; command != "" {
+		opts = append(opts, backend.WithOnePasswordCommand(command))
+	}
+	return backend.NewOnePasswordBackend(vault, opts...)
 }
 
 // createVaultBackend creates a VaultBackend from the backend config.

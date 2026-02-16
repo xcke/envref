@@ -4,12 +4,13 @@ envref resolves `ref://` secret references through configurable backends. Backen
 
 ## Built-in backends
 
-envref ships with two backends:
+envref ships with three backends:
 
 | Backend | Storage | Encryption | Setup | Use case |
 |---------|---------|------------|-------|----------|
 | `keychain` | OS keychain (macOS Keychain, Linux Secret Service, Windows Credential Manager) | OS-managed | None (default) | Development machines with a desktop environment |
 | `vault` | Local SQLite at `~/.config/envref/vault.db` | age scrypt per-value | `envref vault init` | Headless servers, containers, CI |
+| `1password` | 1Password vault via `op` CLI | 1Password-managed | `op signin` | Teams using 1Password for credential management |
 
 ### Keychain backend
 
@@ -26,6 +27,37 @@ No configuration is needed — it works out of the box on systems with a desktop
 The vault backend is a local encrypted store for environments where OS keychain is unavailable (SSH servers, Docker containers, CI runners).
 
 Each secret is individually encrypted using [age](https://age-encryption.org/) with scrypt-based key derivation from a master passphrase. Secrets are stored in a SQLite database at `~/.config/envref/vault.db`.
+
+### 1Password backend
+
+The 1Password backend delegates secret storage to [1Password](https://1password.com/) via the `op` CLI (v2+). Secrets are stored as "Secure Note" items in the configured vault, with the item title as the secret key and the value in the `notesPlain` field.
+
+**Prerequisites:**
+
+1. Install the [1Password CLI](https://developer.1password.com/docs/cli/get-started/):
+   ```bash
+   brew install 1password-cli
+   ```
+
+2. Sign in to your account:
+   ```bash
+   op signin
+   ```
+
+3. (Optional) Enable [biometric unlock](https://developer.1password.com/docs/cli/get-started/#turn-on-biometric-unlock) for passwordless CLI access.
+
+**Configuration:**
+
+```yaml
+backends:
+  - name: op
+    type: 1password
+    config:
+      vault: Personal              # 1Password vault name (default: "Personal")
+      account: my.1password.com    # optional: account shorthand or URL
+```
+
+The `vault` option specifies which 1Password vault to use. The `account` option is only needed if you have multiple 1Password accounts signed in.
 
 ## Configuration
 
@@ -62,6 +94,16 @@ No additional configuration options. Uses the default OS keychain.
 | `path` | Path to the SQLite database file | `~/.config/envref/vault.db` |
 
 The passphrase is provided interactively (prompted at use time) or via the `ENVREF_VAULT_PASSPHRASE` environment variable for non-interactive use.
+
+#### 1Password
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `vault` | 1Password vault name | `Personal` |
+| `account` | Account shorthand or URL (for multi-account setups) | _(none)_ |
+| `command` | Path to the `op` CLI executable | `op` (found via `$PATH`) |
+
+Requires the 1Password CLI v2+ to be installed and authenticated (`op signin`).
 
 ## Setting up the vault
 
@@ -247,9 +289,10 @@ The `ref://secrets/<key>` format is the standard reference syntax. The `secrets`
 | Headless server / SSH | `vault` |
 | Docker container | `vault` with `ENVREF_VAULT_PASSPHRASE` |
 | CI/CD pipeline | `vault` with `ENVREF_VAULT_PASSPHRASE` |
+| Team using 1Password | `1password` |
 | Team with shared secrets | `keychain` per-developer + team sync |
 
-For most development workflows, the default keychain backend is sufficient. Use the vault backend when the OS keychain is not available or when you need a portable, file-based secret store.
+For most development workflows, the default keychain backend is sufficient. Use the vault backend when the OS keychain is not available or when you need a portable, file-based secret store. Use the 1Password backend if your team already uses 1Password for credential management.
 
 ## Troubleshooting
 
@@ -282,6 +325,24 @@ envref vault unlock
 ### "vault: not initialized"
 
 Run `envref vault init` to create the vault database and set a master passphrase.
+
+### "1password: op get: ... isn't an item"
+
+The secret hasn't been stored in 1Password yet. Run:
+
+```bash
+envref secret set <key> --backend op
+```
+
+### "1password: start op: executable file not found"
+
+The `op` CLI is not installed or not on your `$PATH`. Install it:
+
+```bash
+brew install 1password-cli
+```
+
+Then sign in: `op signin`.
 
 ### Checking overall secret status
 
