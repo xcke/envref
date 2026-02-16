@@ -53,6 +53,7 @@ from your OS keychain or other secret backends at runtime.`,
 	rootCmd.AddCommand(newAuditCmd())
 	rootCmd.AddCommand(newSyncCmd())
 	rootCmd.AddCommand(newTeamCmd())
+	rootCmd.AddCommand(newOnboardCmd())
 
 	return rootCmd
 }
