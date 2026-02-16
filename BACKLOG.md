@@ -124,7 +124,7 @@
 - [DONE] P1 | ENV-092 | Add `envref profile use <name>` — set active profile (stored in `.envref.yaml` or `.envref.local`)
 - [DONE] P1 | ENV-093 | Update resolve pipeline to load base `.env` ← profile `.env.<name>` ← `.env.local`
 - [DONE] P2 | ENV-094 | Add `envref profile create <name>` — scaffold new profile file
-- [TODO] P2 | ENV-095 | Add `envref profile diff <a> <b>` — show key/value differences between profiles
+- [DONE] P2 | ENV-095 | Add `envref profile diff <a> <b>` — show key/value differences between profiles
 - [TODO] P2 | ENV-096 | Support profile-scoped secrets (`<project>/<profile>/<key>`)
 - [TODO] P3 | ENV-097 | Add `envref profile export <name>` — export profile as JSON for CI/CD
 

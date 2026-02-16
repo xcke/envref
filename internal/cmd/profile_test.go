@@ -668,3 +668,299 @@ func TestProfileCreateCmd_VisibleInHelp(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, stdout, "create")
 }
+
+// --- profile diff tests ------------------------------------------------------
+
+func TestProfileDiffCmd_ShowsDifferences(t *testing.T) {
+	dir := t.TempDir()
+	cfgContent := `project: myapp
+env_file: .env
+local_file: .env.local
+profiles:
+  staging:
+    env_file: .env.staging
+  production:
+    env_file: .env.production
+`
+	writeTestFile(t, dir, config.FullFileName, cfgContent)
+	writeTestFile(t, dir, ".env", "APP_NAME=myapp\nLOG_LEVEL=info\n")
+	writeTestFile(t, dir, ".env.staging", "DB_HOST=staging-db\nLOG_LEVEL=debug\n")
+	writeTestFile(t, dir, ".env.production", "DB_HOST=prod-db\nCACHE_TTL=3600\n")
+
+	chdir(t, dir)
+
+	stdout, _, err := execCmd(t, "profile", "diff", "staging", "production")
+	require.NoError(t, err)
+
+	// CACHE_TTL is only in production (only_b → +)
+	assert.Contains(t, stdout, "CACHE_TTL")
+	// DB_HOST differs between profiles (changed → ~)
+	assert.Contains(t, stdout, "DB_HOST")
+	// LOG_LEVEL: staging sets debug, production inherits info from base — changed
+	assert.Contains(t, stdout, "LOG_LEVEL")
+	// Summary line
+	assert.Contains(t, stdout, "difference(s)")
+}
+
+func TestProfileDiffCmd_IdenticalProfiles(t *testing.T) {
+	dir := t.TempDir()
+	cfgContent := `project: myapp
+env_file: .env
+local_file: .env.local
+profiles:
+  staging:
+    env_file: .env.staging
+  staging2:
+    env_file: .env.staging2
+`
+	writeTestFile(t, dir, config.FullFileName, cfgContent)
+	writeTestFile(t, dir, ".env", "APP_NAME=myapp\n")
+	writeTestFile(t, dir, ".env.staging", "DB_HOST=staging-db\n")
+	writeTestFile(t, dir, ".env.staging2", "DB_HOST=staging-db\n")
+
+	chdir(t, dir)
+
+	stdout, _, err := execCmd(t, "profile", "diff", "staging", "staging2")
+	require.NoError(t, err)
+	assert.Contains(t, stdout, "identical")
+}
+
+func TestProfileDiffCmd_OnlyInFirstProfile(t *testing.T) {
+	dir := t.TempDir()
+	cfgContent := `project: myapp
+env_file: .env
+local_file: .env.local
+profiles:
+  staging:
+    env_file: .env.staging
+  production:
+    env_file: .env.production
+`
+	writeTestFile(t, dir, config.FullFileName, cfgContent)
+	writeTestFile(t, dir, ".env", "APP_NAME=myapp\n")
+	writeTestFile(t, dir, ".env.staging", "EXTRA_KEY=staging-only\n")
+	writeTestFile(t, dir, ".env.production", "")
+
+	chdir(t, dir)
+
+	stdout, _, err := execCmd(t, "profile", "diff", "staging", "production")
+	require.NoError(t, err)
+	assert.Contains(t, stdout, "EXTRA_KEY")
+	assert.Contains(t, stdout, "-")
+	assert.Contains(t, stdout, "1 only in staging")
+}
+
+func TestProfileDiffCmd_OnlyInSecondProfile(t *testing.T) {
+	dir := t.TempDir()
+	cfgContent := `project: myapp
+env_file: .env
+local_file: .env.local
+profiles:
+  staging:
+    env_file: .env.staging
+  production:
+    env_file: .env.production
+`
+	writeTestFile(t, dir, config.FullFileName, cfgContent)
+	writeTestFile(t, dir, ".env", "APP_NAME=myapp\n")
+	writeTestFile(t, dir, ".env.staging", "")
+	writeTestFile(t, dir, ".env.production", "PROD_KEY=prod-only\n")
+
+	chdir(t, dir)
+
+	stdout, _, err := execCmd(t, "profile", "diff", "staging", "production")
+	require.NoError(t, err)
+	assert.Contains(t, stdout, "PROD_KEY")
+	assert.Contains(t, stdout, "+")
+	assert.Contains(t, stdout, "1 only in production")
+}
+
+func TestProfileDiffCmd_ChangedValues(t *testing.T) {
+	dir := t.TempDir()
+	cfgContent := `project: myapp
+env_file: .env
+local_file: .env.local
+profiles:
+  staging:
+    env_file: .env.staging
+  production:
+    env_file: .env.production
+`
+	writeTestFile(t, dir, config.FullFileName, cfgContent)
+	writeTestFile(t, dir, ".env", "")
+	writeTestFile(t, dir, ".env.staging", "DB_HOST=staging-db\n")
+	writeTestFile(t, dir, ".env.production", "DB_HOST=prod-db\n")
+
+	chdir(t, dir)
+
+	stdout, _, err := execCmd(t, "profile", "diff", "staging", "production")
+	require.NoError(t, err)
+	assert.Contains(t, stdout, "DB_HOST")
+	assert.Contains(t, stdout, "staging-db")
+	assert.Contains(t, stdout, "prod-db")
+	assert.Contains(t, stdout, "1 changed")
+}
+
+func TestProfileDiffCmd_JSONFormat(t *testing.T) {
+	dir := t.TempDir()
+	cfgContent := `project: myapp
+env_file: .env
+local_file: .env.local
+profiles:
+  staging:
+    env_file: .env.staging
+  production:
+    env_file: .env.production
+`
+	writeTestFile(t, dir, config.FullFileName, cfgContent)
+	writeTestFile(t, dir, ".env", "APP_NAME=myapp\n")
+	writeTestFile(t, dir, ".env.staging", "DB_HOST=staging-db\n")
+	writeTestFile(t, dir, ".env.production", "DB_HOST=prod-db\n")
+
+	chdir(t, dir)
+
+	stdout, _, err := execCmd(t, "profile", "diff", "staging", "production", "--format", "json")
+	require.NoError(t, err)
+	assert.Contains(t, stdout, `"key"`)
+	assert.Contains(t, stdout, `"kind"`)
+	assert.Contains(t, stdout, `"changed"`)
+	assert.Contains(t, stdout, `"DB_HOST"`)
+}
+
+func TestProfileDiffCmd_TableFormat(t *testing.T) {
+	dir := t.TempDir()
+	cfgContent := `project: myapp
+env_file: .env
+local_file: .env.local
+profiles:
+  staging:
+    env_file: .env.staging
+  production:
+    env_file: .env.production
+`
+	writeTestFile(t, dir, config.FullFileName, cfgContent)
+	writeTestFile(t, dir, ".env", "APP_NAME=myapp\n")
+	writeTestFile(t, dir, ".env.staging", "DB_HOST=staging-db\n")
+	writeTestFile(t, dir, ".env.production", "DB_HOST=prod-db\n")
+
+	chdir(t, dir)
+
+	stdout, _, err := execCmd(t, "profile", "diff", "staging", "production", "--format", "table")
+	require.NoError(t, err)
+	// Table should have header with profile names.
+	assert.Contains(t, stdout, "staging")
+	assert.Contains(t, stdout, "production")
+	assert.Contains(t, stdout, "KEY")
+	assert.Contains(t, stdout, "DB_HOST")
+}
+
+func TestProfileDiffCmd_ConventionProfiles(t *testing.T) {
+	dir := t.TempDir()
+	cfgContent := `project: myapp
+env_file: .env
+local_file: .env.local
+`
+	writeTestFile(t, dir, config.FullFileName, cfgContent)
+	writeTestFile(t, dir, ".env", "APP_NAME=myapp\n")
+	writeTestFile(t, dir, ".env.development", "DEBUG=true\n")
+	writeTestFile(t, dir, ".env.test", "DEBUG=false\n")
+
+	chdir(t, dir)
+
+	stdout, _, err := execCmd(t, "profile", "diff", "development", "test")
+	require.NoError(t, err)
+	assert.Contains(t, stdout, "DEBUG")
+	assert.Contains(t, stdout, "true")
+	assert.Contains(t, stdout, "false")
+}
+
+func TestProfileDiffCmd_MissingProfileFile(t *testing.T) {
+	dir := t.TempDir()
+	cfgContent := `project: myapp
+env_file: .env
+local_file: .env.local
+`
+	writeTestFile(t, dir, config.FullFileName, cfgContent)
+	writeTestFile(t, dir, ".env", "APP_NAME=myapp\n")
+	writeTestFile(t, dir, ".env.staging", "DB_HOST=staging-db\n")
+	// .env.production does not exist — loadAndMergeEnv loads profile via LoadOptional
+
+	chdir(t, dir)
+
+	// This should succeed — missing profile file means just the base .env is used.
+	stdout, _, err := execCmd(t, "profile", "diff", "staging", "production")
+	require.NoError(t, err)
+	assert.Contains(t, stdout, "DB_HOST")
+}
+
+func TestProfileDiffCmd_NoArgs(t *testing.T) {
+	_, _, err := execCmd(t, "profile", "diff")
+	assert.Error(t, err)
+}
+
+func TestProfileDiffCmd_OneArg(t *testing.T) {
+	_, _, err := execCmd(t, "profile", "diff", "staging")
+	assert.Error(t, err)
+}
+
+func TestProfileDiffCmd_NoConfig(t *testing.T) {
+	dir := t.TempDir()
+	chdir(t, dir)
+
+	_, _, err := execCmd(t, "profile", "diff", "staging", "production")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "loading config")
+}
+
+func TestProfileDiffCmd_Help(t *testing.T) {
+	stdout, _, err := execCmd(t, "profile", "diff", "--help")
+	require.NoError(t, err)
+	assert.Contains(t, stdout, "Compare the environment variables between two profiles")
+	assert.Contains(t, stdout, "--format")
+	assert.Contains(t, stdout, "envref profile diff staging production")
+}
+
+func TestProfileDiffCmd_VisibleInHelp(t *testing.T) {
+	stdout, _, err := execCmd(t, "profile", "--help")
+	require.NoError(t, err)
+	assert.Contains(t, stdout, "diff")
+}
+
+func TestProfileDiffCmd_InvalidFormat(t *testing.T) {
+	dir := t.TempDir()
+	cfgContent := `project: myapp
+env_file: .env
+local_file: .env.local
+`
+	writeTestFile(t, dir, config.FullFileName, cfgContent)
+	writeTestFile(t, dir, ".env", "APP_NAME=myapp\n")
+	writeTestFile(t, dir, ".env.staging", "DB_HOST=staging\n")
+	writeTestFile(t, dir, ".env.production", "DB_HOST=prod\n")
+
+	chdir(t, dir)
+
+	_, _, err := execCmd(t, "profile", "diff", "staging", "production", "--format", "xml")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid format")
+}
+
+func TestProfileDiffCmd_LocalOverrideAffectsBoth(t *testing.T) {
+	dir := t.TempDir()
+	cfgContent := `project: myapp
+env_file: .env
+local_file: .env.local
+`
+	writeTestFile(t, dir, config.FullFileName, cfgContent)
+	writeTestFile(t, dir, ".env", "APP_NAME=myapp\n")
+	writeTestFile(t, dir, ".env.staging", "DB_HOST=staging-db\n")
+	writeTestFile(t, dir, ".env.production", "DB_HOST=prod-db\n")
+	// .env.local overrides DB_HOST for both profiles
+	writeTestFile(t, dir, ".env.local", "DB_HOST=local-db\n")
+
+	chdir(t, dir)
+
+	stdout, _, err := execCmd(t, "profile", "diff", "staging", "production")
+	require.NoError(t, err)
+	// Since .env.local overrides DB_HOST in both, they should be identical for DB_HOST
+	assert.Contains(t, stdout, "identical")
+}

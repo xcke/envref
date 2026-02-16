@@ -1,7 +1,7 @@
 # Project Status
 
 ## Last Completed
-- ENV-094: Added `envref profile create <name>` command to scaffold new profile files [iter-37]
+- ENV-095: Added `envref profile diff <a> <b>` command to compare profiles [iter-38]
 
 ## Current State
 - Go module `github.com/xcke/envref` initialized with Cobra + Viper + go-keyring + testify dependencies
@@ -20,6 +20,7 @@
 - `envref profile list` — shows available profiles from config and convention-based `.env.*` files
 - `envref profile use <name>` — sets active profile in `.envref.yaml`
 - `envref profile create <name>` — scaffolds `.env.<name>` file with optional `--from`, `--register`, `--env-file`, `--force` flags
+- `envref profile diff <a> <b>` — compares effective environments between two profiles, showing only-in-A, only-in-B, and changed keys with colorized output; supports `--format plain|json|table`
 - `envref validate` — checks .env against .env.example schema
 - `envref validate --ci` — CI mode: extra keys are errors, compact output, silent on success, exit code 1 on any failure
 - `envref status` — shows environment overview with actionable hints
