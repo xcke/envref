@@ -8,12 +8,17 @@
 - **Task Queue:** `BACKLOG.md` — prioritized task list
 - **Observer Inbox:** `inbox/` — drop `.md` files here to inject work
 
+## Stack
+
+- **Stack Definition:** `STACK.md` — tech stack, verification commands, language
+  conventions, and bootstrapping steps. Read this before executing any tasks.
+
 ## Workflow
 
 1. Check for dirty tree (crash recovery), read `STATUS.md` and `BACKLOG.md`, process inbox
 2. Pick one focused task from BACKLOG.md (highest priority TODO)
 3. Execute the task — plan first if touching 3+ files
-4. Verify the work (`go build`, `go vet`, `go test`, `golangci-lint`)
+4. Verify the work using the commands defined in `STACK.md`
 5. Update BACKLOG.md + STATUS.md, then commit everything in a **single atomic commit**
 
 ## Git Conventions
@@ -80,43 +85,9 @@ Keep STATUS.md under ~1500 tokens. It tracks **current state**, not history.
 
 Do NOT duplicate "Next Steps" here — that lives in BACKLOG.md.
 
-## Tech Stack
-
-- **Language:** Go 1.24+
-- **CLI Framework:** [Cobra](https://github.com/spf13/cobra) for command structure
-- **Config:** [Viper](https://github.com/spf13/viper) for `.envref.yaml` configuration
-- **Linting:** [golangci-lint](https://golangci-lint.run/) with default config
-- **Testing:** Standard `testing` package + [testify](https://github.com/stretchr/testify) for assertions
-- **Build:** Makefile + [GoReleaser](https://goreleaser.com/) for releases
-
-## Go Conventions
-
-- Follow standard Go project layout: `cmd/`, `internal/`, `pkg/`
-- Use `internal/` for packages that should not be imported by external consumers
-- Use `pkg/` only for packages intended to be importable by other projects
-- All exported functions and types must have doc comments
-- Use `error` return values — do not panic in library code
-- Use `fmt.Errorf("context: %w", err)` for error wrapping
-- Table-driven tests with `t.Run()` subtests
-- No global mutable state — pass dependencies via constructor injection
-- Keep `main.go` minimal — it should only wire things together and call `cmd.Execute()`
-
-## Verification
-
-Before committing, all of these must pass:
-
-```bash
-go build ./...       # compiles without errors
-go vet ./...         # catches common mistakes
-go test ./...        # all tests pass
-golangci-lint run    # lint checks pass
-```
-
-For CLI changes, also run the binary with `--help` to verify command structure.
-
 ## Principles
 
-- Write clean, idiomatic Go — simple, explicit, no magic
+- Write clean, idiomatic code in the project's primary language — simple, explicit, no magic
 - Follow existing project conventions and patterns
 - Don't try to do everything at once — one well-scoped task per iteration
 - Don't commit broken code — verify before committing

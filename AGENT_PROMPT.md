@@ -2,7 +2,7 @@ You are an autonomous coding agent. Your workspace is the repository root. You r
 
 ## Goal
 
-Build the application described in GOAL.md. If no GOAL.md is present, build a Go CLI tool scaffold with Cobra, a root command, and version flag.
+Build the application described in GOAL.md. If no GOAL.md is present, consult `STACK.md` for the default scaffold to create.
 
 ## Step 1: Assess Current State
 
@@ -25,7 +25,7 @@ If there are uncommitted changes:
 - Read STATUS.md in the workspace root (if it exists) to understand what was done previously.
 - Read BACKLOG.md (if it exists) to see the prioritized task queue.
 - Run `git log --oneline -10` to see recent commits.
-- If the workspace is empty (no `go.mod`), proceed to **Bootstrapping** below.
+- If the workspace matches the **Empty Workspace Signal** in `STACK.md`, proceed to **Bootstrapping** below.
 
 ### Process Inbox
 
@@ -80,30 +80,16 @@ Prefer tasks that build on what already exists. Do not try to do everything at o
 
 - Use Agent Teams for parallel subtasks where it makes sense (e.g., creating multiple independent packages simultaneously).
 - Follow the conventions in CLAUDE.md.
-- Write clean, production-quality Go — idiomatic, well-structured, with proper error handling.
+- Write clean, production-quality code following the language conventions in `STACK.md`.
 
 ## Step 4: Verify
 
-Before committing, run in order:
+Before committing, run the verification commands defined in `STACK.md` under
+**Verification**, in order. If any step fails, fix the issues before proceeding.
+Do not commit broken code.
 
-```bash
-go build ./...
-go vet ./...
-go test ./...
-golangci-lint run ./...
-```
-
-If any step fails, fix the issues before proceeding. Do not commit broken code.
-
-### Manual Smoke Test
-
-After the checks pass, run the built binary to verify it works:
-
-```bash
-go run ./cmd/envref --help
-```
-
-Confirm the output looks correct for the current state of the CLI.
+After the checks pass, run the **Smoke Test** command from `STACK.md` and confirm
+the output is correct.
 
 ## Step 5: Commit and Update Status
 
@@ -147,19 +133,11 @@ The commit message describes the **work**, not the status update. Use the standa
 
 ## Bootstrapping (First Run Only)
 
-If the workspace has no `go.mod`, initialize the project:
+If the workspace matches the **Empty Workspace Signal** in `STACK.md`, follow the
+**Bootstrapping** steps defined there.
 
-```bash
-go mod init github.com/xcke/envref
-```
-
-After initializing:
-1. Create the directory structure:
-   ```bash
-   mkdir -p cmd/envref internal pkg
-   ```
-2. Create a minimal `cmd/envref/main.go` with a hello-world or Cobra root command
-3. Verify it builds: `go build ./...`
-4. Commit the initial scaffold: `git add -A && git commit -m "chore: scaffold Go project with module and directory structure"`
-5. Create the initial STATUS.md and BACKLOG.md (see formats in CLAUDE.md)
-6. Commit status files: `git add -A && git commit -m "docs: add STATUS.md and BACKLOG.md"`
+After scaffolding:
+1. Run the **Verification** commands from `STACK.md`
+2. Commit: `git add -A && git commit -m "chore: scaffold project"`
+3. Create initial STATUS.md and BACKLOG.md (see formats in CLAUDE.md)
+4. Commit: `git add -A && git commit -m "docs: add STATUS.md and BACKLOG.md"`
