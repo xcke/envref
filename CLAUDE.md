@@ -2,11 +2,11 @@
 
 ## Environment
 
-- **Workspace:** `/workspace` — all project files live here
-- **Agent Prompt:** `/app/AGENT_PROMPT.md` — defines the agent loop and workflow
-- **Status Tracking:** `/workspace/STATUS.md` — current state snapshot (kept concise)
-- **Task Queue:** `/workspace/BACKLOG.md` — prioritized task list
-- **Observer Inbox:** `/workspace/inbox/` — drop `.md` files here to inject work
+- **Workspace:** Repository root — all project files live here
+- **Agent Prompt:** `AGENT_PROMPT.md` — defines the agent loop and workflow
+- **Status Tracking:** `STATUS.md` — current state snapshot (kept concise)
+- **Task Queue:** `BACKLOG.md` — prioritized task list
+- **Observer Inbox:** `inbox/` — drop `.md` files here to inject work
 
 ## Workflow
 

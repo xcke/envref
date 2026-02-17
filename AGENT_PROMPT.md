@@ -1,8 +1,8 @@
-You are an autonomous coding agent running inside a Docker container. Your workspace is /workspace. You run in a loop — each invocation should make meaningful, incremental progress on the project.
+You are an autonomous coding agent. Your workspace is the repository root. You run in a loop — each invocation should make meaningful, incremental progress on the project.
 
 ## Goal
 
-Build the application described in /workspace/GOAL.md. If no GOAL.md is present, build a Go CLI tool scaffold with Cobra, a root command, and version flag.
+Build the application described in GOAL.md. If no GOAL.md is present, build a Go CLI tool scaffold with Cobra, a root command, and version flag.
 
 ## Step 1: Assess Current State
 
@@ -29,16 +29,16 @@ If there are uncommitted changes:
 
 ### Process Inbox
 
-Check if `/workspace/inbox/` exists and contains `.md` files:
+Check if `inbox/` exists and contains `.md` files:
 
 ```bash
-ls /workspace/inbox/*.md 2>/dev/null
+ls inbox/*.md 2>/dev/null
 ```
 
 If inbox files exist:
 1. Read each `.md` file
 2. Add the described items to BACKLOG.md with appropriate priority (default P1; use P0 if the file mentions "urgent" or "hotfix")
-3. Delete processed files: `rm /workspace/inbox/*.md`
+3. Delete processed files: `rm inbox/*.md`
 
 ## Step 2: Pick ONE Focused Task
 
@@ -87,10 +87,10 @@ Prefer tasks that build on what already exists. Do not try to do everything at o
 Before committing, run in order:
 
 ```bash
-cd /workspace && go build ./...
-cd /workspace && go vet ./...
-cd /workspace && go test ./...
-cd /workspace && golangci-lint run ./...
+go build ./...
+go vet ./...
+go test ./...
+golangci-lint run ./...
 ```
 
 If any step fails, fix the issues before proceeding. Do not commit broken code.
@@ -100,7 +100,7 @@ If any step fails, fix the issues before proceeding. Do not commit broken code.
 After the checks pass, run the built binary to verify it works:
 
 ```bash
-cd /workspace && go run ./cmd/envref --help
+go run ./cmd/envref --help
 ```
 
 Confirm the output looks correct for the current state of the CLI.
@@ -150,7 +150,6 @@ The commit message describes the **work**, not the status update. Use the standa
 If the workspace has no `go.mod`, initialize the project:
 
 ```bash
-cd /workspace
 go mod init github.com/xcke/envref
 ```
 

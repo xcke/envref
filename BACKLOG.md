@@ -201,6 +201,18 @@
 - [DONE] P3 | ENV-149 | Security audit of secret handling (memory zeroing, no secrets in logs/errors)
 ---
 
+## Phase 13 — Security Scanning
+
+- [DONE] P2 | ENV-150 | Add security scanning (gosec, govulncheck, Dependabot, CI workflow)
+
+---
+
+## Phase 14 - Improvements
+- [TODO] P1 | ENV-200 | CRUD operations of Secret should update the active `.env` file also with Profile support
+- [TODO] P1 | ENV-201 | Consistency of active profile and CRUD actions required. (e.g.: set ENV in the active profile ENV file.)
+- [TODO] P3 | ENV-202 | Active Profile feedback to the User accross CLI use. 
+- [TODO] P3 | ENV-203 | `envref secret list` asks for vault password, but does not show secrets from the vault 
+
 ## Milestone Summary
 
 | Milestone              | Phases                                  | Goal                                                           |
