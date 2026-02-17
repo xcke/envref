@@ -511,8 +511,7 @@ func SetActiveProfile(path, profile string) error {
 	}
 
 	content := strings.Join(lines, "\n")
-	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
-		return fmt.Errorf("writing config %s: %w", path, err)
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {		return fmt.Errorf("writing config %s: %w", path, err)
 	}
 	return nil
 }
@@ -593,8 +592,7 @@ func AddProfile(path, profile, envFile string) error {
 	}
 
 	content := strings.Join(lines, "\n")
-	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
-		return fmt.Errorf("writing config %s: %w", path, err)
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {		return fmt.Errorf("writing config %s: %w", path, err)
 	}
 	return nil
 }
@@ -682,8 +680,7 @@ func AddTeamMember(path, name, publicKey string) error {
 	}
 
 	content := strings.Join(lines, "\n")
-	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
-		return fmt.Errorf("writing config %s: %w", path, err)
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {		return fmt.Errorf("writing config %s: %w", path, err)
 	}
 	return nil
 }
@@ -782,8 +779,7 @@ func RemoveTeamMember(path, name string) error {
 	}
 
 	content := strings.Join(newLines, "\n")
-	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
-		return fmt.Errorf("writing config %s: %w", path, err)
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {		return fmt.Errorf("writing config %s: %w", path, err)
 	}
 	return nil
 }

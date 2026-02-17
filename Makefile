@@ -15,8 +15,9 @@ COVER_PROFILE := $(COVER_DIR)/coverage.out
 # Tool paths
 GO          := go
 LINT        := golangci-lint
+GOVULNCHECK := govulncheck
 
-.PHONY: all build test lint vet check install clean help cover cover-html cover-func stats
+.PHONY: all build test lint vet check security install clean help cover cover-html cover-func stats
 
 ## all: Run lint, test, and build (default target)
 all: check build
@@ -41,6 +42,11 @@ vet:
 
 ## check: Run vet, lint, and tests
 check: vet lint test
+
+## security: Run security scanners (govulncheck + gosec)
+security:
+	$(GOVULNCHECK) ./...
+	$(LINT) run --enable-only gosec ./...
 
 ## cover: Run tests with coverage and generate profile
 cover:

@@ -169,5 +169,4 @@ func FuzzLoadParse(f *testing.F) {
 
 // writeTestFile writes content to a file path.
 func writeTestFile(path, content string) error {
-	return os.WriteFile(path, []byte(content), 0o644)
-}
+	return os.WriteFile(path, []byte(content), 0o644)}

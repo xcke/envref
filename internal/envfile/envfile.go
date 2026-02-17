@@ -208,8 +208,7 @@ func (e *Env) Write(path string) error {
 		b.WriteString(formatValue(entry.Value))
 		b.WriteByte('\n')
 	}
-	return os.WriteFile(path, []byte(b.String()), 0o644)
-}
+	return os.WriteFile(path, []byte(b.String()), 0o644)}
 
 // formatValue returns the value formatted for a .env file.
 // Simple values are returned as-is. Values containing spaces, newlines,

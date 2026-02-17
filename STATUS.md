@@ -1,7 +1,7 @@
 # Project Status
 
 ## Last Completed
-- ENV-138: Created animated SVG terminal demo showing the 4-step envref workflow (init, ref://, store secret, resolve); embedded in README.md [iter-77]
+- ENV-150: Added security scanning — gosec via golangci-lint, govulncheck CI job, Dependabot for Go modules and GitHub Actions, `make security` target [iter-78]
 
 ## Current State
 - Go module `github.com/xcke/envref` initialized with Cobra + Viper + go-keyring + age + sqlite + testify + x/term dependencies
@@ -50,7 +50,8 @@
 - **MIT LICENSE** file included
 - `.env` file parser with full quote/multiline/comment/BOM/CRLF support
 - `ref://` URI parser with `FindAll` for embedded ref discovery, `Backend` interface, `Registry`, `NamespacedBackend`
-- GoReleaser config, GitHub Actions CI + release pipelines, Makefile with coverage targets
+- GoReleaser config, GitHub Actions CI + release + security pipelines, Makefile with coverage and security targets
+- **Security scanning:** gosec enabled in `.golangci.yml`, govulncheck + gosec CI workflow (push/PR/weekly cron), Dependabot for gomod + github-actions
 - Comprehensive test coverage across all packages
 - Fuzz tests for .env parser, ref:// URI parser, and variable interpolation
 - **Integration tests** for keychain backend (12 tests) with `//go:build integration` tag
