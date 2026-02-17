@@ -1,15 +1,20 @@
+version: "2"
+
 run:
   timeout: 5m
 
 linters:
   enable:
     - gosec
-
-linters-settings:
-  gosec:
-    excludes:
-      - G204  # Subprocess launched with variable — CLI tool executes user-specified commands by design
-      - G301  # Directory permissions — CLI tool creates project directories with standard 0755
-      - G302  # OpenFile permissions — CLI tool writes config/log files with standard 0644
-      - G304  # File inclusion via variable — CLI tool reads user-specified file paths by design
-      - G306  # WriteFile permissions — CLI tool writes .env/config files with standard 0644
+  settings:
+    gosec:
+      excludes:
+        - G101  # Hardcoded credentials — false positives on test data and struct field names
+        - G115  # Integer overflow conversion — safe uintptr→int for file descriptors
+        - G117  # Struct field matches secret pattern — false positive on backend config fields
+        - G204  # Subprocess launched with variable — CLI tool executes user-specified commands by design
+        - G301  # Directory permissions — CLI tool creates project directories with standard 0755
+        - G302  # OpenFile permissions — CLI tool writes config/log files with standard 0644
+        - G304  # File inclusion via variable — CLI tool reads user-specified file paths by design
+        - G306  # WriteFile permissions — CLI tool writes .env/config files with standard 0644
+        - G703  # Path traversal via taint — CLI tool reads user-specified file paths by design
