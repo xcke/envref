@@ -11,19 +11,15 @@ import (
 	"github.com/xcke/envref/internal/output"
 )
 
-// backendTypeInfo describes a supported backend type for display purposes.
-type backendTypeInfo struct {
-	Name        string
-	Description string
-}
-
-// supportedBackendTypes lists all known backend types with descriptions.
-var supportedBackendTypes = []backendTypeInfo{
-	{Name: "keychain", Description: "macOS Keychain / Linux secret-service"},
-	{Name: "1password", Description: "1Password CLI (op)"},
-	{Name: "aws-ssm", Description: "AWS Systems Manager Parameter Store"},
-	{Name: "oci-vault", Description: "Oracle Cloud Infrastructure Vault"},
-	{Name: "hashicorp-vault", Description: "HashiCorp Vault"},
+// backendDescriptions maps backend type names to human-readable descriptions.
+// The list of valid types is sourced from config.KnownBackendTypes; this map
+// only adds UX descriptions for display purposes.
+var backendDescriptions = map[string]string{
+	"keychain":        "macOS Keychain / Linux secret-service",
+	"1password":       "1Password CLI (op)",
+	"aws-ssm":         "AWS Systems Manager Parameter Store",
+	"oci-vault":       "Oracle Cloud Infrastructure Vault",
+	"hashicorp-vault": "HashiCorp Vault",
 }
 
 // newBackendCmd creates the backend command group for managing secret backends.
@@ -122,13 +118,12 @@ func printSupportedTypes(w *output.Writer) {
 	w.Info("Supported backend types:\n")
 
 	// Sort by name for consistent output.
-	sorted := make([]backendTypeInfo, len(supportedBackendTypes))
-	copy(sorted, supportedBackendTypes)
-	sort.Slice(sorted, func(i, j int) bool {
-		return sorted[i].Name < sorted[j].Name
-	})
+	sorted := make([]string, len(config.KnownBackendTypes))
+	copy(sorted, config.KnownBackendTypes)
+	sort.Strings(sorted)
 
-	for _, bt := range sorted {
-		w.Info("  %-20s %s\n", bt.Name, bt.Description)
+	for _, name := range sorted {
+		desc := backendDescriptions[name]
+		w.Info("  %-20s %s\n", name, desc)
 	}
 }
