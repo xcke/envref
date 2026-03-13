@@ -67,7 +67,7 @@ jobs:
         run: go tool cover -func=coverage/coverage.out | tail -1
 
       - name: Upload coverage profile
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: coverage-profile
           path: coverage/coverage.out
