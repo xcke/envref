@@ -29,11 +29,13 @@ builds:
 
 archives:
   - id: default
-    format: tar.gz
+    formats:
+      - tar.gz
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     format_overrides:
       - goos: windows
-        format: zip
+        formats:
+          - zip
     files:
       - LICENSE*
       - README*
@@ -59,43 +61,12 @@ brews:
     homepage: "https://github.com/xcke/envref"
     description: "CLI tool for separating config from secrets in .env files"
     license: "MIT"
+    skip_upload: "{{ if .Env.HOMEBREW_TAP_TOKEN }}false{{ else }}true{{ end }}"
     install: |
       bin.install "envref"
     test: |
       assert_match "envref", shell_output("#{bin}/envref --help")
 
-scoops:
-  - name: envref
-    repository:
-      owner: xcke
-      name: scoop-bucket
-      token: "{{ .Env.SCOOP_BUCKET_TOKEN }}"
-    homepage: "https://github.com/xcke/envref"
-    description: "CLI tool for separating config from secrets in .env files"
-    license: "MIT"
-    skip_upload: auto
-
-aurs:
-  - name: envref-bin
-    homepage: "https://github.com/xcke/envref"
-    description: "CLI tool for separating config from secrets in .env files"
-    license: "MIT"
-    maintainers:
-      - "xcke <xcke@users.noreply.github.com>"
-    contributors:
-      - "xcke <xcke@users.noreply.github.com>"
-    private_key: "{{ .Env.AUR_SSH_KEY }}"
-    git_url: "ssh://aur@aur.archlinux.org/envref-bin.git"
-    provides:
-      - envref
-    conflicts:
-      - envref
-    depends:
-      - glibc
-    package: |-
-      install -Dm755 "./envref" "${pkgdir}/usr/bin/envref"
-      install -Dm644 "./LICENSE" "${pkgdir}/usr/share/licenses/envref/LICENSE"
-      install -Dm644 "./README.md" "${pkgdir}/usr/share/doc/envref/README.md"
 
 release:
   github:
