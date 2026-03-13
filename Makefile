@@ -17,7 +17,7 @@ GO          := go
 LINT        := golangci-lint
 GOVULNCHECK := govulncheck
 
-.PHONY: all build test lint vet check security install clean help cover cover-html cover-func stats
+.PHONY: all build test lint vet check security install clean help cover cover-html cover-func stats release
 
 ## all: Run lint, test, and build (default target)
 all: check build
@@ -94,6 +94,20 @@ stats:
 	@printf "%-24s %s\n" "Dependencies (direct):" "$$(grep -c '^\t[^/]*/' go.mod 2>/dev/null || echo 0)"
 	@printf "%-24s %s\n" "Git commits:" "$$(git rev-list --count HEAD 2>/dev/null || echo '?')"
 	@printf "%-24s %s\n" "Version:" "$(VERSION)"
+
+## release: Create a new release (usage: make release v=0.6.0)
+release:
+ifndef v
+	$(error Usage: make release v=X.Y.Z)
+endif
+	@if [ -n "$$(git status --porcelain)" ]; then \
+		echo "Error: working tree is dirty — commit or stash changes first"; \
+		exit 1; \
+	fi
+	@echo "Creating release v$(v)..."
+	git tag -a "v$(v)" -m "Release v$(v)"
+	git push origin "v$(v)"
+	@echo "Pushed tag v$(v) — GitHub Actions will build and publish the release."
 
 ## help: Show this help message
 help:
