@@ -54,6 +54,7 @@ from your OS keychain or other secret backends at runtime.`,
 	rootCmd.AddCommand(newAuditLogCmd())
 	rootCmd.AddCommand(newSyncCmd())
 	rootCmd.AddCommand(newTeamCmd())
+	rootCmd.AddCommand(newBackendCmd())
 	rootCmd.AddCommand(newOnboardCmd())
 
 	return rootCmd
