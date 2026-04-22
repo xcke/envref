@@ -321,6 +321,61 @@ func TestEnv(t *testing.T) {
 		}
 	})
 
+	t.Run("Delete removes existing key", func(t *testing.T) {
+		env := NewEnv()
+		env.Set(parser.Entry{Key: "A", Value: "1", Line: 1})
+		env.Set(parser.Entry{Key: "B", Value: "2", Line: 2})
+		env.Set(parser.Entry{Key: "C", Value: "3", Line: 3})
+
+		ok := env.Delete("B")
+		if !ok {
+			t.Error("expected Delete to return true for existing key")
+		}
+		if env.Len() != 2 {
+			t.Fatalf("expected 2 entries, got %d", env.Len())
+		}
+		_, found := env.Get("B")
+		if found {
+			t.Error("expected B to be removed")
+		}
+		keys := env.Keys()
+		if len(keys) != 2 || keys[0] != "A" || keys[1] != "C" {
+			t.Errorf("unexpected keys after delete: %v", keys)
+		}
+	})
+
+	t.Run("Delete returns false for missing key", func(t *testing.T) {
+		env := NewEnv()
+		env.Set(parser.Entry{Key: "A", Value: "1", Line: 1})
+
+		ok := env.Delete("MISSING")
+		if ok {
+			t.Error("expected Delete to return false for missing key")
+		}
+		if env.Len() != 1 {
+			t.Errorf("expected 1 entry, got %d", env.Len())
+		}
+	})
+
+	t.Run("Delete ref entry decrements refCount", func(t *testing.T) {
+		env := NewEnv()
+		env.Set(parser.Entry{Key: "PLAIN", Value: "val", Line: 1})
+		env.Set(parser.Entry{Key: "SECRET", Value: "ref://secrets/key", Line: 2, IsRef: true})
+
+		if !env.HasRefs() {
+			t.Fatal("expected HasRefs() true before delete")
+		}
+
+		env.Delete("SECRET")
+
+		if env.HasRefs() {
+			t.Error("expected HasRefs() false after deleting the only ref")
+		}
+		if env.Len() != 1 {
+			t.Errorf("expected 1 entry, got %d", env.Len())
+		}
+	})
+
 	t.Run("All returns entries in order", func(t *testing.T) {
 		env := NewEnv()
 		env.Set(parser.Entry{Key: "B", Value: "2", Line: 1})

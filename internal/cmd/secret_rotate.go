@@ -177,6 +177,11 @@ func runSecretRotate(cmd *cobra.Command, key string, length int, charset, backen
 		Profile:   effectiveProfile,
 	})
 
+	// Update the .env file with a ref:// entry.
+	if err := syncEnvRef(cmd, cfg, configDir, key, backendName, effectiveProfile); err != nil {
+		output.NewWriter(cmd).Warn("could not update .env file: %v\n", err)
+	}
+
 	if printVal {
 		_, _ = fmt.Fprintln(cmd.OutOrStdout(), newValue)
 	}

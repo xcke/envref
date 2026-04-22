@@ -36,6 +36,8 @@ Secrets are namespaced by project name from .envref.yaml.`,
 		},
 	}
 
+	cmd.PersistentFlags().Bool("no-env", false, "skip automatic .env file update")
+
 	cmd.AddCommand(newSecretSetCmd())
 	cmd.AddCommand(newSecretGetCmd())
 	cmd.AddCommand(newSecretDeleteCmd())
@@ -374,6 +376,11 @@ func runSecretDelete(cmd *cobra.Command, key, backendName string, force bool, pr
 		Profile:   effectiveProfile,
 	})
 
+	// Remove the ref:// entry from the .env file.
+	if err := removeEnvRef(cmd, cfg, configDir, key, effectiveProfile); err != nil {
+		output.NewWriter(cmd).Warn("could not update .env file: %v\n", err)
+	}
+
 	output.NewWriter(cmd).Info("secret %q deleted from %s\n", key, scopeLabel)
 	return nil
 }
@@ -489,6 +496,11 @@ func runSecretSet(cmd *cobra.Command, key, value, backendName, profile string) e
 		Project:   cfg.Project,
 		Profile:   effectiveProfile,
 	})
+
+	// Update the .env file with a ref:// entry.
+	if err := syncEnvRef(cmd, cfg, configDir, key, backendName, effectiveProfile); err != nil {
+		output.NewWriter(cmd).Warn("could not update .env file: %v\n", err)
+	}
 
 	scopeLabel := fmt.Sprintf("backend %q", backendName)
 	if effectiveProfile != "" {
@@ -658,6 +670,11 @@ func runSecretGenerate(cmd *cobra.Command, key string, length int, charset, back
 		Project:   cfg.Project,
 		Profile:   effectiveProfile,
 	})
+
+	// Update the .env file with a ref:// entry.
+	if err := syncEnvRef(cmd, cfg, configDir, key, backendName, effectiveProfile); err != nil {
+		output.NewWriter(cmd).Warn("could not update .env file: %v\n", err)
+	}
 
 	if printVal {
 		_, _ = fmt.Fprintln(cmd.OutOrStdout(), value)
@@ -864,6 +881,11 @@ func runSecretCopy(cmd *cobra.Command, key, fromProject, backendName, profile, f
 		Profile:   effectiveProfile,
 		Detail:    detail,
 	})
+
+	// Update the .env file with a ref:// entry.
+	if err := syncEnvRef(cmd, cfg, configDir, key, backendName, effectiveProfile); err != nil {
+		output.NewWriter(cmd).Warn("could not update .env file: %v\n", err)
+	}
 
 	dstLabel := fmt.Sprintf("%q", cfg.Project)
 	if effectiveProfile != "" {

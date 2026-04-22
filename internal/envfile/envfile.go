@@ -62,6 +62,25 @@ func (e *Env) Get(key string) (parser.Entry, bool) {
 	return entry, ok
 }
 
+// Delete removes the entry for the given key. Returns true if the key existed.
+func (e *Env) Delete(key string) bool {
+	existing, ok := e.entries[key]
+	if !ok {
+		return false
+	}
+	if existing.IsRef {
+		e.refCount--
+	}
+	delete(e.entries, key)
+	for i, k := range e.order {
+		if k == key {
+			e.order = append(e.order[:i], e.order[i+1:]...)
+			break
+		}
+	}
+	return true
+}
+
 // Keys returns all keys in insertion order.
 func (e *Env) Keys() []string {
 	result := make([]string, len(e.order))
